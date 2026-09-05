@@ -25,6 +25,10 @@ import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -71,6 +75,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web.addJavascriptInterface(new TtsBridge(), "AndroidTTS");
         web.addJavascriptInterface(new FileBridge(), "AndroidFile");
         web.addJavascriptInterface(new DictionaryBridge(), "AndroidDictionary");
+        web.addJavascriptInterface(new SpellBridge(), "AndroidSpell");
         loadBundledDictionary();
         loadSavedDictionary();
 
@@ -154,6 +159,26 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     runJs("window.onNativeFileError && window.onNativeFileError('Не удалось открыть выбор файла')");
                 }
             });
+        }
+    }
+
+    public class SpellBridge {
+        @JavascriptInterface
+        public void check(final String text, final String requestId) {
+            final String source = text == null ? "" : text;
+            final String id = requestId == null ? "" : requestId;
+            if (source.trim().isEmpty()) {
+                runJs("window.onNativeSpellResult && window.onNativeSpellResult(" + JSONObject.quote(id) + ",[])");
+                return;
+            }
+            new Thread(() -> {
+                try {
+                    JSONArray result = checkSpellingOnline(source);
+                    runJs("window.onNativeSpellResult && window.onNativeSpellResult(" + JSONObject.quote(id) + "," + result.toString() + ")");
+                } catch (Exception e) {
+                    runJs("window.onNativeSpellError && window.onNativeSpellError(" + JSONObject.quote(id) + ",'Не удалось обратиться к Яндекс.Спеллеру. Проверьте интернет.')");
+                }
+            }, "dzen-speller").start();
         }
     }
 
@@ -433,6 +458,76 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (current == null) current = new ArrayList<>();
         for (String v : vals) addSyn(current, v);
         if (!current.isEmpty()) out.put(k, current);
+    }
+
+    private static class SpellChunk {
+        final int start;
+        final String text;
+        SpellChunk(int start, String text) { this.start = start; this.text = text; }
+    }
+
+    private List<SpellChunk> splitForSpeller(String text) {
+        final int maxChars = 7000;
+        List<SpellChunk> out = new ArrayList<>();
+        int start = 0;
+        while (start < text.length()) {
+            int end = Math.min(text.length(), start + maxChars);
+            if (end < text.length()) {
+                int best = -1;
+                for (int i = end; i > start + maxChars / 2; i--) {
+                    char c = text.charAt(i - 1);
+                    if (c == '\n' || Character.isWhitespace(c)) { best = i; break; }
+                }
+                if (best > start) end = best;
+            }
+            out.add(new SpellChunk(start, text.substring(start, end)));
+            start = end;
+        }
+        return out;
+    }
+
+    private JSONArray checkSpellingOnline(String text) throws Exception {
+        JSONArray result = new JSONArray();
+        for (SpellChunk chunk : splitForSpeller(text)) {
+            String body = "text=" + URLEncoder.encode(chunk.text, "UTF-8") + "&lang=ru&options=6&format=plain";
+            byte[] payload = body.getBytes(StandardCharsets.UTF_8);
+            HttpURLConnection conn = (HttpURLConnection) new URL("https://speller.yandex.net/services/spellservice.json/checkText").openConnection();
+            conn.setRequestMethod("POST");
+            conn.setConnectTimeout(12000);
+            conn.setReadTimeout(18000);
+            conn.setDoOutput(true);
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+            conn.setRequestProperty("Accept", "application/json");
+            conn.setRequestProperty("User-Agent", "Dzen-Text/1.5.0 Android");
+            conn.setFixedLengthStreamingMode(payload.length);
+            try (OutputStream os = conn.getOutputStream()) { os.write(payload); }
+            int code = conn.getResponseCode();
+            InputStream response = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+            if (response == null) { conn.disconnect(); throw new Exception("HTTP " + code); }
+            byte[] bytes;
+            try (InputStream in = response; ByteArrayOutputStream buf = new ByteArrayOutputStream()) {
+                byte[] tmp = new byte[4096]; int n;
+                while ((n = in.read(tmp)) != -1) buf.write(tmp, 0, n);
+                bytes = buf.toByteArray();
+            } finally { conn.disconnect(); }
+            if (code < 200 || code >= 300) throw new Exception("HTTP " + code);
+            JSONArray errors = new JSONArray(new String(bytes, StandardCharsets.UTF_8));
+            for (int i = 0; i < errors.length(); i++) {
+                JSONObject e = errors.optJSONObject(i);
+                if (e == null) continue;
+                int pos = e.optInt("pos", -1), len = e.optInt("len", 0);
+                if (pos < 0 || len <= 0) continue;
+                JSONObject item = new JSONObject();
+                item.put("start", chunk.start + pos);
+                item.put("end", chunk.start + pos + len);
+                item.put("word", e.optString("word", ""));
+                item.put("code", e.optInt("code", 0));
+                JSONArray suggestions = e.optJSONArray("s");
+                item.put("suggestions", suggestions == null ? new JSONArray() : suggestions);
+                result.put(item);
+            }
+        }
+        return result;
     }
 
     private String readDisplayName(Uri uri) {
