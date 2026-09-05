@@ -13,25 +13,25 @@ android {
         applicationId 'ru.dzenprep.texteditor'
         minSdk 24
         targetSdk 35
-        versionCode 15
-        versionName '1.3.2'
+        versionCode 16
+        versionName '1.3.3'
     }
 
     signingConfigs {
         release {
-  if (keystorePath) {
-      storeFile file(keystorePath)
-      storePassword keystorePassword
-      keyAlias keystoreAlias
-      keyPassword keyPassword
-  }
+            if (keystorePath) {
+                storeFile file(keystorePath)
+                storePassword keystorePassword
+                keyAlias keystoreAlias
+                keyPassword keyPassword
+            }
         }
     }
 
     buildTypes {
         release {
-  if (keystorePath) signingConfig signingConfigs.release
-  minifyEnabled false
+            if (keystorePath) signingConfig signingConfigs.release
+            minifyEnabled false
         }
     }
 }
