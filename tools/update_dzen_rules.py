@@ -20,12 +20,12 @@ from html.parser import HTMLParser
 from pathlib import Path
 
 SOURCE_URL = os.getenv("DZEN_RULES_SOURCE_URL", "https://dzen.ru/help/ru/requirements/rules.html")
-PRIMARY_MODEL = os.getenv("DZEN_RULES_MODEL", "openai/gpt-oss-20b:free")
+PRIMARY_MODEL = os.getenv("DZEN_RULES_MODEL", "openrouter/free")
 FALLBACK_MODEL = "openrouter/free"
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 RULES_PATH = Path("rules/dzen-rules.json")
 FORCE = os.getenv("FORCE_REBUILD", "").lower() in {"1", "true", "yes"}
-PROMPT_VERSION = 2
+PROMPT_VERSION = 3
 
 
 class TextExtractor(HTMLParser):
@@ -128,6 +128,11 @@ def prompt_for(source_text: str) -> tuple[str, str]:
 5. article_title_max_chars укажи только если в источнике явно назван лимит заголовка статьи; иначе 0.
 6. manual_checks — то, что локальный анализ текста надежно определить не может (например, права на медиа, фактическую достоверность, внешний дубль).
 7. Все строки — на русском, кроме технических id в snake_case.
+8. phrases — только высокоточные сигналы. Нейтральное упоминание темы само по себе не должно давать предупреждение. Не помещай в phrases обычные формулировки вроде указания источника, доказательной медицины, призыва подписаться/поставить лайк или бесплатного курса, если сам официальный источник прямо не объявляет именно такую формулировку нарушением.
+9. Не пытайся автоматически определять неоригинальность, внешние дубли и авторские права по словам внутри статьи: такие пункты отправляй в manual_checks.
+10. stems должны быть достаточно специфичными. Не используй основы короче 4 символов и обычные куски распространённых слов. Запрещены двусмысленные основы вроде «тот», «бот», «бад».
+11. Для кликбейта используй scope=title, если официальный текст описывает проблему заголовка/карточки. Для широких тематических категорий предпочитай min_score 3–4.
+12. Лучше пропустить слабый сигнал, чем сделать базу, которая красит обычный безопасный текст. База должна помогать автору, а не пугать ложными совпадениями.
 """
     user = "ОФИЦИАЛЬНЫЙ ТЕКСТ ПРАВИЛ ДЗЕНА:\n\n" + source_text
     return system, user
@@ -194,6 +199,64 @@ def clean_list(value, limit=40, max_len=100):
     return out
 
 
+
+NEUTRAL_PHRASES = {
+    "доказательная медицина", "назначение лекарств", "народная медицина",
+    "источник:", "подлинная история", "подпишитесь на канал", "ставьте лайк",
+    "бесплатный курс"
+}
+DROP_STEMS = {"тот", "бот", "бад"}
+MANUAL_DEFAULTS = [
+    "Неоригинальный или дублированный контент — для надёжной проверки нужны внешние публикации, а не слова внутри статьи.",
+    "Авторские права на текст, изображения и видео — автоматически по тексту статьи не определяются.",
+    "Достоверность фактических утверждений — требует сверки с внешними источниками.",
+    "Соответствие заголовка содержанию — локальная эвристика видит отдельные признаки, но не понимает весь смысл статьи."
+]
+TITLE_OVERRIDES = {
+    "azartnye_igry": "Азартные игры — проверить контекст",
+    "nenavist_nasilie": "Вражда или насилие — проверить контекст",
+    "iskusstvennye_pokazateli": "Искусственная активность — проверить",
+    "klikbeit": "Возможный кликбейт",
+    "medicina": "Медицинские рекомендации — проверить",
+    "nezakonnaya_informaciya": "Потенциально незаконная информация — проверить",
+    "otkrovennyy_kontent": "Откровенный контент — проверить",
+    "proisshestviya_tragedii": "Трагический контент — проверить",
+    "spam": "Возможный спам или навязчивый призыв",
+    "shok_kontent": "Шокирующий контент — проверить"
+}
+
+
+def apply_guardrails(cat: dict):
+    ident = str(cat.get("id", ""))
+    low_id = ident.lower()
+    if any(x in low_id for x in ("neoriginal", "duplicate", "dubl", "copyright")):
+        return None
+    cat = dict(cat)
+    cat["phrases"] = [x for x in clean_list(cat.get("phrases")) if x not in NEUTRAL_PHRASES]
+    cat["stems"] = [x for x in clean_list(cat.get("stems"), max_len=40) if len(x) >= 4 and x not in DROP_STEMS]
+    cat["action_words"] = clean_list(cat.get("action_words"), max_len=60)
+    cat["context_words"] = clean_list(cat.get("context_words"), max_len=60)
+    cat["exclude_words"] = clean_list(cat.get("exclude_words"), max_len=100)
+    cat["min_score"] = max(3, min(5, int(cat.get("min_score", 3))))
+    if low_id in {"medicina", "spam", "proisshestviya_tragedii", "shok_kontent"}:
+        cat["min_score"] = max(4, cat["min_score"])
+    if "klik" in low_id or "clickbait" in low_id:
+        cat["scope"] = "title"
+    if ident in TITLE_OVERRIDES:
+        cat["title"] = TITLE_OVERRIDES[ident]
+    if not cat["phrases"] and not cat["stems"]:
+        return None
+    return cat
+
+
+def add_manual_defaults(items):
+    out = []
+    for x in list(items or []) + MANUAL_DEFAULTS:
+        text = re.sub(r"\s+", " ", str(x)).strip()[:260]
+        if text and text not in out:
+            out.append(text)
+    return out[:20]
+
 def validate_and_wrap(generated: dict, source_hash: str, model_used: str) -> dict:
     if not isinstance(generated, dict):
         raise ValueError("Model output is not an object")
@@ -221,7 +284,8 @@ def validate_and_wrap(generated: dict, source_hash: str, model_used: str) -> dic
             "min_score": max(1, min(5, int(raw.get("min_score", 2)))),
             "explanation": re.sub(r"\s+", " ", str(raw.get("explanation", "Проверьте фрагмент в контексте правил Дзена."))).strip()[:300],
         }
-        if cat["phrases"] or cat["stems"]:
+        cat = apply_guardrails(cat)
+        if cat:
             categories.append(cat)
     if len(categories) < 3:
         raise ValueError(f"Too few usable categories: {len(categories)}")
@@ -230,6 +294,7 @@ def validate_and_wrap(generated: dict, source_hash: str, model_used: str) -> dic
         s = re.sub(r"\s+", " ", str(x)).strip()[:260]
         if s and s not in manual:
             manual.append(s)
+    manual = add_manual_defaults(manual)
     title_limit = int(generated.get("article_title_max_chars") or 0)
     if not 0 <= title_limit <= 300:
         title_limit = 0
@@ -244,6 +309,7 @@ def validate_and_wrap(generated: dict, source_hash: str, model_used: str) -> dic
             "provider": "OpenRouter",
             "model": model_used,
             "prompt_version": PROMPT_VERSION,
+            "guardrails_version": 1,
         },
         "privacy": "OpenRouter receives only the official Dzen rules page. User articles are never sent by this updater.",
         "note": "Локальная эвристическая проверка. Совпадение означает возможный риск, а не установленное нарушение.",
