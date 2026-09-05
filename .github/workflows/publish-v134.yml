@@ -1,0 +1,82 @@
+name: Publish v1.3.4
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v134.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: v1.3.4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dzen-text-release.jks"
+          test -s "$RUNNER_TEMP/dzen-text-release.jks"
+
+      - name: Build signed v1.3.4 APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dzen-text-release.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          grep -q "versionCode 17" app/build.gradle
+          grep -q "versionName '1.3.4'" app/build.gradle
+          gradle --no-daemon :app:assembleRelease
+
+      - name: Verify permanent signature
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose "$APK"
+          CERT_INFO=$("$APKSIGNER" verify --print-certs "$APK")
+          NORMALIZED=$(printf '%s' "$CERT_INFO" | tr '[:upper:]' '[:lower:]' | tr -d ':')
+          echo "$NORMALIZED" | grep -q '0fd2d2518979f8db3ff5ccd6da29669a3e8de10fbcc35156de8396d3dba3f2b2'
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/release/app-release.apk Dzen-Text-v1.3.4.apk
+          if gh release view v1.3.4 >/dev/null 2>&1; then
+            gh release upload v1.3.4 Dzen-Text-v1.3.4.apk --clobber
+          else
+            gh release create v1.3.4 Dzen-Text-v1.3.4.apk \
+              --title "Дзен Текст v1.3.4" \
+              --notes "Добавлен накопитель собственных синонимов. Ручные замены из поля «Своя замена» автоматически сохраняются на устройстве и в дальнейшем показываются первыми для этого слова. В настройках словаря отображается число накопленных пар, их список и кнопка очистки. Данные сохраняются при обновлении приложения."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Dzen-Text-v1.3.4
+          path: Dzen-Text-v1.3.4.apk
