@@ -1,0 +1,41 @@
+from pathlib import Path
+
+html = Path('app/src/main/assets/www/index.html')
+s = html.read_text(encoding='utf-8')
+
+def rep(old, new, label):
+    global s
+    if old not in s:
+        raise SystemExit(f'Patch marker not found: {label}')
+    s = s.replace(old, new, 1)
+
+rep('<title>Дзен Текст 1.6.0</title>', '<title>Дзен Текст 1.6.1</title>', 'html version')
+
+marker = 'function analyzeDzenRules(src,headings,issues){'
+helper = r'''function analyzeDzenCoreSignals(src,titleObj,issues){
+ const overlaps=(start,end)=>issues.some(x=>x.type==='dzen'&&Number.isFinite(x.start)&&Number.isFinite(x.end)&&x.start<end&&x.end>start);
+ const prof=/(?:^|[^А-Яа-яЁё])((?:хуй|хуя|хуем|хуём|хуи|хуями|хуёв[А-Яа-яЁё]*|хуев[А-Яа-яЁё]*|нихуя|дохуя|нахуй|похуй|оху[А-Яа-яЁё]+|хуйн[А-Яа-яЁё]*|пизд[А-Яа-яЁё]*|ебан[А-Яа-яЁё]*|ёбан[А-Яа-яЁё]*|ебат[А-Яа-яЁё]*|ёбат[А-Яа-яЁё]*|ебуч[А-Яа-яЁё]*|ёбуч[А-Яа-яЁё]*|блят[А-Яа-яЁё]*|бляд[А-Яа-яЁё]*))(?![А-Яа-яЁё])/giu;
+ let shown=0;for(const m of src.matchAll(prof)){if(shown>=4)break;const word=m[1]||'',at=(m.index||0)+m[0].lastIndexOf(word),en=at+word.length;if(overlaps(at,en))continue;addSimpleIssue(issues,'dzen','Возможная ненормативная лексика',`Найдено «${word}». Проверьте допустимость формулировки перед публикацией`,at,en,'critical');shown++}
+ if(titleObj){const lower=titleObj.text.toLocaleLowerCase('ru-RU');const phrases=['самое лучшее','лучшее решение в мире','вы не поверите','никто не расскажет','от вас скрывают','шокирующая правда','это изменит вашу жизнь'];for(const ph of phrases){const p=lower.indexOf(ph);if(p<0)continue;const at=titleObj.start+p,en=at+ph.length;if(!overlaps(at,en))addSimpleIssue(issues,'dzen','Возможный кликбейт',`Сильная оценочная формулировка «${ph}». Проверьте, подтверждает ли её содержание статьи`,at,en,'warning');break}}
+}
+'''
+rep(marker, helper + marker, 'core signal helper')
+
+old = "if(Number(r.schema)===2)analyzeDzenSchema2(src,headings,issues,r,titleObj);else analyzeDzenLegacy(src,issues,r);const urls="
+new = "if(Number(r.schema)===2)analyzeDzenSchema2(src,headings,issues,r,titleObj);else analyzeDzenLegacy(src,issues,r);analyzeDzenCoreSignals(src,titleObj,issues);const urls="
+rep(old, new, 'core signal call')
+
+html.write_text(s, encoding='utf-8')
+
+gradle = Path('app/build.gradle')
+g = gradle.read_text(encoding='utf-8')
+if "versionCode 24" not in g or "versionName '1.6.0'" not in g:
+    raise SystemExit('Unexpected app version in build.gradle')
+g = g.replace('versionCode 24', 'versionCode 25', 1).replace("versionName '1.6.0'", "versionName '1.6.1'", 1)
+gradle.write_text(g, encoding='utf-8')
+
+assert 'хуев[А-Яа-яЁё]*' in s
+assert 'хуя' in s
+assert "'самое лучшее'" in s
+assert 'analyzeDzenCoreSignals(src,titleObj,issues)' in s
+print('Patched Dzen core checks and bumped to 1.6.1')
