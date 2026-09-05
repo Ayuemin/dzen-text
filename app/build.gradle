@@ -3,7 +3,7 @@ plugins { id 'com.android.application' }
 def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
 def keystoreAlias = System.getenv('ANDROID_KEY_ALIAS')
 def keystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
-def keyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
 
 android {
     namespace 'ru.dzenprep.texteditor'
@@ -23,7 +23,7 @@ android {
                 storeFile file(keystorePath)
                 storePassword keystorePassword
                 keyAlias keystoreAlias
-                keyPassword keyPassword
+                keyPassword keyPasswordValue
             }
         }
     }
