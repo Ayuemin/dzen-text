@@ -1,0 +1,120 @@
+name: Implement nearby repeat view v1.3.5 fixed
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/implement-nearby-v135-fixed.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch files
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import base64
+          d=lambda x: base64.b64decode(x).decode('utf-8')
+          p=Path('app/src/main/assets/www/index.html')
+          s=p.read_text(encoding='utf-8')
+          def rep(old,new,label):
+              global s
+              if old not in s:
+                  raise SystemExit('anchor not found: '+label)
+              s=s.replace(old,new,1)
+          rep('<title>Дзен Текст 1.3.4</title>','<title>Дзен Текст 1.3.5</title>','title')
+          ca=d('LmZpbGVJbnB1dHtkaXNwbGF5Om5vbmV9LmRpY3RTdGF0dXN7Zm9udC1zaXplOjEycHg7Y29sb3I6dmFyKC0tbXV0ZWQpO21hcmdpbjo3cHggMCA4cHh9LmRpY3RTdGF0dXMgYntjb2xvcjp2YXIoLS10ZXh0KX0=')
+          ci=d('Lm5lYXJieVBhbmVse3Bvc2l0aW9uOmFic29sdXRlO2xlZnQ6MTBweDtyaWdodDoxMHB4O2JvdHRvbTo4cHg7ei1pbmRleDo3O2JhY2tncm91bmQ6dmFyKC0tc3VyZmFjZSk7Ym9yZGVyOjFweCBzb2xpZCB2YXIoLS1ib3JkZXIpO2JvcmRlci1yYWRpdXM6MTZweDtib3gtc2hhZG93OjAgMTBweCAzNXB4IHJnYmEoMCwwLDAsLjI0KTtwYWRkaW5nOjExcHg7ZGlzcGxheTpub25lO21heC1oZWlnaHQ6MzAwcHg7b3ZlcmZsb3c6YXV0b30ubmVhcmJ5UGFuZWwub3BlbntkaXNwbGF5OmJsb2NrfS5uZWFyYnlIZWFke2Rpc3BsYXk6ZmxleDthbGlnbi1pdGVtczpjZW50ZXI7Z2FwOjhweDttYXJnaW4tYm90dG9tOjhweH0ubmVhcmJ5VGl0bGV7Zm9udC1zaXplOjEzcHg7Y29sb3I6dmFyKC0tbXV0ZWQpO21pbi13aWR0aDowO2ZsZXg6MX0ubmVhcmJ5VGl0bGUgYntjb2xvcjp2YXIoLS10ZXh0KTtmb250LXNpemU6MTVweH0ubmVhcmJ5U2VudGVuY2V7ZGlzcGxheTpibG9jazt3aWR0aDoxMDAlO3RleHQtYWxpZ246bGVmdDtib3JkZXI6MXB4IHNvbGlkIHZhcigtLWJvcmRlcik7YmFja2dyb3VuZDp2YXIoLS1zdXJmYWNlMik7Y29sb3I6dmFyKC0tdGV4dCk7Ym9yZGVyLXJhZGl1czoxMXB4O3BhZGRpbmc6MTBweCAxMXB4O21hcmdpbjo3cHggMDtmb250LXNpemU6MTNweDtsaW5lLWhlaWdodDoxLjQ1fS5uZWFyYnlTZW50ZW5jZTphY3RpdmV7Ym9yZGVyLWNvbG9yOnZhcigtLWFjY2VudCl9Lm5lYXJieUxhYmVse2Rpc3BsYXk6YmxvY2s7Y29sb3I6dmFyKC0tbXV0ZWQpO2ZvbnQtc2l6ZToxMXB4O21hcmdpbi1ib3R0b206NHB4fS5uZWFyYnlIaXR7Y29sb3I6dmFyKC0tYWNjZW50KTtmb250LXdlaWdodDo4MDA7dGV4dC1kZWNvcmF0aW9uOnVuZGVybGluZTt0ZXh0LWRlY29yYXRpb24tdGhpY2tuZXNzOjJweDt0ZXh0LXVuZGVybGluZS1vZmZzZXQ6M3B4O2JhY2tncm91bmQ6dmFyKC0tYWNjZW50U29mdCk7Ym9yZGVyLXJhZGl1czo0cHg7cGFkZGluZzowIDJweH0ubmVhcmJ5QWN0aW9uc3tkaXNwbGF5OmZsZXg7Z2FwOjdweDtmbGV4LXdyYXA6d3JhcDttYXJnaW4tdG9wOjhweH0ubmVhcmJ5QWN0aW9ucyAubmF0aXZlQnRue2ZsZXg6MTttaW4td2lkdGg6MTMwcHh9LmFuYWx5c2lzUm93Lm5lYXJieVdvcmQgLndhcm57dGV4dC1kZWNvcmF0aW9uOnVuZGVybGluZTt0ZXh0LWRlY29yYXRpb24tdGhpY2tuZXNzOjJweDt0ZXh0LXVuZGVybGluZS1vZmZzZXQ6M3B4fQo=')
+          rep(ca,ci+ca,'css')
+          ma=d('ICAgICAgPGRpdiBjbGFzcz0icmVwbGFjZU5vdGUiPtCf0L7QtNCx0LjRgNCw0Y4g0YTQvtGA0LzRgyDQu9C+0LrQsNC70YzQvdC+LiDQn9C+0YHQu9C1INC30LDQvNC10L3RiyDQu9GD0YfRiNC1INC/0YDQvtCy0LXRgNC40YLRjCDRgdC+0LPQu9Cw0YHQvtCy0LDQvdC40LUg0YHQu9C+0LLQsCDRgSDRgdC+0YHQtdC00L3QuNC80Lgg0YHQu9C+0LLQsNC80LguPC9kaXY+CiAgICA8L2Rpdj4KICA8L21haW4+')
+          mi=d('ICAgICAgPGRpdiBjbGFzcz0icmVwbGFjZU5vdGUiPtCf0L7QtNCx0LjRgNCw0Y4g0YTQvtGA0LzRgyDQu9C+0LrQsNC70YzQvdC+LiDQn9C+0YHQu9C1INC30LDQvNC10L3RiyDQu9GD0YfRiNC1INC/0YDQvtCy0LXRgNC40YLRjCDRgdC+0LPQu9Cw0YHQvtCy0LDQvdC40LUg0YHQu9C+0LLQsCDRgSDRgdC+0YHQtdC00L3QuNC80Lgg0YHQu9C+0LLQsNC80LguPC9kaXY+CiAgICA8L2Rpdj4KICAgIDxkaXYgaWQ9Im5lYXJieVBhbmVsIiBjbGFzcz0ibmVhcmJ5UGFuZWwiIGFyaWEtbGl2ZT0icG9saXRlIj4KICAgICAgPGRpdiBjbGFzcz0ibmVhcmJ5SGVhZCI+PGRpdiBjbGFzcz0ibmVhcmJ5VGl0bGUiPtCf0L7QstGC0L7RgCDRgNGP0LTQvtC8OiA8YiBpZD0ibmVhcmJ5V29yZCI+4oCUPC9iPjxkaXY+0J7QtNC90L4g0YHQu9C+0LLQviDQvdCw0LnQtNC10L3QviDQsiDQtNCy0YPRhSDRgdC+0YHQtdC00L3QuNGFINC/0YDQtdC00LvQvtC20LXQvdC40Y/RhTwvZGl2PjwvZGl2PjxidXR0b24gY2xhc3M9Im1pbmlJY29uIiBvbmNsaWNrPSJjbG9zZU5lYXJieVJlcGVhdCgpIiBhcmlhLWxhYmVsPSLQl9Cw0LrRgNGL0YLRjCI+w5c8L2J1dHRvbj48L2Rpdj4KICAgICAgPGJ1dHRvbiBpZD0ibmVhcmJ5Rmlyc3QiIGNsYXNzPSJuZWFyYnlTZW50ZW5jZSIgb25jbGljaz0ianVtcE5lYXJieVJlcGVhdCgwKSI+PC9idXR0b24+CiAgICAgIDxidXR0b24gaWQ9Im5lYXJieVNlY29uZCIgY2xhc3M9Im5lYXJieVNlbnRlbmNlIiBvbmNsaWNrPSJqdW1wTmVhcmJ5UmVwZWF0KDEpIj48L2J1dHRvbj4KICAgICAgPGRpdiBjbGFzcz0ibmVhcmJ5QWN0aW9ucyI+PGJ1dHRvbiBjbGFzcz0ibmF0aXZlQnRuIiB0eXBlPSJidXR0b24iIG9uY2xpY2s9InJlcGxhY2VOZWFyYnlSZXBlYXQoMCkiPtCX0LDQvNC10L3QuNGC0Ywg0L/QtdGA0LLQvtC1PC9idXR0b24+PGJ1dHRvbiBjbGFzcz0ibmF0aXZlQnRuIiB0eXBlPSJidXR0b24iIG9uY2xpY2s9InJlcGxhY2VOZWFyYnlSZXBlYXQoMSkiPtCX0LDQvNC10L3QuNGC0Ywg0LLRgtC+0YDQvtC1PC9idXR0b24+PC9kaXY+CiAgICAgIDxkaXYgY2xhc3M9InJlcGxhY2VOb3RlIj7Qn9C+0LLRgtC+0YDRj9GO0YnQtdC10YHRjyDRgdC70L7QstC+INC/0L7QtNGH0ZHRgNC60L3Rg9GC0L4g0LIg0L7QsdC+0LjRhSDQv9GA0LXQtNC70L7QttC10L3QuNGP0YUuINCd0LDQttC80LjRgtC1INC90LAg0L/RgNC10LTQu9C+0LbQtdC90LjQtSwg0YfRgtC+0LHRiyDQv9C10YDQtdC50YLQuCDQuiDRgdC+0L7RgtCy0LXRgtGB0YLQstGD0Y7RidC10LzRgyDQvNC10YHRgtGDINGC0LXQutGB0YLQsC48L2Rpdj4KICAgIDwvZGl2PgogIDwvbWFpbj4=')
+          rep(ma,mi,'markup')
+          on=d('IGlmKHNldHRpbmdzLm5lYXJieUNoZWNrKXtsZXQgbj0wO2ZvcihsZXQgaT0xO2k8c2VudGVuY2VzLmxlbmd0aCYmbjwyMDtpKyspe2NvbnN0IHByZXY9bmV3IFNldCh3b3JkTWF0Y2hlcyhzZW50ZW5jZXNbaS0xXS50ZXh0KS5tYXAobT0+bVswXS50b0xvY2FsZUxvd2VyQ2FzZSgncnUtUlUnKSkuZmlsdGVyKHc9PncubGVuZ3RoPj01JiYhc3RvcFdvcmRzLmhhcyh3KSkpO2NvbnN0IGN1cj13b3JkTWF0Y2hlcyhzZW50ZW5jZXNbaV0udGV4dCk7Y29uc3QgdXNlZD1uZXcgU2V0KCk7Zm9yKGNvbnN0IG0gb2YgY3VyKXtjb25zdCB3PW1bMF0udG9Mb2NhbGVMb3dlckNhc2UoJ3J1LVJVJyk7aWYocHJldi5oYXModykmJiF1c2VkLmhhcyh3KSYmdy5sZW5ndGg+PTUmJiFzdG9wV29yZHMuaGFzKHcpKXt1c2VkLmFkZCh3KTtjb25zdCBzdGFydD1zZW50ZW5jZXNbaV0uc3RhcnQrbS5pbmRleDthZGRJc3N1ZShpc3N1ZXMsJ25lYXJieScsYNCf0L7QstGC0L7RgCDRgNGP0LTQvtC8OiDCqyR7bVswXX3Cu2Asc2hvcnRDb250ZXh0KHNyYyxzdGFydCxzdGFydCttWzBdLmxlbmd0aCksc3RhcnQsc3RhcnQrbVswXS5sZW5ndGgpO2lzc3Vlc1tpc3N1ZXMubGVuZ3RoLTFdLndvcmQ9bVswXTtuKys7aWYobj49MjApYnJlYWt9fX19')
+          nn=d('IGlmKHNldHRpbmdzLm5lYXJieUNoZWNrKXtsZXQgbj0wO2ZvcihsZXQgaT0xO2k8c2VudGVuY2VzLmxlbmd0aCYmbjwyMDtpKyspe2NvbnN0IHByZXZNYXRjaGVzPXdvcmRNYXRjaGVzKHNlbnRlbmNlc1tpLTFdLnRleHQpLHByZXZNYXA9bmV3IE1hcCgpO2Zvcihjb25zdCBwbSBvZiBwcmV2TWF0Y2hlcyl7Y29uc3QgcHc9cG1bMF0udG9Mb2NhbGVMb3dlckNhc2UoJ3J1LVJVJyk7aWYocHcubGVuZ3RoPj01JiYhc3RvcFdvcmRzLmhhcyhwdykmJiFwcmV2TWFwLmhhcyhwdykpcHJldk1hcC5zZXQocHcscG0pfWNvbnN0IGN1cj13b3JkTWF0Y2hlcyhzZW50ZW5jZXNbaV0udGV4dCk7Y29uc3QgdXNlZD1uZXcgU2V0KCk7Zm9yKGNvbnN0IG0gb2YgY3VyKXtjb25zdCB3PW1bMF0udG9Mb2NhbGVMb3dlckNhc2UoJ3J1LVJVJyk7aWYocHJldk1hcC5oYXModykmJiF1c2VkLmhhcyh3KSYmdy5sZW5ndGg+PTUmJiFzdG9wV29yZHMuaGFzKHcpKXt1c2VkLmFkZCh3KTtjb25zdCBwbT1wcmV2TWFwLmdldCh3KSxwYWlyU3RhcnQ9c2VudGVuY2VzW2ktMV0uc3RhcnQrcG0uaW5kZXgscGFpckVuZD1wYWlyU3RhcnQrcG1bMF0ubGVuZ3RoLHN0YXJ0PXNlbnRlbmNlc1tpXS5zdGFydCttLmluZGV4LGVuZD1zdGFydCttWzBdLmxlbmd0aDthZGRJc3N1ZShpc3N1ZXMsJ25lYXJieScsYNCf0L7QstGC0L7RgCDRgNGP0LTQvtC8OiDCqyR7bVswXX3Cu2AsJ9Ce0LTQvdC+INGB0LvQvtCy0L4g0LLRgdGC0YDQtdGH0LDQtdGC0YHRjyDQsiDQtNCy0YPRhSDRgdC+0YHQtdC00L3QuNGFINC/0YDQtdC00LvQvtC20LXQvdC40Y/RhScsc3RhcnQsZW5kKTtjb25zdCBpc3N1ZT1pc3N1ZXNbaXNzdWVzLmxlbmd0aC0xXTtpc3N1ZS53b3JkPW1bMF07aXNzdWUucGFpclN0YXJ0PXBhaXJTdGFydDtpc3N1ZS5wYWlyRW5kPXBhaXJFbmQ7aXNzdWUuZmlyc3RTZW50ZW5jZVN0YXJ0PXNlbnRlbmNlc1tpLTFdLnN0YXJ0O2lzc3VlLmZpcnN0U2VudGVuY2VFbmQ9c2VudGVuY2VzW2ktMV0uZW5kO2lzc3VlLnNlY29uZFNlbnRlbmNlU3RhcnQ9c2VudGVuY2VzW2ldLnN0YXJ0O2lzc3VlLnNlY29uZFNlbnRlbmNlRW5kPXNlbnRlbmNlc1tpXS5lbmQ7bisrO2lmKG4+PTIwKWJyZWFrfX19fQ==')
+          rep(on,nn,'nearby logic')
+          oi=d('ZnVuY3Rpb24gaXNzdWVIdG1sKGkpe2NvbnN0IHNldj1pLnNldmVyaXR5PT09J2NyaXRpY2FsJz8n0JrQvtC90YLRgNC+0LvRjCc6J9Ce0LHRgNCw0YLQuNGC0LUg0LLQvdC40LzQsNC90LjQtSc7Y29uc3Qgd29yZD1pLndvcmQ/U3RyaW5nKGkud29yZCk6Jyc7Y29uc3QgY2xpY2s9d29yZD9gb3BlblJlcGxhY2VtZW50KCR7aS5zdGFydH0sJHtpLmVuZH0sJHtKU09OLnN0cmluZ2lmeSh3b3JkKX0pYDpganVtcFRvKCR7aS5zdGFydH0sJHtpLmVuZH0pYDtjb25zdCBjbHM9d29yZD8nYW5hbHlzaXNSb3cganVtcCBmcmVxdWVudFdvcmQnOidhbmFseXNpc1JvdyBqdW1wJztjb25zdCBoaW50PXdvcmQ/J9C90LDQttC80LjRgtC1OiDQv9C10YDQtdC50YLQuCDQuCDQstGL0LHRgNCw0YLRjCDQt9Cw0LzQtdC90YMnOifQvdCw0LbQvNC40YLQtSDQtNC70Y8g0L/QtdGA0LXRhdC+0LTQsCc7cmV0dXJuIGA8YnV0dG9uIGNsYXNzPSIke2Nsc30iIG9uY2xpY2s9JyR7Y2xpY2sucmVwbGFjZSgvJy9nLCImIzM5OyIpfSc+PHNwYW4gY2xhc3M9Indhcm4iPiR7ZXNjYXBlSHRtbChpLnRpdGxlKX08L3NwYW4+PHNwYW4gY2xhc3M9Im1ldGEiPiR7ZXNjYXBlSHRtbChpLmRldGFpbHx8JycpfSDCtyAke3Nldn0gwrcgJHtoaW50fTwvc3Bhbj48L2J1dHRvbj5gfQ==')
+          ni=d('ZnVuY3Rpb24gaXNzdWVIdG1sKGkpe2NvbnN0IHNldj1pLnNldmVyaXR5PT09J2NyaXRpY2FsJz8n0JrQvtC90YLRgNC+0LvRjCc6J9Ce0LHRgNCw0YLQuNGC0LUg0LLQvdC40LzQsNC90LjQtSc7Y29uc3Qgd29yZD1pLndvcmQ/U3RyaW5nKGkud29yZCk6Jyc7bGV0IGNsaWNrLGNscyxoaW50O2lmKGkudHlwZT09PSduZWFyYnknJiZOdW1iZXIuaXNGaW5pdGUoaS5wYWlyU3RhcnQpKXtjbGljaz1gb3Blbk5lYXJieVJlcGVhdCgke2kucGFpclN0YXJ0fSwke2kucGFpckVuZH0sJHtpLnN0YXJ0fSwke2kuZW5kfSwke2kuZmlyc3RTZW50ZW5jZVN0YXJ0fSwke2kuZmlyc3RTZW50ZW5jZUVuZH0sJHtpLnNlY29uZFNlbnRlbmNlU3RhcnR9LCR7aS5zZWNvbmRTZW50ZW5jZUVuZH0sJHtKU09OLnN0cmluZ2lmeSh3b3JkKX0pYDtjbHM9J2FuYWx5c2lzUm93IGp1bXAgbmVhcmJ5V29yZCc7aGludD0n0L3QsNC20LzQuNGC0LU6INC/0L7QutCw0LfQsNGC0Ywg0L7QsdCwINC/0L7QstGC0L7RgNCwJ31lbHNle2NsaWNrPXdvcmQ/YG9wZW5SZXBsYWNlbWVudCgke2kuc3RhcnR9LCR7aS5lbmR9LCR7SlNPTi5zdHJpbmdpZnkod29yZCl9KWA6YGp1bXBUbygke2kuc3RhcnR9LCR7aS5lbmR9KWA7Y2xzPXdvcmQ/J2FuYWx5c2lzUm93IGp1bXAgZnJlcXVlbnRXb3JkJzonYW5hbHlzaXNSb3cganVtcCc7aGludD13b3JkPyfQvdCw0LbQvNC40YLQtTog0L/QtdGA0LXQudGC0Lgg0Lgg0LLRi9Cx0YDQsNGC0Ywg0LfQsNC80LXQvdGDJzon0L3QsNC20LzQuNGC0LUg0LTQu9GPINC/0LXRgNC10YXQvtC00LAnfXJldHVybiBgPGJ1dHRvbiBjbGFzcz0iJHtjbHN9IiBvbmNsaWNrPScke2NsaWNrLnJlcGxhY2UoLycvZywiJiMzOTsiKX0nPjxzcGFuIGNsYXNzPSJ3YXJuIj4ke2VzY2FwZUh0bWwoaS50aXRsZSl9PC9zcGFuPjxzcGFuIGNsYXNzPSJtZXRhIj4ke2VzY2FwZUh0bWwoaS5kZXRhaWx8fCcnKX0gwrcgJHtzZXZ9IMK3ICR7aGludH08L3NwYW4+PC9idXR0b24+YH0=')
+          rep(oi,ni,'issue click')
+          ja=d('ZnVuY3Rpb24gZXhhY3RXb3JkT2NjdXJyZW5jZXMod29yZCl7Y29uc3QgcmU9bmV3IFJlZ0V4cCgnKD88IVtBLVphLXrQkC3Qr9CwLdGP0IHRkTAtOV9dKScrd29yZC5yZXBsYWNlKC9bLiorP14ke30oKXxbXF1cXF0vZywnXFwkJicpKycoPyFbQS1aYS160JAt0K/QsC3Rj9CB0ZEwLTlfXSknLCdnaXUnKTtyZXR1cm4gQXJyYXkuZnJvbShlZGl0b3IudmFsdWUubWF0Y2hBbGwocmUpKS5tYXAobT0+KHtzdGFydDptLmluZGV4LGVuZDptLmluZGV4K21bMF0ubGVuZ3RoLHRleHQ6bVswXX0pKX0=')
+          hp=d('bGV0IG5lYXJieVN0YXRlPW51bGw7CmZ1bmN0aW9uIG5lYXJieVNlbnRlbmNlTWFya3VwKHNlbnRlbmNlU3RhcnQsc2VudGVuY2VFbmQsd29yZFN0YXJ0LHdvcmRFbmQsbGFiZWwpe2NvbnN0IHNyYz1lZGl0b3IudmFsdWV8fCcnLGZ1bGw9c3JjLnNsaWNlKHNlbnRlbmNlU3RhcnQsc2VudGVuY2VFbmQpLGE9TWF0aC5tYXgoMCxNYXRoLm1pbihmdWxsLmxlbmd0aCx3b3JkU3RhcnQtc2VudGVuY2VTdGFydCkpLGI9TWF0aC5tYXgoYSxNYXRoLm1pbihmdWxsLmxlbmd0aCx3b3JkRW5kLXNlbnRlbmNlU3RhcnQpKTtyZXR1cm4gYDxzcGFuIGNsYXNzPSJuZWFyYnlMYWJlbCI+JHtsYWJlbH08L3NwYW4+JHtlc2NhcGVIdG1sKGZ1bGwuc2xpY2UoMCxhKSl9PHNwYW4gY2xhc3M9Im5lYXJieUhpdCI+JHtlc2NhcGVIdG1sKGZ1bGwuc2xpY2UoYSxiKSl9PC9zcGFuPiR7ZXNjYXBlSHRtbChmdWxsLnNsaWNlKGIpKX1gfQpmdW5jdGlvbiBvcGVuTmVhcmJ5UmVwZWF0KHBhaXJTdGFydCxwYWlyRW5kLHN0YXJ0LGVuZCxmaXJzdFNlbnRlbmNlU3RhcnQsZmlyc3RTZW50ZW5jZUVuZCxzZWNvbmRTZW50ZW5jZVN0YXJ0LHNlY29uZFNlbnRlbmNlRW5kLHdvcmQpe2RvY3VtZW50LmdldEVsZW1lbnRCeUlkKCdhbmFseXNpc0JhY2tkcm9wJykuY2xhc3NMaXN0LnJlbW92ZSgnb3BlbicpO2lmKHJlcGxhY2VtZW50U3RhdGUpY2xvc2VSZXBsYWNlbWVudCgpO25lYXJieVN0YXRlPXtwYWlyU3RhcnQscGFpckVuZCxzdGFydCxlbmQsZmlyc3RTZW50ZW5jZVN0YXJ0LGZpcnN0U2VudGVuY2VFbmQsc2Vjb25kU2VudGVuY2VTdGFydCxzZWNvbmRTZW50ZW5jZUVuZCx3b3JkfTtzaG93UGFuZSgnZWRpdCcpO3JlbmRlck5lYXJieVJlcGVhdCgpO2p1bXBUbyhzdGFydCxlbmQsdHJ1ZSl9CmZ1bmN0aW9uIHJlbmRlck5lYXJieVJlcGVhdCgpe2NvbnN0IHBhbmVsPWRvY3VtZW50LmdldEVsZW1lbnRCeUlkKCduZWFyYnlQYW5lbCcpO2lmKCFuZWFyYnlTdGF0ZSl7cGFuZWwuY2xhc3NMaXN0LnJlbW92ZSgnb3BlbicpO3JldHVybn1kb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbmVhcmJ5V29yZCcpLnRleHRDb250ZW50PW5lYXJieVN0YXRlLndvcmR8fGVkaXRvci52YWx1ZS5zbGljZShuZWFyYnlTdGF0ZS5zdGFydCxuZWFyYnlTdGF0ZS5lbmQpO2RvY3VtZW50LmdldEVsZW1lbnRCeUlkKCduZWFyYnlGaXJzdCcpLmlubmVySFRNTD1uZWFyYnlTZW50ZW5jZU1hcmt1cChuZWFyYnlTdGF0ZS5maXJzdFNlbnRlbmNlU3RhcnQsbmVhcmJ5U3RhdGUuZmlyc3RTZW50ZW5jZUVuZCxuZWFyYnlTdGF0ZS5wYWlyU3RhcnQsbmVhcmJ5U3RhdGUucGFpckVuZCwn0J/QtdGA0LLQvtC1INC/0YDQtdC00LvQvtC20LXQvdC40LUnKTtkb2N1bWVudC5nZXRFbGVtZW50QnlJZCgnbmVhcmJ5U2Vjb25kJykuaW5uZXJIVE1MPW5lYXJieVNlbnRlbmNlTWFya3VwKG5lYXJieVN0YXRlLnNlY29uZFNlbnRlbmNlU3RhcnQsbmVhcmJ5U3RhdGUuc2Vjb25kU2VudGVuY2VFbmQsbmVhcmJ5U3RhdGUuc3RhcnQsbmVhcmJ5U3RhdGUuZW5kLCfQodC70LXQtNGD0Y7RidC10LUg0L/RgNC10LTQu9C+0LbQtdC90LjQtScpO3BhbmVsLmNsYXNzTGlzdC5hZGQoJ29wZW4nKX0KZnVuY3Rpb24ganVtcE5lYXJieVJlcGVhdCh3aGljaCl7aWYoIW5lYXJieVN0YXRlKXJldHVybjtjb25zdCBmaXJzdD13aGljaD09PTAscz1maXJzdD9uZWFyYnlTdGF0ZS5wYWlyU3RhcnQ6bmVhcmJ5U3RhdGUuc3RhcnQsZT1maXJzdD9uZWFyYnlTdGF0ZS5wYWlyRW5kOm5lYXJieVN0YXRlLmVuZDtqdW1wVG8ocyxlLHRydWUpfQpmdW5jdGlvbiByZXBsYWNlTmVhcmJ5UmVwZWF0KHdoaWNoKXtpZighbmVhcmJ5U3RhdGUpcmV0dXJuO2NvbnN0IGZpcnN0PXdoaWNoPT09MCxzPWZpcnN0P25lYXJieVN0YXRlLnBhaXJTdGFydDpuZWFyYnlTdGF0ZS5zdGFydCxlPWZpcnN0P25lYXJieVN0YXRlLnBhaXJFbmQ6bmVhcmJ5U3RhdGUuZW5kLHc9ZWRpdG9yLnZhbHVlLnNsaWNlKHMsZSl8fG5lYXJieVN0YXRlLndvcmQ7Y2xvc2VOZWFyYnlSZXBlYXQoKTtvcGVuUmVwbGFjZW1lbnQocyxlLHcpfQpmdW5jdGlvbiBjbG9zZU5lYXJieVJlcGVhdCgpe25lYXJieVN0YXRlPW51bGw7ZG9jdW1lbnQuZ2V0RWxlbWVudEJ5SWQoJ25lYXJieVBhbmVsJykuY2xhc3NMaXN0LnJlbW92ZSgnb3BlbicpfQo=')
+          rep(ja,hp+ja,'helpers')
+          rep("editor.addEventListener('input',()=>{if(replacementState)closeReplacement();render()});","editor.addEventListener('input',()=>{if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();render()});",'input')
+          rep("stopSpeak();closeReplacement();editor.value='';","stopSpeak();closeReplacement();closeNearbyRepeat();editor.value='';",'clear')
+          rep("closeReplacement();render();showPane('edit');editor.focus();toast(name?`Загружен файл: ${name}`:'Текст загружен из файла')","closeReplacement();closeNearbyRepeat();render();showPane('edit');editor.focus();toast(name?`Загружен файл: ${name}`:'Текст загружен из файла')",'load')
+          p.write_text(s,encoding='utf-8')
+          g=Path('app/build.gradle')
+          b=g.read_text(encoding='utf-8')
+          if "versionCode 17" not in b or "versionName '1.3.4'" not in b:
+              raise SystemExit('unexpected version')
+          g.write_text(b.replace('versionCode 17','versionCode 18',1).replace("versionName '1.3.4'","versionName '1.3.5'",1),encoding='utf-8')
+          PY
+
+      - name: Check JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/assets/www/index.html').read_text(encoding='utf-8')
+          a=s.rfind('<script>')+8
+          b=s.rfind('</script>')
+          Path('/tmp/dzen.js').write_text(s[a:b],encoding='utf-8')
+          PY
+          node --check /tmp/dzen.js
+          grep -q "versionName '1.3.5'" app/build.gradle
+          grep -q 'openNearbyRepeat' app/src/main/assets/www/index.html
+
+      - name: Commit and tag
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle app/src/main/assets/www/index.html
+          git commit -m "Show both nearby repeat occurrences (v1.3.5)"
+          git push origin main
+          git tag -a v1.3.5 -m "Дзен Текст v1.3.5 — наглядные повторы рядом"
+          git push origin v1.3.5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: yes | sdkmanager --licenses >/dev/null || true
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Restore keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dzen-text-release.jks"
+      - name: Build release
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dzen-text-release.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
+      - name: Verify signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose "$APK"
+          CERT_INFO=$("$APKSIGNER" verify --print-certs "$APK")
+          NORMALIZED=$(printf '%s' "$CERT_INFO" | tr '[:upper:]' '[:lower:]' | tr -d ':')
+          echo "$NORMALIZED" | grep -q '0fd2d2518979f8db3ff5ccd6da29669a3e8de10fbcc35156de8396d3dba3f2b2'
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/release/app-release.apk Dzen-Text-v1.3.5.apk
+          gh release create v1.3.5 Dzen-Text-v1.3.5.apk --title "Дзен Текст v1.3.5" --notes "Улучшены «Повторы рядом»: приложение показывает два соседних предложения и подчёркивает повторяющееся слово в обоих местах. Можно перейти к любому из двух употреблений и открыть замену."
