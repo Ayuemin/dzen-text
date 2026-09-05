@@ -8,10 +8,6 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/update-dzen-rules.yml'
   schedule:
     - cron: '23 3 * * *'
 
@@ -44,9 +40,9 @@ jobs:
       - name: Build compact rules database from official Dzen rules
         if: env.OPENROUTER_API_KEY != ''
         env:
-          DZEN_RULES_MODEL: openai/gpt-oss-20b:free
+          DZEN_RULES_MODEL: openrouter/free
           DZEN_RULES_SOURCE_URL: https://dzen.ru/help/ru/requirements/rules.html
-          FORCE_REBUILD: 'true'
+          FORCE_REBUILD: ${{ github.event.inputs.force || 'false' }}
         run: python3 tools/update_dzen_rules.py
 
       - name: Validate generated database
@@ -62,6 +58,7 @@ jobs:
               assert isinstance(o.get('categories'), list) and len(o['categories']) >= 3
               assert o.get('source') == 'https://dzen.ru/help/ru/requirements/rules.html'
               assert o.get('privacy')
+              assert o.get('generator', {}).get('guardrails_version', 0) >= 1
           print('Database OK:', o.get('version'), 'schema', o.get('schema'))
           PY
 
