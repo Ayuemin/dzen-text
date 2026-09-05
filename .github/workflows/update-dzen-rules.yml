@@ -8,6 +8,10 @@ on:
         required: false
         default: false
         type: boolean
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/update-dzen-rules.yml'
   schedule:
     - cron: '23 3 * * *'
 
@@ -42,7 +46,7 @@ jobs:
         env:
           DZEN_RULES_MODEL: openai/gpt-oss-20b:free
           DZEN_RULES_SOURCE_URL: https://dzen.ru/help/ru/requirements/rules.html
-          FORCE_REBUILD: ${{ github.event.inputs.force || 'false' }}
+          FORCE_REBUILD: 'true'
         run: python3 tools/update_dzen_rules.py
 
       - name: Validate generated database
