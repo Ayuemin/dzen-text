@@ -1,3 +1,4 @@
+# rerun after Gradle signing fix
 name: Bootstrap permanent signed v1.3.3
 
 on:
