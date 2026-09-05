@@ -1,0 +1,47 @@
+name: Implement Dzen Text v1.5.2
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/implement-v152.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply v1.5.2 patch
+        run: python3 .github/scripts/v152_patch.py
+
+      - name: Check JavaScript and version
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/assets/www/index.html').read_text(encoding='utf-8')
+          a=s.rfind('<script>')+len('<script>')
+          b=s.rfind('</script>')
+          Path('/tmp/dzen.js').write_text(s[a:b],encoding='utf-8')
+          PY
+          node --check /tmp/dzen.js
+          grep -q 'textareaCaretContentTop' app/src/main/assets/www/index.html
+          grep -q 'ensureSelectionVisible' app/src/main/assets/www/index.html
+          grep -q 'versionCode 23' app/build.gradle
+          grep -q "versionName '1.5.2'" app/build.gradle
+
+      - name: Commit and tag v1.5.2
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle app/src/main/assets/www/index.html README.md
+          git commit -m "Scroll selected corrections into visible editor area (v1.5.2)"
+          git push origin main
+          git tag -a v1.5.2 -m "Дзен Текст v1.5.2 — выделение в видимой области"
+          git push origin v1.5.2
