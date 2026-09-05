@@ -1,0 +1,74 @@
+name: Update Dzen rules database
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if official source hash has not changed
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    - cron: '23 3 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dzen-rules-updater
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Explain missing OpenRouter secret
+        if: ${{ secrets.OPENROUTER_API_KEY == '' }}
+        run: |
+          echo 'OPENROUTER_API_KEY is not configured.'
+          echo 'Add it in Settings -> Secrets and variables -> Actions.'
+          echo 'No rules are changed and no user article data is involved.'
+
+      - name: Build compact rules database from official Dzen rules
+        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          DZEN_RULES_MODEL: openai/gpt-oss-20b:free
+          DZEN_RULES_SOURCE_URL: https://dzen.ru/help/ru/requirements/rules.html
+          FORCE_REBUILD: ${{ github.event.inputs.force || 'false' }}
+        run: python3 tools/update_dzen_rules.py
+
+      - name: Validate generated database
+        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('rules/dzen-rules.json')
+          o=json.loads(p.read_text(encoding='utf-8'))
+          assert o.get('schema') in (1,2)
+          if o.get('schema') == 2:
+              assert isinstance(o.get('categories'), list) and len(o['categories']) >= 3
+              assert o.get('source') == 'https://dzen.ru/help/ru/requirements/rules.html'
+              assert o.get('privacy')
+          print('Database OK:', o.get('version'), 'schema', o.get('schema'))
+          PY
+
+      - name: Commit database only when it changed
+        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        run: |
+          if git diff --quiet -- rules/dzen-rules.json; then
+            echo 'No database changes.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add rules/dzen-rules.json
+          git commit -m 'Update Dzen rules database from official source'
+          git push origin main
