@@ -21,6 +21,8 @@ concurrency:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -29,23 +31,22 @@ jobs:
           python-version: '3.12'
 
       - name: Explain missing OpenRouter secret
-        if: ${{ secrets.OPENROUTER_API_KEY == '' }}
+        if: env.OPENROUTER_API_KEY == ''
         run: |
           echo 'OPENROUTER_API_KEY is not configured.'
           echo 'Add it in Settings -> Secrets and variables -> Actions.'
           echo 'No rules are changed and no user article data is involved.'
 
       - name: Build compact rules database from official Dzen rules
-        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        if: env.OPENROUTER_API_KEY != ''
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           DZEN_RULES_MODEL: openai/gpt-oss-20b:free
           DZEN_RULES_SOURCE_URL: https://dzen.ru/help/ru/requirements/rules.html
           FORCE_REBUILD: ${{ github.event.inputs.force || 'false' }}
         run: python3 tools/update_dzen_rules.py
 
       - name: Validate generated database
-        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        if: env.OPENROUTER_API_KEY != ''
         run: |
           python3 - <<'PY'
           import json
@@ -61,7 +62,7 @@ jobs:
           PY
 
       - name: Commit database only when it changed
-        if: ${{ secrets.OPENROUTER_API_KEY != '' }}
+        if: env.OPENROUTER_API_KEY != ''
         run: |
           if git diff --quiet -- rules/dzen-rules.json; then
             echo 'No database changes.'
