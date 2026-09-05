@@ -1,0 +1,153 @@
+name: Implement nearby repeat pair view v1.3.5
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/implement-nearby-pairs-v135.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Patch nearby repeat UX and bump version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/src/main/assets/www/index.html')
+          s = p.read_text(encoding='utf-8')
+
+          def rep(old, new, label):
+              global s
+              if old not in s:
+                  raise SystemExit(f'Patch anchor not found: {label}')
+              s = s.replace(old, new, 1)
+
+          rep('<title>Дзен Текст 1.3.4</title>', '<title>Дзен Текст 1.3.5</title>', 'title')
+
+          css_anchor = '.fileInput{display:none}.dictStatus{font-size:12px;color:var(--muted);margin:7px 0 8px}.dictStatus b{color:var(--text)}'
+          css_new = '''.nearbyPanel{position:absolute;left:10px;right:10px;bottom:8px;z-index:7;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:0 10px 35px rgba(0,0,0,.24);padding:11px;display:none;max-height:300px;overflow:auto}.nearbyPanel.open{display:block}.nearbyHead{display:flex;align-items:center;gap:8px;margin-bottom:8px}.nearbyTitle{font-size:13px;color:var(--muted);min-width:0;flex:1}.nearbyTitle b{color:var(--text);font-size:15px}.nearbySentence{display:block;width:100%;text-align:left;border:1px solid var(--border);background:var(--surface2);color:var(--text);border-radius:11px;padding:10px 11px;margin:7px 0;font-size:13px;line-height:1.45}.nearbySentence:active{border-color:var(--accent)}.nearbyLabel{display:block;color:var(--muted);font-size:11px;margin-bottom:4px}.nearbyHit{color:var(--accent);font-weight:800;text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px;background:var(--accentSoft);border-radius:4px;padding:0 2px}.nearbyActions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}.nearbyActions .nativeBtn{flex:1;min-width:130px}.analysisRow.nearbyWord .warn{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:3px}\n'''+css_anchor
+          rep(css_anchor, css_new, 'nearby css')
+
+          markup_anchor = '''      <div class="replaceNote">Подбираю форму локально. После замены лучше проверить согласование слова с соседними словами.</div>\n    </div>\n  </main>'''
+          markup_new = '''      <div class="replaceNote">Подбираю форму локально. После замены лучше проверить согласование слова с соседними словами.</div>\n    </div>\n    <div id="nearbyPanel" class="nearbyPanel" aria-live="polite">\n      <div class="nearbyHead"><div class="nearbyTitle">Повтор рядом: <b id="nearbyWord">—</b><div>Одно слово найдено в двух соседних предложениях</div></div><button class="miniIcon" onclick="closeNearbyRepeat()" aria-label="Закрыть">×</button></div>\n      <button id="nearbyFirst" class="nearbySentence" onclick="jumpNearbyRepeat(0)"></button>\n      <button id="nearbySecond" class="nearbySentence" onclick="jumpNearbyRepeat(1)"></button>\n      <div class="nearbyActions"><button class="nativeBtn" type="button" onclick="replaceNearbyRepeat(0)">Заменить первое</button><button class="nativeBtn" type="button" onclick="replaceNearbyRepeat(1)">Заменить второе</button></div>\n      <div class="replaceNote">Повторяющееся слово подчёркнуто в обоих предложениях. Нажмите на предложение, чтобы перейти к соответствующему месту текста.</div>\n    </div>\n  </main>'''
+          rep(markup_anchor, markup_new, 'nearby panel markup')
+
+          old_nearby = ''' if(settings.nearbyCheck){let n=0;for(let i=1;i<sentences.length&&n<20;i++){const prev=new Set(wordMatches(sentences[i-1].text).map(m=>m[0].toLocaleLowerCase('ru-RU')).filter(w=>w.length>=5&&!stopWords.has(w)));const cur=wordMatches(sentences[i].text);const used=new Set();for(const m of cur){const w=m[0].toLocaleLowerCase('ru-RU');if(prev.has(w)&&!used.has(w)&&w.length>=5&&!stopWords.has(w)){used.add(w);const start=sentences[i].start+m.index;addIssue(issues,'nearby',`Повтор рядом: «${m[0]}»`,shortContext(src,start,start+m[0].length),start,start+m[0].length);issues[issues.length-1].word=m[0];n++;if(n>=20)break}}}}'''
+          new_nearby = ''' if(settings.nearbyCheck){let n=0;for(let i=1;i<sentences.length&&n<20;i++){const prevMatches=wordMatches(sentences[i-1].text),prevMap=new Map();for(const pm of prevMatches){const pw=pm[0].toLocaleLowerCase('ru-RU');if(pw.length>=5&&!stopWords.has(pw)&&!prevMap.has(pw))prevMap.set(pw,pm)}const cur=wordMatches(sentences[i].text);const used=new Set();for(const m of cur){const w=m[0].toLocaleLowerCase('ru-RU');if(prevMap.has(w)&&!used.has(w)&&w.length>=5&&!stopWords.has(w)){used.add(w);const pm=prevMap.get(w),pairStart=sentences[i-1].start+pm.index,pairEnd=pairStart+pm[0].length,start=sentences[i].start+m.index,end=start+m[0].length;addIssue(issues,'nearby',`Повтор рядом: «${m[0]}»`,'Одно слово встречается в двух соседних предложениях',start,end);const issue=issues[issues.length-1];issue.word=m[0];issue.pairStart=pairStart;issue.pairEnd=pairEnd;issue.firstSentenceStart=sentences[i-1].start;issue.firstSentenceEnd=sentences[i-1].end;issue.secondSentenceStart=sentences[i].start;issue.secondSentenceEnd=sentences[i].end;n++;if(n>=20)break}}}}'''
+          rep(old_nearby, new_nearby, 'nearby analysis')
+
+          old_issue = '''function issueHtml(i){const sev=i.severity==='critical'?'Контроль':'Обратите внимание';const word=i.word?String(i.word):'';const click=word?`openReplacement(${i.start},${i.end},${JSON.stringify(word)})`:`jumpTo(${i.start},${i.end})`;const cls=word?'analysisRow jump frequentWord':'analysisRow jump';const hint=word?'нажмите: перейти и выбрать замену':'нажмите для перехода';return `<button class="${cls}" onclick='${click.replace(/'/g,"&#39;")}'><span class="warn">${escapeHtml(i.title)}</span><span class="meta">${escapeHtml(i.detail||'')} · ${sev} · ${hint}</span></button>`}'''
+          new_issue = '''function issueHtml(i){const sev=i.severity==='critical'?'Контроль':'Обратите внимание';const word=i.word?String(i.word):'';let click,cls,hint;if(i.type==='nearby'&&Number.isFinite(i.pairStart)){click=`openNearbyRepeat(${i.pairStart},${i.pairEnd},${i.start},${i.end},${i.firstSentenceStart},${i.firstSentenceEnd},${i.secondSentenceStart},${i.secondSentenceEnd},${JSON.stringify(word)})`;cls='analysisRow jump nearbyWord';hint='нажмите: показать оба повтора'}else{click=word?`openReplacement(${i.start},${i.end},${JSON.stringify(word)})`:`jumpTo(${i.start},${i.end})`;cls=word?'analysisRow jump frequentWord':'analysisRow jump';hint=word?'нажмите: перейти и выбрать замену':'нажмите для перехода'}return `<button class="${cls}" onclick='${click.replace(/'/g,"&#39;")}'><span class="warn">${escapeHtml(i.title)}</span><span class="meta">${escapeHtml(i.detail||'')} · ${sev} · ${hint}</span></button>`}'''
+          rep(old_issue, new_issue, 'nearby issue click')
+
+          jump_anchor = '''function exactWordOccurrences(word){const re=new RegExp('(?<![A-Za-zА-Яа-яЁё0-9_])'+word.replace(/[.*+?^${}()|[\\]\\\\]/g,'\\\\$&')+'(?![A-Za-zА-Яа-яЁё0-9_])','giu');return Array.from(editor.value.matchAll(re)).map(m=>({start:m.index,end:m.index+m[0].length,text:m[0]}))}'''
+          nearby_helpers = r'''let nearbyState=null;
+function nearbySentenceMarkup(sentenceStart,sentenceEnd,wordStart,wordEnd,label){const src=editor.value||'',full=src.slice(sentenceStart,sentenceEnd),a=Math.max(0,Math.min(full.length,wordStart-sentenceStart)),b=Math.max(a,Math.min(full.length,wordEnd-sentenceStart));return `<span class="nearbyLabel">${label}</span>${escapeHtml(full.slice(0,a))}<span class="nearbyHit">${escapeHtml(full.slice(a,b))}</span>${escapeHtml(full.slice(b))}`}
+function openNearbyRepeat(pairStart,pairEnd,start,end,firstSentenceStart,firstSentenceEnd,secondSentenceStart,secondSentenceEnd,word){document.getElementById('analysisBackdrop').classList.remove('open');if(replacementState)closeReplacement();nearbyState={pairStart,pairEnd,start,end,firstSentenceStart,firstSentenceEnd,secondSentenceStart,secondSentenceEnd,word};showPane('edit');renderNearbyRepeat();jumpTo(start,end,true)}
+function renderNearbyRepeat(){const panel=document.getElementById('nearbyPanel');if(!nearbyState){panel.classList.remove('open');return}document.getElementById('nearbyWord').textContent=nearbyState.word||editor.value.slice(nearbyState.start,nearbyState.end);document.getElementById('nearbyFirst').innerHTML=nearbySentenceMarkup(nearbyState.firstSentenceStart,nearbyState.firstSentenceEnd,nearbyState.pairStart,nearbyState.pairEnd,'Первое предложение');document.getElementById('nearbySecond').innerHTML=nearbySentenceMarkup(nearbyState.secondSentenceStart,nearbyState.secondSentenceEnd,nearbyState.start,nearbyState.end,'Следующее предложение');panel.classList.add('open')}
+function jumpNearbyRepeat(which){if(!nearbyState)return;const first=which===0,s=first?nearbyState.pairStart:nearbyState.start,e=first?nearbyState.pairEnd:nearbyState.end;jumpTo(s,e,true)}
+function replaceNearbyRepeat(which){if(!nearbyState)return;const first=which===0,s=first?nearbyState.pairStart:nearbyState.start,e=first?nearbyState.pairEnd:nearbyState.end,w=editor.value.slice(s,e)||nearbyState.word;closeNearbyRepeat();openReplacement(s,e,w)}
+function closeNearbyRepeat(){nearbyState=null;document.getElementById('nearbyPanel').classList.remove('open')}
+'''
+          rep(jump_anchor, nearby_helpers + jump_anchor, 'nearby helper functions')
+
+          rep("editor.addEventListener('input',()=>{if(replacementState)closeReplacement();render()});", "editor.addEventListener('input',()=>{if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();render()});", 'editor input closes nearby')
+          rep("stopSpeak();closeReplacement();editor.value='';", "stopSpeak();closeReplacement();closeNearbyRepeat();editor.value='';", 'clear closes nearby')
+          rep("closeReplacement();render();showPane('edit');editor.focus();toast(name?`Загружен файл: ${name}`:'Текст загружен из файла')", "closeReplacement();closeNearbyRepeat();render();showPane('edit');editor.focus();toast(name?`Загружен файл: ${name}`:'Текст загружен из файла')", 'file load closes nearby')
+
+          p.write_text(s, encoding='utf-8')
+
+          g=Path('app/build.gradle')
+          b=g.read_text(encoding='utf-8')
+          if "versionCode 17" not in b or "versionName '1.3.4'" not in b:
+              raise SystemExit('Unexpected Android version')
+          b=b.replace('versionCode 17','versionCode 18',1).replace("versionName '1.3.4'","versionName '1.3.5'",1)
+          g.write_text(b,encoding='utf-8')
+          PY
+
+      - name: Syntax-check JavaScript and version
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('app/src/main/assets/www/index.html').read_text(encoding='utf-8')
+          a=s.rfind('<script>')+len('<script>'); b=s.rfind('</script>')
+          Path('/tmp/dzen.js').write_text(s[a:b],encoding='utf-8')
+          PY
+          node --check /tmp/dzen.js
+          grep -q "openNearbyRepeat" app/src/main/assets/www/index.html
+          grep -q "nearbyHit" app/src/main/assets/www/index.html
+          grep -q "versionCode 18" app/build.gradle
+          grep -q "versionName '1.3.5'" app/build.gradle
+
+      - name: Commit and tag v1.3.5
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle app/src/main/assets/www/index.html
+          git commit -m "Show both nearby repeat occurrences (v1.3.5)"
+          git push origin main
+          git tag -a v1.3.5 -m "Дзен Текст v1.3.5 — наглядные повторы рядом"
+          git push origin v1.3.5
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dzen-text-release.jks"
+
+      - name: Build signed APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dzen-text-release.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Verify permanent signature
+        run: |
+          set -euo pipefail
+          APK=app/build/outputs/apk/release/app-release.apk
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose "$APK"
+          CERT_INFO=$("$APKSIGNER" verify --print-certs "$APK")
+          NORMALIZED=$(printf '%s' "$CERT_INFO" | tr '[:upper:]' '[:lower:]' | tr -d ':')
+          echo "$NORMALIZED" | grep -q '0fd2d2518979f8db3ff5ccd6da29669a3e8de10fbcc35156de8396d3dba3f2b2'
+
+      - name: Publish v1.3.5
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          cp app/build/outputs/apk/release/app-release.apk Dzen-Text-v1.3.5.apk
+          gh release create v1.3.5 Dzen-Text-v1.3.5.apk \
+            --title "Дзен Текст v1.3.5" \
+            --notes "Улучшен раздел «Повторы рядом». Теперь при выборе замечания показываются оба соседних предложения, а повторяющееся слово подчёркивается в обоих местах. Можно перейти к первому или второму употреблению и сразу открыть замену."
