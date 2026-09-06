@@ -1,0 +1,84 @@
+name: Ship Dzen Text v1.7.0
+
+on:
+  push:
+    paths:
+      - '.github/workflows/ship-v170.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Apply v1.7.0 patch
+        run: python3 tools/patch_v170.py
+
+      - name: Check JavaScript syntax
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('app/src/main/assets/www/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script>([\s\S]*?)</script>',h)
+          if not blocks:
+              raise SystemExit('no script block')
+          Path('/tmp/dzen-app.js').write_text('\n'.join(blocks),encoding='utf-8')
+          PY
+          node --check /tmp/dzen-app.js
+
+      - name: Commit application changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/build.gradle app/src/main/assets/www/index.html app/src/main/java/ru/dzenprep/texteditor/MainActivity.java README.md
+          git commit -m "Release Dzen Text v1.7.0"
+          git push origin HEAD:main
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses >/dev/null || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+
+      - name: Restore signing keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dzen-text-release.jks"
+
+      - name: Build signed release APK
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/dzen-text-release.jks
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: gradle --no-daemon :app:assembleRelease
+
+      - name: Verify APK signature
+        run: |
+          APKSIGNER=$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --verbose app/build/outputs/apk/release/app-release.apk
+
+      - name: Tag and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git tag -a v1.7.0 -m "Dzen Text v1.7.0"
+          git push origin v1.7.0
+          cp app/build/outputs/apk/release/app-release.apk Dzen-Text-v1.7.0.apk
+          gh release create v1.7.0 Dzen-Text-v1.7.0.apk --title "Дзен Текст v1.7.0" --generate-notes
