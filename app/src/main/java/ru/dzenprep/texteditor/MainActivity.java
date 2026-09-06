@@ -42,6 +42,7 @@ import java.util.Iterator;
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int REQUEST_OPEN_TEXT = 1907;
     private static final int REQUEST_OPEN_DICTIONARY = 1908;
+    private static final int REQUEST_SAVE_REPORT = 1909;
     private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final String DICT_FILE = "user_synonyms.dat";
@@ -55,6 +56,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private String synonymName = "";
     private int synonymCount = 0;
     private volatile String bundledDictionaryError = "";
+    private volatile String pendingReportText = "";
 
     @Override
     public void onCreate(Bundle state) {
@@ -160,6 +162,22 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 }
             });
         }
+
+        @JavascriptInterface
+        public void saveReport(final String text, final String fileName) {
+            runOnUiThread(() -> {
+                pendingReportText = text == null ? "" : text;
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("text/plain");
+                intent.putExtra(Intent.EXTRA_TITLE, (fileName == null || fileName.trim().isEmpty()) ? "Dzen-Text-report.txt" : fileName);
+                try {
+                    startActivityForResult(intent, REQUEST_SAVE_REPORT);
+                } catch (Exception e) {
+                    runJs("window.onNativeReportError && window.onNativeReportError('Не удалось открыть сохранение файла')");
+                }
+            });
+        }
     }
 
     public class SpellBridge {
@@ -247,6 +265,20 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (resultCode != RESULT_OK || data == null) return;
         Uri uri = data.getData();
         if (uri == null) return;
+
+        if (requestCode == REQUEST_SAVE_REPORT) {
+            try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new Exception("stream");
+                out.write(pendingReportText.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                runJs("window.onNativeReportSaved && window.onNativeReportSaved('TXT')");
+            } catch (Exception e) {
+                runJs("window.onNativeReportError && window.onNativeReportError('Не удалось сохранить отчёт')");
+            } finally {
+                pendingReportText = "";
+            }
+            return;
+        }
 
         if (requestCode == REQUEST_OPEN_TEXT) {
             try {
@@ -498,7 +530,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             conn.setDoOutput(true);
             conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
             conn.setRequestProperty("Accept", "application/json");
-            conn.setRequestProperty("User-Agent", "Dzen-Text/1.5.0 Android");
+            conn.setRequestProperty("User-Agent", "Dzen-Text/1.7.0 Android");
             conn.setFixedLengthStreamingMode(payload.length);
             try (OutputStream os = conn.getOutputStream()) { os.write(payload); }
             int code = conn.getResponseCode();
