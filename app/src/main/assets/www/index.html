@@ -116,24 +116,29 @@
       <button class="drawerClose" type="button" onclick="closeSideDrawer()" aria-label="Закрыть">×</button>
     </div>
 
-    <div class="drawerSectionLabel">Текущая статья</div>
-    <nav class="drawerNav drawerActions">
-      <button type="button" class="drawerPrimary" onclick="createNewArticle()">＋ Новая статья</button>
-      <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
-      <button type="button" onclick="drawerCheck()">Проверить текст</button>
-      <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
-      <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
-      <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
-      <button type="button" onclick="drawerImport()">Импортировать файл</button>
-      <button type="button" onclick="drawerVersions()">Версии текста</button>
-      <button type="button" onclick="drawerIdeas()">Идеи</button>
-      <button type="button" class="drawerDanger" onclick="drawerClear()">Очистить текущую статью</button>
-    </nav>
+    <section class="drawerCurrentBlock">
+      <div class="drawerSectionLabel">Текущая статья</div>
+      <nav class="drawerNav drawerActions">
+        <button type="button" class="drawerPrimary" onclick="createNewArticle()">＋ Новая статья</button>
+        <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
+        <button type="button" onclick="drawerCheck()">Проверить текст</button>
+        <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
+        <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
+        <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
+        <button type="button" onclick="drawerImport()">Импортировать файл</button>
+        <button type="button" onclick="drawerVersions()">Версии текста</button>
+        <button type="button" class="drawerDanger" onclick="drawerClear()">Очистить текущую статью</button>
+      </nav>
+    </section>
 
-    <details class="drawerArticles" id="savedArticlesDetails">
-      <summary>Сохранённые статьи <span id="savedArticlesCount">0</span></summary>
-      <div id="savedArticlesList" class="savedArticlesList"></div>
-    </details>
+    <section class="drawerLibraryBlock">
+      <div class="drawerSectionLabel">Библиотека</div>
+      <button class="drawerLibraryAction" type="button" onclick="drawerIdeas()">Идеи</button>
+      <details class="drawerArticles" id="savedArticlesDetails">
+        <summary>Сохранённые статьи <span id="savedArticlesCount">0</span></summary>
+        <div id="savedArticlesList" class="savedArticlesList"></div>
+      </details>
+    </section>
 
     <div class="drawerSpacer"></div>
     <button class="drawerSettings" type="button" onclick="drawerSettings()">Настройки</button>
