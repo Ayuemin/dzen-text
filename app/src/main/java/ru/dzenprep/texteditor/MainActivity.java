@@ -18,6 +18,8 @@ import android.util.JsonReader;
 import android.util.Base64;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Rect;
+import android.view.ViewTreeObserver;
 
 import org.json.JSONObject;
 import org.json.JSONArray;
@@ -49,6 +51,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int REQUEST_SAVE_REPORT = 1909;
     private static final int REQUEST_OPEN_BACKGROUND = 1910;
     private static final int REQUEST_OPEN_FONT = 1911;
+    private static final int REQUEST_SAVE_ARTICLE = 1912;
     private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final int MAX_FONT_BYTES = 6 * 1024 * 1024;
@@ -66,6 +69,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private int synonymCount = 0;
     private volatile String bundledDictionaryError = "";
     private volatile String pendingReportText = "";
+    private volatile String pendingArticleText = "";
+    private volatile String pendingArticleFileName = "article.md";
+    private DocumentStore documentStore;
 
     @Override
     public void onCreate(Bundle state) {
@@ -73,6 +79,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
         web = new WebView(this);
         setContentView(web);
+        documentStore = new DocumentStore(this);
 
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
@@ -87,6 +94,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web.addJavascriptInterface(new FileBridge(), "AndroidFile");
         web.addJavascriptInterface(new DictionaryBridge(), "AndroidDictionary");
         web.addJavascriptInterface(new SpellBridge(), "AndroidSpell");
+        web.addJavascriptInterface(new DocumentsBridge(), "AndroidDocuments");
+        installKeyboardObserver();
         loadBundledDictionary();
         loadSavedDictionary();
 
@@ -268,6 +277,42 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 }
             });
         }
+
+        @JavascriptInterface
+        public void saveArticleFile(final String text, final String fileName) {
+            runOnUiThread(() -> {
+                pendingArticleText = text == null ? "" : text;
+                pendingArticleFileName = (fileName == null || fileName.trim().isEmpty()) ? "article.md" : fileName.trim();
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("text/markdown");
+                intent.putExtra(Intent.EXTRA_TITLE, pendingArticleFileName);
+                try {
+                    startActivityForResult(intent, REQUEST_SAVE_ARTICLE);
+                } catch (Exception e) {
+                    runJs("window.onNativeArticleSaveError && window.onNativeArticleSaveError('Не удалось открыть сохранение статьи')");
+                }
+            });
+        }
+    }
+
+
+    public class DocumentsBridge {
+        @JavascriptInterface public String ensureActiveArticle() { return documentStore.ensureActiveArticle(); }
+        @JavascriptInterface public String createArticle() { return documentStore.createArticle(); }
+        @JavascriptInterface public String activeArticleId() { return documentStore.activeArticleId(); }
+        @JavascriptInterface public boolean setActiveArticle(String id) { return documentStore.setActiveArticle(id); }
+        @JavascriptInterface public boolean saveArticle(String id, String text) { return documentStore.saveArticle(id, text); }
+        @JavascriptInterface public String loadArticle(String id) { return documentStore.loadArticle(id); }
+        @JavascriptInterface public String listArticles() { return documentStore.listArticlesJson(); }
+        @JavascriptInterface public boolean deleteArticle(String id) { return documentStore.deleteArticle(id); }
+        @JavascriptInterface public String saveVersion(String articleId, String reason, String text) { return documentStore.saveVersion(articleId, reason, text); }
+        @JavascriptInterface public String listVersions(String articleId) { return documentStore.listVersionsJson(articleId); }
+        @JavascriptInterface public String loadVersion(String articleId, String versionId) { return documentStore.loadVersion(articleId, versionId); }
+        @JavascriptInterface public boolean deleteVersion(String articleId, String versionId) { return documentStore.deleteVersion(articleId, versionId); }
+        @JavascriptInterface public int deleteVersionsOlderThan(String articleId, long cutoff) { return documentStore.deleteVersionsOlderThan(articleId, cutoff); }
+        @JavascriptInterface public int deleteAllVersions(String articleId) { return documentStore.deleteAllVersions(articleId); }
+        @JavascriptInterface public String versionUsage(String articleId) { return documentStore.versionUsageJson(articleId); }
     }
 
     public class SpellBridge {
@@ -370,6 +415,21 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             return;
         }
 
+        if (requestCode == REQUEST_SAVE_ARTICLE) {
+            try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+                if (out == null) throw new Exception("stream");
+                out.write(pendingArticleText.getBytes(StandardCharsets.UTF_8));
+                out.flush();
+                runJs("window.onNativeArticleSaved && window.onNativeArticleSaved(" + JSONObject.quote(pendingArticleFileName) + ")");
+            } catch (Exception e) {
+                runJs("window.onNativeArticleSaveError && window.onNativeArticleSaveError('Не удалось сохранить статью')");
+            } finally {
+                pendingArticleText = "";
+                pendingArticleFileName = "article.md";
+            }
+            return;
+        }
+
         if (requestCode == REQUEST_OPEN_BACKGROUND) {
             try {
                 saveEditorBackground(uri);
@@ -433,6 +493,29 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+
+    private void installKeyboardObserver() {
+        final Rect visible = new Rect();
+        final int threshold = Math.round(100f * getResources().getDisplayMetrics().density);
+        web.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
+            private int lastInset = -1;
+            private boolean lastOpen = false;
+
+            @Override
+            public void onGlobalLayout() {
+                if (web == null) return;
+                web.getWindowVisibleDisplayFrame(visible);
+                int rootHeight = web.getRootView().getHeight();
+                int inset = Math.max(0, rootHeight - visible.bottom);
+                boolean open = inset > threshold;
+                int effective = open ? inset : 0;
+                if (effective == lastInset && open == lastOpen) return;
+                lastInset = effective;
+                lastOpen = open;
+                runJs("window.onNativeKeyboardInset && window.onNativeKeyboardInset(" + effective + "," + (open ? "true" : "false") + ")");
+            }
+        });
+    }
 
     private void saveEditorBackground(Uri uri) throws Exception {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
