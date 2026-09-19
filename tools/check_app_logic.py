@@ -95,6 +95,41 @@ if "scheduleRepeatNavigatorRefresh" not in bootstrap_js:
 
 if "function scheduleArticleSave()" not in articles_js or "articleDirty=true" not in articles_js:
     errors.append("native article autosave dirty-state scheduler is missing")
+if "function resetArticleAutosaveState()" not in articles_js:
+    errors.append("article switches must cancel stale autosave state")
+if "legacyNeedsRetry" not in articles_js or "if(migrated)" not in articles_js:
+    errors.append("legacy draft must remain until native article migration succeeds")
+if "if(!text.trim())return true;" in articles_js:
+    errors.append("empty article edits must be persisted before switching articles")
+
+open_start = articles_js.find("function openSavedArticle")
+if open_start < 0:
+    errors.append("missing openSavedArticle")
+else:
+    block = articles_js[open_start:open_start + 2200]
+    load_pos = block.find("AndroidDocuments.loadArticle(next)")
+    activate_pos = block.find("AndroidDocuments.setActiveArticle(next)")
+    if load_pos < 0 or activate_pos < 0 or load_pos > activate_pos:
+        errors.append("openSavedArticle must read the target before changing active article")
+    if "preserveCurrentArticleBeforeSwitch('Перед сменой статьи')" not in block:
+        errors.append("openSavedArticle must preserve current article before switching")
+
+new_start = articles_js.find("function createNewArticle")
+if new_start < 0 or "if(!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;" not in articles_js[new_start:new_start + 900]:
+    errors.append("createNewArticle must persist even an empty dirty article before switching")
+
+ui_js = (JS / "11-ui.js").read_text(encoding="utf-8")
+idea_start = ui_js.find("async function ideaAsText")
+if idea_start < 0 or "preserveCurrentArticleBeforeSwitch('Перед статьёй из идеи')" not in ui_js[idea_start:idea_start + 1800]:
+    errors.append("ideaAsText must preserve current article before switching")
+
+migration_start = history_js.find("function migrateLegacyVersions")
+if migration_start < 0:
+    errors.append("missing migrateLegacyVersions")
+else:
+    block = history_js[migration_start:migration_start + 1400]
+    if "result.ok||result.duplicate" not in block or "if(complete)" not in block:
+        errors.append("legacy versions must only be deleted after confirmed migration")
 
 # Zero-argument render() runs a full analysis by default and is forbidden in
 # routine UI/storage flows.
