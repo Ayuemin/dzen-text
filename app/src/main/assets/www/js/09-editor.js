@@ -1,4 +1,32 @@
-async function clearEditor(){if(!editor.value.trim()){toast('Поле уже пустое');return}if(!await appConfirm('Очистить текущий текст?','Перед очисткой будет сохранена версия, поэтому текст можно будет восстановить.','Очистить',true))return;saveVersionSnapshot('Перед очисткой',true);historyCheckpoint();stopSpeak();closeReplacement();closeNearbyRepeat();closeRepeatNavigator();closeSpellPanel();clearOnlineSpelling();editor.value='';localStorage.removeItem('dzenDraft');render(true);editor.focus();toast('Поле очищено')}
+async function clearEditor(){
+  if(!editor.value.trim()){
+    showPane('edit');
+    setTimeout(()=>editor.focus(),40);
+    return;
+  }
+  if(!await appConfirm('Очистить текущий текст?','Перед очисткой будет сохранена версия, поэтому текст можно будет восстановить.','Очистить',true))return;
+  saveVersionSnapshot('Перед очисткой',true);
+  historyCheckpoint();
+  stopSpeak();
+  closeReplacement();
+  closeNearbyRepeat();
+  closeRepeatNavigator();
+  if(typeof closeIssueNavigator==='function')closeIssueNavigator();
+  closeSpellPanel();
+  clearOnlineSpelling();
+  editor.value='';
+  localStorage.removeItem('dzenDraft');
+  markAnalysisStale();
+  render(false);
+  if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
+  if(typeof renderSavedArticles==='function')renderSavedArticles();
+  showPane('edit');
+  setTimeout(()=>{
+    editor.focus();
+    editor.setSelectionRange(0,0);
+  },60);
+  toast('Статья очищена');
+}
 function chooseFile(){if(window.AndroidFile&&typeof AndroidFile.pick==='function'){AndroidFile.pick();return}document.getElementById('fileInput').click()}
 function htmlToEditableText(html){const root=document.createElement('div');root.innerHTML=html;function walk(n){if(n.nodeType===3)return n.nodeValue||'';if(n.nodeType!==1)return '';const tag=n.tagName.toLowerCase();const inner=Array.from(n.childNodes).map(walk).join('');if(/^h[1-6]$/.test(tag))return '#'.repeat(+tag[1])+' '+inner.trim()+'\n\n';if(tag==='p'||tag==='div'||tag==='section'||tag==='article')return inner.trim()+'\n\n';if(tag==='br')return '\n';if(tag==='strong'||tag==='b')return '**'+inner+'**';if(tag==='em'||tag==='i')return '*'+inner+'*';if(tag==='blockquote')return inner.trim().split(/\n/).map(x=>'> '+x).join('\n')+'\n\n';if(tag==='li'){const ol=n.parentElement&&n.parentElement.tagName.toLowerCase()==='ol';return (ol?'1. ':'- ')+inner.trim()+'\n'}if(tag==='ul'||tag==='ol')return inner+'\n';if(tag==='hr')return '---\n\n';if(tag==='a'){const href=n.getAttribute('href')||'';return /^https?:/i.test(href)?`[${inner.trim()||href}](${href})`:inner}return inner}return walk(root).replace(/\n[ \t]+/g,'\n').replace(/\n{3,}/g,'\n\n').trim()}
 async function loadFileText(text,name=''){
@@ -78,13 +106,11 @@ function render(runAnalysis=true,forcePreview=false){
   if(forcePreview||previewActive)renderPreview();
   scheduleStatsUpdate(runAnalysis||forcePreview);
   if(runAnalysis)analyzeText();
-  if(settings.autosave){
-    if(typeof documentsAvailable==='function'&&documentsAvailable()){
-      if(typeof scheduleArticleSave==='function')scheduleArticleSave();
-    }else{
-      clearTimeout(saveTimer);
-      saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
-    }
+  if(typeof documentsAvailable==='function'&&documentsAvailable()){
+    if(typeof scheduleArticleSave==='function')scheduleArticleSave();
+  }else if(settings.autosave){
+    clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
   }
 }
 
