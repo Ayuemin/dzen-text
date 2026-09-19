@@ -79,7 +79,7 @@ document.addEventListener('touchend',e=>{
   if(!sideTouch||!e.changedTouches.length)return;
   const t=e.changedTouches[0],dx=t.clientX-sideTouch.x,dy=t.clientY-sideTouch.y;
   if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.4){
-    if(!sideTouch.drawer&&sideTouch.x<24&&dx>0)openSideDrawer();
+    if(!sideTouch.drawer&&sideTouch.x<64&&dx>0)openSideDrawer();
     else if(sideTouch.drawer&&dx<0)closeSideDrawer()
   }
   sideTouch=null
