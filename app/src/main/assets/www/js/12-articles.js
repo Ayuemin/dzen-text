@@ -49,13 +49,27 @@ function initArticleWorkspace(){
     return false;
   }
   let text=String(AndroidDocuments.loadArticle(activeArticleId)||'');
-  const legacy=localStorage.getItem('dzenDraft')||'';
+  let legacy='';
+  try{legacy=localStorage.getItem('dzenDraft')||''}catch(e){}
+  let legacyNeedsRetry=false;
   if(!text&&legacy){
     text=legacy;
-    AndroidDocuments.saveArticle(activeArticleId,text);
-    localStorage.removeItem('dzenDraft');
+    let migrated=false;
+    try{migrated=!!AndroidDocuments.saveArticle(activeArticleId,text)}catch(e){migrated=false}
+    if(migrated){
+      try{localStorage.removeItem('dzenDraft')}catch(e){}
+    }else{
+      // Не удаляем единственную старую копию, пока нативное хранилище
+      // не подтвердило запись. Фоновое автосохранение попробует ещё раз.
+      legacyNeedsRetry=true;
+    }
   }
   editor.value=text;
+  if(legacyNeedsRetry){
+    articleDirty=true;
+    scheduleArticleSave();
+    toast('Черновик восстановлен. Сохранение будет повторено автоматически');
+  }
   updateCurrentArticleUi();
   return true;
 }
@@ -196,7 +210,7 @@ function createNewArticle(){
   }
 
   setEditorTextForArticle('',true);
-  localStorage.removeItem('dzenDraft');
+  try{localStorage.removeItem('dzenDraft')}catch(e){}
   closeSideDrawer();
   updateCurrentArticleUi();
   renderSavedArticles();
