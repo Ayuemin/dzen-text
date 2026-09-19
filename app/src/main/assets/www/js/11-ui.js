@@ -197,6 +197,13 @@ function handleNativeBack(){
   if(typeof issueNavState!=='undefined'&&issueNavState){closeIssueNavigator();return true}
   const previewPane=document.getElementById('previewPane');
   if(previewPane&&previewPane.classList.contains('active')){showPane('edit');return true}
+
+  // Android may destroy the WebView immediately after Back. Flush the active
+  // article synchronously through the native bridge before allowing Activity exit.
+  try{
+    if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
+    if(typeof flushAutoVersion==='function')flushAutoVersion();
+  }catch(e){}
   return false;
 }
 
