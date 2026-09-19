@@ -1,3 +1,10 @@
+function afterProgrammaticEdit(runAnalysis=false){
+  markAnalysisStale();
+  render(!!runAnalysis);
+  if(typeof scheduleAutoVersion==='function')scheduleAutoVersion();
+  if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
+}
+
 async function clearEditor(){
   if(!editor.value.trim()){
     showPane('edit');
