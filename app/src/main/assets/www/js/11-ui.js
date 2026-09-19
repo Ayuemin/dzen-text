@@ -44,6 +44,7 @@ function saveIdeas(value){
 
 function openIdeas(){
   closeSideDrawer();
+  if(typeof closeAllCorrectionPanels==='function')closeAllCorrectionPanels();
   renderIdeas();
   document.getElementById('ideasBackdrop').classList.add('open');
   setTimeout(function(){document.getElementById('ideaInput').focus()},80);
@@ -128,18 +129,11 @@ async function ideaAsText(id){
     activeArticleId='local_'+Date.now();
   }
 
-  resetUndoHistory();
-  editor.value=idea.text||'';
-  clearOnlineSpelling();
-  markAnalysisStale();
-  render(false);
+  setEditorTextForArticle(idea.text||'',true);
   if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
   closeIdeas();
-  showPane('edit');
   updateCurrentArticleUi();
   renderSavedArticles();
-  editor.focus();
-  editor.setSelectionRange(editor.value.length,editor.value.length);
   toast('Идея открыта как новая статья');
 }
 
