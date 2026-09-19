@@ -1,7 +1,152 @@
-function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateDzenRulesStatus();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
+function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateDzenRulesStatus();renderCustomBackgrounds();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
 function closeSettings(){document.getElementById('settingsBackdrop').classList.remove('open')}
 function backdropClick(e){if(e.target.id==='settingsBackdrop')closeSettings()}
 let cachedCustomBackground='';
+let cachedCustomBackgroundId='';
+function normalizeAccentHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:'#D65C43'}
+
+function backgroundList(){
+  try{
+    if(window.AndroidFile&&typeof AndroidFile.backgroundList==='function'){
+      const list=JSON.parse(AndroidFile.backgroundList()||'[]');
+      return Array.isArray(list)?list:[];
+    }
+  }catch(e){}
+  return [];
+}
+
+function currentBackgroundId(){
+  if(settings.customBackgroundId)return String(settings.customBackgroundId);
+  try{
+    if(window.AndroidFile&&typeof AndroidFile.activeBackgroundId==='function'){
+      return String(AndroidFile.activeBackgroundId()||'');
+    }
+  }catch(e){}
+  return '';
+}
+
+function readCustomBackground(){
+  const id=currentBackgroundId();
+  if(!id)return '';
+  if(cachedCustomBackground&&cachedCustomBackgroundId===id)return cachedCustomBackground;
+  cachedCustomBackground='';
+  cachedCustomBackgroundId=id;
+  try{
+    if(window.AndroidFile&&typeof AndroidFile.backgroundDataById==='function'){
+      cachedCustomBackground=AndroidFile.backgroundDataById(id)||'';
+    }else if(window.AndroidFile&&typeof AndroidFile.backgroundData==='function'){
+      cachedCustomBackground=AndroidFile.backgroundData()||'';
+    }
+  }catch(e){}
+  return cachedCustomBackground;
+}
+
+function chooseBackground(){
+  if(window.AndroidFile&&typeof AndroidFile.pickBackground==='function'){
+    AndroidFile.pickBackground();
+    return;
+  }
+  toast('Выбор собственного фона доступен в установленном приложении');
+}
+
+function renderCustomBackgrounds(){
+  const root=document.getElementById('customBackgroundList');
+  if(!root)return;
+  const list=backgroundList();
+  if(!list.length){
+    root.innerHTML='<div class="backgroundEmpty">Своих фонов пока нет</div>';
+    return;
+  }
+  const active=currentBackgroundId();
+  root.innerHTML=list.map(item=>{
+    const id=String(item.id||'').replace(/'/g,'');
+    const name=escapeHtml(item.name||'Свой фон');
+    const selected=id===active;
+    return '<div class="backgroundItem '+(selected?'active':'')+'">'+
+      '<button type="button" class="backgroundSelect" onclick="selectCustomBackground(\''+id+'\')">'+
+      '<span class="backgroundIcon">▧</span><span class="backgroundName">'+name+'</span>'+
+      (selected?'<span class="backgroundActive">выбран</span>':'')+
+      '</button>'+
+      '<button type="button" class="backgroundDelete" onclick="deleteCustomBackground(\''+id+'\')" aria-label="Удалить фон">×</button>'+
+      '</div>';
+  }).join('');
+}
+
+function selectCustomBackground(id){
+  let ok=false;
+  try{
+    if(window.AndroidFile&&typeof AndroidFile.selectBackground==='function')ok=!!AndroidFile.selectBackground(id);
+  }catch(e){}
+  if(!ok){toast('Не удалось выбрать фон');return}
+  settings.customBackgroundId=String(id||'');
+  settings.paper='custom';
+  cachedCustomBackground='';
+  cachedCustomBackgroundId='';
+  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  syncSettingsUI();
+  applyVisualSettings();
+  renderCustomBackgrounds();
+}
+
+async function deleteCustomBackground(id){
+  const list=backgroundList();
+  const item=list.find(x=>String(x.id)===String(id));
+  const name=item&&item.name?item.name:'этот фон';
+  const ok=await appConfirm('Удалить фон?','«'+name+'» будет удалён только из приложения. Исходное изображение на телефоне не изменится.','Удалить',true);
+  if(!ok)return;
+  let deleted=false;
+  try{
+    if(window.AndroidFile&&typeof AndroidFile.deleteBackground==='function')deleted=!!AndroidFile.deleteBackground(id);
+  }catch(e){}
+  if(!deleted){toast('Не удалось удалить фон');return}
+  if(String(settings.customBackgroundId||'')===String(id)){
+    const next=currentBackgroundId();
+    settings.customBackgroundId=next;
+    if(!next)settings.paper='gray';
+  }
+  cachedCustomBackground='';
+  cachedCustomBackgroundId='';
+  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  syncSettingsUI();
+  applyVisualSettings();
+  renderCustomBackgrounds();
+  toast('Фон удалён');
+}
+
+function onPaperSelectChanged(){
+  if(paperSelect.value==='custom'){
+    const list=backgroundList();
+    if(!list.length){
+      paperSelect.value=settings.paper||'gray';
+      chooseBackground();
+      return;
+    }
+    if(!currentBackgroundId())selectCustomBackground(list[0].id);
+  }
+  applySettings();
+}
+
+window.onNativeBackgroundAdded=(id,name)=>{
+  cachedCustomBackground='';
+  cachedCustomBackgroundId='';
+  settings.customBackgroundId=String(id||'');
+  settings.paper='custom';
+  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  syncSettingsUI();
+  applyVisualSettings();
+  renderCustomBackgrounds();
+  toast(name?'Фон добавлен: '+name:'Фон добавлен');
+};
+window.onNativeBackgroundSelected=(id)=>{
+  cachedCustomBackground='';
+  cachedCustomBackgroundId='';
+  settings.customBackgroundId=String(id||'');
+  if(!id&&settings.paper==='custom')settings.paper='gray';
+  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  syncSettingsUI();
+  applyVisualSettings();
+  renderCustomBackgrounds();
+};
 let cachedCustomFontData='';
 let cachedCustomFontName='';
 function normalizeAccentHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:'#D65C43'}
@@ -44,7 +189,7 @@ function onFontSelectChanged(){
 function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
 window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';localStorage.setItem('dzenSettings',JSON.stringify(settings));}else if(settings.font==='custom'){settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
 window.onNativeFontError=(msg)=>toast(msg||'Не удалось подключить шрифт');
-function syncSettingsUI(){paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;markdownToolbarSwitch.checked=settings.markdownToolbar!==false;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus()}
+function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;markdownToolbarSwitch.checked=settings.markdownToolbar!==false;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus()}
 async function applySettings(){
   let wantsOnline=onlineSpelling.checked;
   if(wantsOnline&&!settings.onlineSpelling){
@@ -66,6 +211,7 @@ async function applySettings(){
     accent:normalizeAccentHex(accentHex.value),
     backgroundVeil:+backgroundVeil.value,
     backgroundText:backgroundTextSelect.value,
+    customBackgroundId:settings.customBackgroundId||currentBackgroundId(),
     font:fontSelect.value,
     size:+sizeRange.value,
     line:+lineRange.value,
