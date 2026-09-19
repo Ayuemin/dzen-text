@@ -237,8 +237,9 @@
     <details class="settingsGroup">
       <summary><span>Сохранение и предпросмотр</span><small>Черновик, версии и HTML</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Автосохранение черновика</span><input id="autosaveSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Текст хранится только на этом устройстве.</div>
+        <input id="autosaveSwitch" type="checkbox" checked hidden>
+        <div class="saveAlwaysRow"><b>Автосохранение статьи включено всегда</b><span>Текст сохраняется локально на устройстве примерно через секунду после изменений.</span></div>
+        <div class="smallNote">Автоверсия создаётся после начала редактирования и затем не чаще одного раза в минуту.</div>
         <div class="switchRow" style="margin-top:13px"><span>Показывать HTML-код в превью</span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button></div>
       </div>
