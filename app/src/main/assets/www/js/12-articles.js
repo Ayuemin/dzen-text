@@ -73,6 +73,33 @@ function scheduleArticleSave(){
   },1100);
 }
 
+function preserveCurrentArticleBeforeSwitch(reason){
+  const text=editor.value||'';
+  if(!text.trim())return true;
+
+  if(documentsAvailable()){
+    if(!activeArticleId){
+      try{activeArticleId=String(AndroidDocuments.ensureActiveArticle()||'')}catch(e){}
+    }
+    let saved=false;
+    try{saved=!!AndroidDocuments.saveArticle(activeArticleId,text)}catch(e){saved=false}
+    if(!saved){
+      toast('Не удалось сохранить текущую статью. Переход отменён');
+      return false;
+    }
+  }else{
+    try{localStorage.setItem('dzenDraft',text)}catch(e){
+      toast('Не удалось сохранить текущую статью. Переход отменён');
+      return false;
+    }
+  }
+
+  if(typeof saveVersionSnapshot==='function'){
+    saveVersionSnapshot(reason||'Перед сменой статьи',true);
+  }
+  return true;
+}
+
 function resetEditorPanels(){
   try{closeReplacement()}catch(e){}
   try{closeNearbyRepeat()}catch(e){}
@@ -102,16 +129,22 @@ function setEditorTextForArticle(text,focus){
 function createNewArticle(){
   const previousId=activeArticleId;
   const hadText=!!editor.value.trim();
-  persistCurrentArticleNow();
-  if(hadText&&typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед новой статьёй',true);
+
+  if(hadText&&!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;
+
   if(documentsAvailable()){
     if(!hadText&&previousId){
       try{AndroidDocuments.deleteArticle(previousId)}catch(e){}
     }
     activeArticleId=String(AndroidDocuments.createArticle()||'');
+    if(!activeArticleId){
+      toast('Не удалось создать новую статью');
+      return;
+    }
   }else{
     activeArticleId='local_'+Date.now();
   }
+
   setEditorTextForArticle('',true);
   localStorage.removeItem('dzenDraft');
   closeSideDrawer();
@@ -123,8 +156,7 @@ function openSavedArticle(id){
   if(!documentsAvailable())return;
   const next=String(id||'');
   if(!next||next===activeArticleId){closeSideDrawer();return}
-  persistCurrentArticleNow();
-  if(editor.value.trim()&&typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед сменой статьи',true);
+  if(editor.value.trim()&&!preserveCurrentArticleBeforeSwitch('Перед сменой статьи'))return;
   if(!AndroidDocuments.setActiveArticle(next)){toast('Не удалось открыть статью');return}
   activeArticleId=next;
   const text=String(AndroidDocuments.loadArticle(next)||'');
