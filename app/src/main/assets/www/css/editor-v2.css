@@ -133,3 +133,184 @@
 .accentRow{display:flex;align-items:center;gap:10px}
 .accentRow input{flex:1;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:10px 11px;font:14px ui-monospace,monospace;text-transform:uppercase}
 .accentPreview{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:block;flex:0 0 auto}
+
+/* v1.9 visual polish: calmer, denser Android-like workspace */
+.editor{
+  padding:78px 24px 56px!important;
+  font-feature-settings:"kern" 1;
+}
+.previewWrap{padding:72px 22px 50px}
+.article{padding:6px 2px 46px}
+
+.workspaceControls{
+  top:calc(env(safe-area-inset-top) + 7px);
+  height:48px;
+}
+.roundFloat{
+  width:42px;height:42px;
+  border-color:color-mix(in srgb,var(--paper-text) 14%,transparent);
+  background:color-mix(in srgb,var(--paper-bg) 82%,transparent);
+  box-shadow:0 5px 18px rgba(18,20,18,.10);
+  backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px);
+  transition:transform .12s ease,background .12s ease;
+}
+.roundFloat:active{transform:scale(.94)}
+.roundFloat svg{width:21px;height:21px}
+.navFloat{left:12px}.moreFloat{right:12px}
+:root[data-paper="dark"] .roundFloat{background:rgba(29,30,31,.82)}
+:root[data-paper="custom"] .roundFloat{background:rgba(250,250,247,.78)}
+:root[data-paper="custom"][style*="--paper-text: #F4F3EE"] .roundFloat{background:rgba(25,25,25,.58)}
+
+.quickMenu{
+  left:auto!important;
+  right:12px!important;
+  top:calc(env(safe-area-inset-top) + 57px)!important;
+  width:min(72vw,260px)!important;
+  min-width:0!important;
+  max-width:260px!important;
+  padding:7px!important;
+  border-radius:20px!important;
+  border-color:color-mix(in srgb,var(--border) 78%,transparent)!important;
+  background:color-mix(in srgb,var(--surface) 94%,transparent)!important;
+  box-shadow:0 18px 48px rgba(0,0,0,.20)!important;
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  transform-origin:top right;
+}
+.quickMenu.open{display:block;animation:quickMenuIn .14s ease-out}
+@keyframes quickMenuIn{
+  from{opacity:0;transform:translateY(-5px) scale(.97)}
+  to{opacity:1;transform:none}
+}
+.quickMenu button{
+  min-height:45px!important;
+  padding:0 13px!important;
+  border-radius:13px!important;
+  font-size:14.5px!important;
+  font-weight:560!important;
+  letter-spacing:.005em;
+}
+.quickMenu button:active{background:var(--surface2)!important}
+.quickMenu .dangerText{
+  margin-top:5px!important;
+  padding-top:0!important;
+  border-top:1px solid color-mix(in srgb,var(--border) 70%,transparent)!important;
+  border-radius:0 0 13px 13px!important;
+}
+
+.sideBackdrop{
+  background:rgba(0,0,0,.30);
+  backdrop-filter:blur(1.5px);
+  -webkit-backdrop-filter:blur(1.5px);
+}
+.sideDrawer{
+  width:min(78vw,304px)!important;
+  padding:calc(20px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom))!important;
+  border-radius:0 24px 24px 0;
+  background:color-mix(in srgb,var(--surface) 97%,var(--paper-bg));
+  box-shadow:16px 0 44px rgba(0,0,0,.20);
+}
+.drawerHead{
+  padding:3px 2px 18px!important;
+  border-bottom-color:color-mix(in srgb,var(--border) 72%,transparent)!important;
+}
+.drawerTitle{font-size:21px!important;font-weight:760!important;letter-spacing:-.02em}
+.drawerSub{font-size:11.5px!important;line-height:1.35!important;margin-top:4px!important}
+.drawerClose{
+  width:36px!important;height:36px!important;
+  border-radius:50%;
+  font-size:24px!important;
+}
+.drawerNav{padding:11px 0!important;gap:2px}
+.drawerNav button,.drawerSettings{
+  min-height:47px;
+  padding:0 12px!important;
+  display:flex;align-items:center;justify-content:space-between;
+  border-radius:13px!important;
+  font-size:15.5px!important;
+  font-weight:520;
+}
+.drawerNav button::after,.drawerSettings::after{
+  content:"›";
+  color:var(--muted);
+  font-size:20px;
+  font-weight:400;
+  opacity:.55;
+}
+.drawerNav button:active,.drawerSettings:active{background:var(--surface2)!important}
+.drawerSettings{
+  border-top:1px solid color-mix(in srgb,var(--border) 72%,transparent)!important;
+  border-radius:0!important;
+  padding-top:9px!important;
+}
+
+.bottom{
+  padding:0 7px calc(3px + env(safe-area-inset-bottom)) 12px!important;
+}
+.stats{
+  font-size:10.8px!important;
+  opacity:.64!important;
+  letter-spacing:.01em;
+}
+.analysisDot{width:40px!important;height:40px!important}
+.analysisDot span{width:9px!important;height:9px!important}
+
+/* Sheets inherit the same calmer visual language */
+.sheet{
+  border-radius:26px 26px 0 0!important;
+  padding:14px 18px calc(24px + env(safe-area-inset-bottom))!important;
+  box-shadow:0 -18px 54px rgba(0,0,0,.22)!important;
+}
+.handle{
+  width:38px!important;height:4px!important;
+  margin-bottom:15px!important;
+  opacity:.9;
+}
+.sheetHeader h2{
+  font-size:20px!important;
+  font-weight:740!important;
+  letter-spacing:-.015em;
+}
+.sheetClose{
+  width:36px!important;height:36px!important;
+  border-radius:50%!important;
+  background:var(--surface2)!important;
+  font-size:21px!important;
+}
+.setting{
+  padding:14px 0!important;
+  border-top-color:color-mix(in srgb,var(--border) 72%,transparent)!important;
+}
+.setting label,.switchRow span{font-weight:600!important}
+.setting select{
+  min-height:44px!important;
+  border-radius:12px!important;
+}
+.nativeBtn{
+  border-radius:11px!important;
+}
+.analysisFilter{
+  border-radius:999px!important;
+  min-height:36px;
+  padding:0 12px!important;
+}
+
+/* Ideas use cards but stay visually light */
+.ideasSheet{max-height:82vh!important}
+.ideaComposer textarea{
+  border-radius:15px!important;
+  background:color-mix(in srgb,var(--surface2) 86%,transparent)!important;
+}
+.ideaCard{
+  border-radius:15px!important;
+  background:color-mix(in srgb,var(--surface2) 82%,transparent)!important;
+}
+.ideaActions button{border-radius:10px!important}
+
+@media(max-width:380px){
+  .editor{padding-left:20px!important;padding-right:20px!important}
+  .quickMenu{width:min(76vw,250px)!important}
+  .sideDrawer{width:min(82vw,292px)!important}
+}
+
