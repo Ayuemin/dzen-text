@@ -4,7 +4,6 @@ let redoStack=[];
 let beforeInputSnapshot=null;
 let lastTypingAt=0;
 let autoVersionTimer=null;
-let autoVersionInterval=null;
 let autoVersionDirty=false;
 let lastAutoVersionAt=0;
 let historyRestoring=false;
@@ -44,6 +43,7 @@ function resetUndoHistory(){
   clearTimeout(autoVersionTimer);
   autoVersionTimer=null;
   autoVersionDirty=false;
+  lastAutoVersionAt=0;
   updateHistoryButtons();
 }
 
@@ -296,12 +296,18 @@ function flushAutoVersion(){
   const now=Date.now();
   const minGap=60000;
   if(lastAutoVersionAt&&now-lastAutoVersionAt<minGap)return false;
-  if(saveVersionSnapshot('Авто',true)){
+
+  if(!editor.value.trim()){
     autoVersionDirty=false;
-    lastAutoVersionAt=now;
-    return true;
+    return false;
   }
-  return false;
+
+  const saved=saveVersionSnapshot('Авто',true);
+  // Duplicate/current-state-already-saved is also a completed snapshot attempt.
+  // Do not keep retrying the same text forever.
+  autoVersionDirty=false;
+  if(saved)lastAutoVersionAt=now;
+  return saved;
 }
 
 function scheduleAutoVersion(){
@@ -317,16 +323,9 @@ function scheduleAutoVersion(){
 
   autoVersionTimer=setTimeout(function(){
     autoVersionTimer=null;
-    flushAutoVersion();
+    const flushed=flushAutoVersion();
     if(autoVersionDirty)scheduleAutoVersion();
   },wait);
-
-  if(!autoVersionInterval){
-    autoVersionInterval=setInterval(function(){
-      if(flushAutoVersion())clearTimeout(autoVersionTimer);
-      if(autoVersionDirty&&!autoVersionTimer)scheduleAutoVersion();
-    },60000);
-  }
 }
 
 editor.addEventListener('beforeinput',function(){
