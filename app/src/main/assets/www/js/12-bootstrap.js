@@ -12,12 +12,16 @@ function bootstrapDzenText(){
     if(replacementState)closeReplacement();
     if(nearbyState)closeNearbyRepeat();
     if(repeatNavState)closeRepeatNavigator();
+    if(typeof issueNavState!=='undefined'&&issueNavState)closeIssueNavigator();
     if(spellNavState)closeSpellPanel();
     const pasted=inputWasPaste;
     inputWasPaste=false;
     clearOnlineSpelling();
-    render(pasted);
-    if(!pasted)markAnalysisStale();
+    render(false);
+    markAnalysisStale();
+    if(pasted&&editor.value.length<120000){
+      setTimeout(()=>{try{analyzeText()}catch(e){}},240);
+    }
   });
   editor.addEventListener('keydown',e=>{
     if(e.key==='Tab'){
@@ -59,15 +63,20 @@ function bootstrapDzenText(){
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&speaking)stopSpeak()});
 
   applyVisualSettings();
-  if(settings.autosave){
+  let managed=false;
+  if(typeof initArticleWorkspace==='function')managed=initArticleWorkspace();
+  if(!managed&&settings.autosave){
     const draft=localStorage.getItem('dzenDraft');
     if(draft)editor.value=draft;
   }
+  if(typeof migrateLegacyVersions==='function')migrateLegacyVersions();
   syncSettingsUI();
   updateUserSynonymStatus();
   updateDzenRulesStatus();
   updateSpellIgnoreStatus();
-  render();
+  render(false);
+  if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
+  if(typeof updateDrawerSpeakLabel==='function')updateDrawerSpeakLabel();
   setTimeout(updateDictStatus,80);
   setTimeout(updateDictStatus,800);
 }
