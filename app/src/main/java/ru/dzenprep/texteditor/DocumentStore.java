@@ -92,6 +92,7 @@ public final class DocumentStore {
 
         for (File file : list) {
             try {
+                if (file.length() == 0L) continue;
                 String name = file.getName();
                 String id = name.substring(0, name.length() - 4);
                 JSONObject item = new JSONObject();
