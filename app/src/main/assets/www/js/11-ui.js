@@ -100,16 +100,24 @@ async function ideaAsText(id){
   }
 
   if(documentsAvailable()){
-    const newId=String(AndroidDocuments.createArticle()||'');
+    const previousId=activeArticleId;
+    let newId='';
+    try{newId=String(AndroidDocuments.createArticle()||'')}catch(e){newId=''}
     if(!newId){
       toast('Не удалось создать статью из идеи');
       return;
     }
-    activeArticleId=newId;
-    if(!AndroidDocuments.saveArticle(activeArticleId,idea.text||'')){
+
+    let saved=false;
+    try{saved=!!AndroidDocuments.saveArticle(newId,idea.text||'')}catch(e){saved=false}
+    if(!saved){
+      try{AndroidDocuments.deleteArticle(newId)}catch(e){}
+      try{if(previousId)AndroidDocuments.setActiveArticle(previousId)}catch(e){}
+      activeArticleId=previousId;
       toast('Не удалось сохранить статью из идеи');
       return;
     }
+    activeArticleId=newId;
   }else{
     activeArticleId='local_'+Date.now();
   }
