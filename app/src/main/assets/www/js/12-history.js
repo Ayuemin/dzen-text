@@ -114,10 +114,21 @@ function migrateLegacyVersions(){
   if(!nativeVersionsAvailable())return;
   const old=legacyVersions();
   if(!old.length)return;
-  for(const item of old.slice(0,12)){
-    try{AndroidDocuments.saveVersion(activeArticleId,item.reason||'Перенесено',item.text||'')}catch(e){}
+  const pending=old.slice(0,12);
+  let complete=true;
+  for(const item of pending){
+    try{
+      const result=JSON.parse(AndroidDocuments.saveVersion(activeArticleId,item.reason||'Перенесено',item.text||'')||'{}');
+      if(!(result.ok||result.duplicate))complete=false;
+    }catch(e){
+      complete=false;
+    }
   }
-  localStorage.removeItem(LEGACY_VERSIONS_KEY);
+  // Старое хранилище удаляем только после подтверждённого переноса каждой
+  // версии. При нехватке места или ошибке записи исходные копии остаются.
+  if(complete){
+    try{localStorage.removeItem(LEGACY_VERSIONS_KEY)}catch(e){}
+  }
 }
 
 function saveVersionSnapshot(reason,silent){
@@ -276,10 +287,18 @@ async function restoreVersion(id){
 async function deleteVersion(id){
   const ok=await appConfirm('Удалить версию?','Эту сохранённую копию нельзя будет восстановить.','Удалить',true);
   if(!ok)return;
+  let deleted=false;
   if(nativeVersionsAvailable()){
-    try{AndroidDocuments.deleteVersion(activeArticleId,id)}catch(e){}
+    try{deleted=!!AndroidDocuments.deleteVersion(activeArticleId,id)}catch(e){deleted=false}
   }else{
-    localStorage.setItem(LEGACY_VERSIONS_KEY,JSON.stringify(legacyVersions().filter(function(x){return String(x.id)!==String(id)})));
+    try{
+      localStorage.setItem(LEGACY_VERSIONS_KEY,JSON.stringify(legacyVersions().filter(function(x){return String(x.id)!==String(id)})));
+      deleted=true;
+    }catch(e){deleted=false}
+  }
+  if(!deleted){
+    toast('Не удалось удалить версию');
+    return;
   }
   renderVersions();
 }
