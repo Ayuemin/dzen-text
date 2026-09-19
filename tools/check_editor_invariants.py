@@ -38,6 +38,10 @@ if "body.keyboard-open.app{padding-bottom:calc(env(safe-area-inset-bottom)+var(-
     errors.append("editor layout must reserve unresolved Android keyboard overlap")
 if "bottom:calc(8px+env(safe-area-inset-bottom)+var(--keyboardInset))!important" not in compact_css:
     errors.append("fixed editor panels must stay above the Android keyboard")
+if "body.keyboard-open.sheetBackdrop.open.sheet{bottom:var(--keyboardInset)!important;" not in compact_css:
+    errors.append("open bottom sheets must rise above unresolved Android keyboard overlap")
+if "#riskWords.riskArea{min-height:190px!important;" not in compact_css:
+    errors.append("control-word textarea must remain a comfortable multiline editor")
 
 for block in re.findall(r"\.markdownToolbar\s*\{([^}]*)\}", css, re.S):
     if re.search(r"position\s*:\s*fixed", block):
@@ -66,6 +70,9 @@ if "markdown-toolbar-visible .bottom{display:none" not in css.replace("\n", "").
     compact = re.sub(r"\s+", "", css)
     if "body.markdown-toolbar-visible.bottom{display:none!important}" in compact:
         pass
+
+if "keepFocusedSheetFieldVisible" not in core or "scrollIntoView" not in core:
+    errors.append("focused sheet fields must be revealed after the keyboard opens")
 
 toolbar = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
 if "touchDevice" not in toolbar or "keyboardExpected" not in toolbar:

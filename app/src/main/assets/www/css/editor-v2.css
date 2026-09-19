@@ -1208,3 +1208,32 @@ body.markdown-toolbar-visible .issueNavPanel,body.markdown-toolbar-visible .repe
   color:var(--paper-muted)!important;
   opacity:.48!important;
 }
+
+
+/* Bottom sheets with text inputs use the same unresolved IME overlap as the editor. */
+body.keyboard-open .sheetBackdrop.open .sheet{
+  bottom:var(--keyboardInset)!important;
+  max-height:calc(100vh - var(--keyboardInset) - max(12px,env(safe-area-inset-top)))!important;
+}
+
+/* Control-word list is a real multiline editor, not an input-sized box. */
+#riskWords.riskArea{
+  min-height:190px!important;
+  height:190px;
+  max-height:42vh;
+  resize:vertical;
+  padding:12px 13px!important;
+  font:500 15px/1.48 system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  white-space:pre-wrap;
+  overflow:auto;
+}
+
+/* Give the quick-idea composer enough room when the keyboard is open. */
+#ideaInput{
+  min-height:108px;
+  padding:11px 12px!important;
+  line-height:1.45!important;
+}
+body.keyboard-open .ideasSheet{
+  max-height:calc(100vh - var(--keyboardInset) - max(12px,env(safe-area-inset-top)))!important;
+}

@@ -315,7 +315,7 @@
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Проверять риск-слова</span><input id="riskCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Это ваш редакторский список. По одному слову или фразе на строку.</div>
-        <textarea id="riskWords" class="riskArea" oninput="applySettings()" placeholder="VPN&#10;ВПН&#10;обход"></textarea>
+        <textarea id="riskWords" class="riskArea" rows="8" oninput="applySettings()" placeholder="VPN&#10;ВПН&#10;обход"></textarea>
         <div class="settingActions"><button class="nativeBtn" type="button" onclick="resetRiskWords()">Вернуть пример</button><button class="nativeBtn" type="button" onclick="clearRiskWords()">Очистить</button></div>
       </div>
     </details>

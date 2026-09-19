@@ -1,5 +1,10 @@
 function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateDzenRulesStatus();renderCustomBackgrounds();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
-function closeSettings(){document.getElementById('settingsBackdrop').classList.remove('open')}
+function closeSettings(){
+  const backdrop=document.getElementById('settingsBackdrop');
+  const active=document.activeElement;
+  if(active&&backdrop.contains(active)&&typeof active.blur==='function')active.blur();
+  backdrop.classList.remove('open');
+}
 function backdropClick(e){if(e.target.id==='settingsBackdrop')closeSettings()}
 let cachedCustomBackground='';
 let cachedCustomBackgroundId='';
