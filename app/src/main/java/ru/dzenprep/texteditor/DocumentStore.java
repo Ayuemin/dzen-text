@@ -44,6 +44,7 @@ public final class DocumentStore {
     }
 
     public synchronized String createArticle() {
+        cleanupTransientEmptyActiveArticle();
         String id = "a_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
         try {
             writeUtf8(articleFile(id), "");
@@ -96,14 +97,21 @@ public final class DocumentStore {
 
         for (File file : list) {
             try {
-                if (file.length() == 0L) continue;
                 String name = file.getName();
                 String id = name.substring(0, name.length() - 4);
+                boolean empty = file.length() == 0L;
+                File titleSource = file;
+                if (empty) {
+                    File newestVersion = newestVersionFile(versionDir(id));
+                    if (newestVersion == null) continue;
+                    titleSource = newestVersion;
+                }
                 JSONObject item = new JSONObject();
                 item.put("id", id);
-                item.put("title", deriveTitle(readPrefix(file, 4096)));
+                item.put("title", deriveTitle(readPrefix(titleSource, 4096)));
                 item.put("updated", file.lastModified());
                 item.put("size", file.length());
+                item.put("empty", empty);
                 out.put(item);
             } catch (Exception ignored) { }
         }
@@ -288,6 +296,17 @@ public final class DocumentStore {
                 if (reason.startsWith("Авто")) out.add(file);
             }
         }
+    }
+
+    private void cleanupTransientEmptyActiveArticle() {
+        String active = safeId(prefs.getString(ACTIVE_KEY, ""));
+        if (active.isEmpty()) return;
+        File article = articleFile(active);
+        if (!article.exists() || article.length() != 0L) return;
+        if (newestVersionFile(versionDir(active)) != null) return;
+        article.delete();
+        deleteRecursively(versionDir(active));
+        prefs.edit().remove(ACTIVE_KEY).apply();
     }
 
     private File newestVersionFile(File dir) {
