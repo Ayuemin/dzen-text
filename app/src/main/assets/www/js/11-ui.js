@@ -89,18 +89,46 @@ function insertIdea(id){
 async function ideaAsText(id){
   const idea=loadIdeas().find(function(x){return x.id===id});
   if(!idea)return;
-  if(editor.value.trim()&&!await appConfirm('Сделать идею текущим текстом?','Текущий текст будет сохранён в версиях перед заменой.','Заменить',false))return;
-  if(typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед заменой идеей',true);
-  historyCheckpoint();
-  editor.value=idea.text;
+
+  if(editor.value.trim()){
+    const ok=await appConfirm(
+      'Создать статью из идеи?',
+      'Текущая статья сохранится в библиотеке, а идея откроется как новая статья.',
+      'Создать статью',
+      false
+    );
+    if(!ok)return;
+    if(typeof preserveCurrentArticleBeforeSwitch==='function'&&!preserveCurrentArticleBeforeSwitch('Перед статьёй из идеи'))return;
+  }
+
+  if(documentsAvailable()){
+    const newId=String(AndroidDocuments.createArticle()||'');
+    if(!newId){
+      toast('Не удалось создать статью из идеи');
+      return;
+    }
+    activeArticleId=newId;
+    if(!AndroidDocuments.saveArticle(activeArticleId,idea.text||'')){
+      toast('Не удалось сохранить статью из идеи');
+      return;
+    }
+  }else{
+    activeArticleId='local_'+Date.now();
+  }
+
+  resetUndoHistory();
+  editor.value=idea.text||'';
   clearOnlineSpelling();
-  render(false);
   markAnalysisStale();
+  render(false);
   if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
   closeIdeas();
   showPane('edit');
+  updateCurrentArticleUi();
+  renderSavedArticles();
   editor.focus();
-  toast('Идея открыта в редакторе');
+  editor.setSelectionRange(editor.value.length,editor.value.length);
+  toast('Идея открыта как новая статья');
 }
 
 function renderIdeas(){
