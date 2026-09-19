@@ -1,9 +1,69 @@
-function activeCorrectionPanel(){for(const id of ['replacePanel','nearbyPanel','repeatNavPanel','spellPanel']){const el=document.getElementById(id);if(el&&el.classList.contains('open'))return el}return null}
+function activeCorrectionPanel(){for(const id of ['replacePanel','nearbyPanel','repeatNavPanel','spellPanel','issueNavPanel']){const el=document.getElementById(id);if(el&&el.classList.contains('open'))return el}return null}
 function textareaCaretContentTop(pos){const cs=getComputedStyle(editor),mirror=document.createElement('div');mirror.style.position='fixed';mirror.style.left='-10000px';mirror.style.top='0';mirror.style.visibility='hidden';mirror.style.pointerEvents='none';mirror.style.whiteSpace='pre-wrap';mirror.style.overflowWrap='break-word';mirror.style.wordBreak=cs.wordBreak||'normal';mirror.style.boxSizing=cs.boxSizing;mirror.style.width=editor.offsetWidth+'px';mirror.style.padding=cs.padding;mirror.style.border=cs.border;mirror.style.fontFamily=cs.fontFamily;mirror.style.fontSize=cs.fontSize;mirror.style.fontWeight=cs.fontWeight;mirror.style.fontStyle=cs.fontStyle;mirror.style.letterSpacing=cs.letterSpacing;mirror.style.lineHeight=cs.lineHeight;mirror.style.tabSize=cs.tabSize||'8';mirror.textContent=editor.value.slice(0,Math.max(0,pos));const marker=document.createElement('span');marker.textContent='\u200b';mirror.appendChild(marker);document.body.appendChild(mirror);const top=marker.offsetTop;mirror.remove();return top}
 function ensureSelectionVisible(start,end){if(!editor||!editor.offsetWidth)return;const er=editor.getBoundingClientRect();if(!er.height)return;const vv=window.visualViewport;const viewportTop=vv?vv.offsetTop:0,viewportBottom=vv?vv.offsetTop+vv.height:window.innerHeight;let visibleTop=Math.max(er.top,viewportTop)+12,visibleBottom=Math.min(er.bottom,viewportBottom)-12;const panel=activeCorrectionPanel();if(panel){const pr=panel.getBoundingClientRect();if(pr.height&&pr.top>visibleTop)visibleBottom=Math.min(visibleBottom,pr.top-12)}if(visibleBottom-visibleTop<80)return;const contentTop=textareaCaretContentTop(start),targetY=visibleTop+(visibleBottom-visibleTop)*0.43,maxScroll=Math.max(0,editor.scrollHeight-editor.clientHeight),desired=contentTop-(targetY-er.top);editor.scrollTop=Math.max(0,Math.min(maxScroll,desired))}
 let selectionVisibilityTimer=null;function scheduleSelectionVisibility(delay=40){if(!activeCorrectionPanel())return;clearTimeout(selectionVisibilityTimer);selectionVisibilityTimer=setTimeout(()=>ensureSelectionVisible(editor.selectionStart,editor.selectionEnd),delay)}
 if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>scheduleSelectionVisibility(55));window.visualViewport.addEventListener('scroll',()=>scheduleSelectionVisibility(55))}window.addEventListener('resize',()=>scheduleSelectionVisibility(55));
 function jumpTo(start,end,quiet=false){document.getElementById('analysisBackdrop').classList.remove('open');showPane('edit');setTimeout(()=>{const s=Math.max(0,start),e=Math.max(s,end);editor.focus();editor.setSelectionRange(s,e);ensureSelectionVisible(s,e);setTimeout(()=>ensureSelectionVisible(s,e),140);setTimeout(()=>ensureSelectionVisible(s,e),320);if(!quiet){const h=document.getElementById('highlightHint');h.classList.add('show');setTimeout(()=>h.classList.remove('show'),1200)}},70)}
+
+let issueNavState=null;
+function issueTypeLabel(type){
+  const group=(typeof issueGroups==='function'?issueGroups():[]).find(x=>x.id===type);
+  return group?group.name:'Замечания';
+}
+function openIssueNavigator(issueIndex){
+  const issue=currentAnalysis.issues[issueIndex];
+  if(!issue)return;
+  const same=currentAnalysis.issues.filter(x=>x.type===issue.type);
+  if(same.length<2){jumpTo(issue.start,issue.end);return}
+  closeAnalysis();
+  if(replacementState)closeReplacement();
+  if(nearbyState)closeNearbyRepeat();
+  if(repeatNavState)closeRepeatNavigator();
+  if(typeof spellNavState!=='undefined'&&spellNavState)closeSpellPanel();
+  let index=same.indexOf(issue);
+  if(index<0)index=0;
+  issueNavState={type:issue.type,issues:same,index};
+  showPane('edit');
+  renderIssueNavigator();
+  jumpIssueNavigator(true);
+}
+function renderIssueNavigator(){
+  const panel=document.getElementById('issueNavPanel');
+  if(!panel)return;
+  if(!issueNavState||!issueNavState.issues.length){panel.classList.remove('open');return}
+  const total=issueNavState.issues.length;
+  issueNavState.index=((issueNavState.index%total)+total)%total;
+  const issue=issueNavState.issues[issueNavState.index];
+  document.getElementById('issueNavType').textContent=issueTypeLabel(issue.type);
+  document.getElementById('issueNavCount').textContent=(issueNavState.index+1)+' из '+total;
+  document.getElementById('issueNavTitle').textContent=issue.title||'Замечание';
+  document.getElementById('issueNavDetail').textContent=issue.detail||'';
+  document.getElementById('issueNavPrev').disabled=total<2;
+  document.getElementById('issueNavNext').disabled=total<2;
+  const src=editor.value||'';
+  const a=Math.max(0,(Number(issue.start)||0)-90);
+  const b=Math.min(src.length,(Number(issue.end)||Number(issue.start)||0)+120);
+  document.getElementById('issueNavContext').textContent=src.slice(a,b).replace(/\s+/g,' ').trim();
+  panel.classList.add('open');
+}
+function navigateIssueNavigator(dir){
+  if(!issueNavState)return;
+  issueNavState.index+=dir;
+  renderIssueNavigator();
+  jumpIssueNavigator(true);
+}
+function jumpIssueNavigator(quiet=false){
+  if(!issueNavState)return;
+  const issue=issueNavState.issues[issueNavState.index];
+  jumpTo(issue.start,issue.end,true);
+  if(!quiet)toast((issueNavState.index+1)+' из '+issueNavState.issues.length);
+}
+function closeIssueNavigator(){
+  issueNavState=null;
+  const panel=document.getElementById('issueNavPanel');
+  if(panel)panel.classList.remove('open');
+}
+
 let repeatNavState=null;
 function repeatContextMarkup(occ){const src=editor.value||'';let a=Number.isFinite(occ.contextStart)?occ.contextStart:Math.max(0,occ.start-90),b=Number.isFinite(occ.contextEnd)?occ.contextEnd:Math.min(src.length,occ.end+110);if(!Number.isFinite(occ.contextStart)){const left=src.lastIndexOf('\n',occ.start-1);if(left>=0)a=Math.max(a,left+1);const right=src.indexOf('\n',occ.end);if(right>=0)b=Math.min(b,right)}const full=src.slice(a,b).replace(/^\s+|\s+$/g,'');const trimLeft=src.slice(a,b).indexOf(full),base=a+Math.max(0,trimLeft),hs=Math.max(0,occ.start-base),he=Math.max(hs,Math.min(full.length,occ.end-base));return `${escapeHtml(full.slice(0,hs))}<span class="repeatNavHit">${escapeHtml(full.slice(hs,he))}</span>${escapeHtml(full.slice(he))}`}
 function openRepeatNavigator(issueIndex){const issue=currentAnalysis.issues[issueIndex];if(!issue||!Array.isArray(issue.occurrences)||issue.occurrences.length<2){if(issue)jumpTo(issue.start,issue.end);return}closeAnalysis();if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();repeatNavState={issueIndex,index:0,occurrences:issue.occurrences,title:issue.navTitle||issue.title};showPane('edit');renderRepeatNavigator();jumpRepeatOccurrence(true)}

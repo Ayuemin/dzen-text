@@ -105,6 +105,7 @@ function handleNativeBack(){
   if(typeof replacementState!=='undefined'&&replacementState){closeReplacement();return true}
   if(typeof nearbyState!=='undefined'&&nearbyState){closeNearbyRepeat();return true}
   if(typeof repeatNavState!=='undefined'&&repeatNavState){closeRepeatNavigator();return true}
+  if(typeof issueNavState!=='undefined'&&issueNavState){closeIssueNavigator();return true}
   const previewPane=document.getElementById('previewPane');
   if(previewPane&&previewPane.classList.contains('active')){showPane('edit');return true}
   return false

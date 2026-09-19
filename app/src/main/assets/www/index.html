@@ -67,6 +67,22 @@
       <button id="repeatNavContext" class="repeatNavContext" type="button" onclick="jumpRepeatOccurrence()"></button>
       <div class="repeatNavMeta">Листайте совпадения стрелками. Нажмите на фрагмент, чтобы перейти к нему в редакторе.</div>
     </div>
+
+    <div id="issueNavPanel" class="issueNavPanel" aria-live="polite">
+      <div class="issueNavHead">
+        <div class="issueNavHeading">
+          <div id="issueNavType" class="issueNavType">Замечания</div>
+          <b id="issueNavTitle">Замечание</b>
+          <div id="issueNavCount" class="issueNavCount"></div>
+        </div>
+        <button id="issueNavPrev" class="miniIcon" onclick="navigateIssueNavigator(-1)" aria-label="Предыдущее замечание">‹</button>
+        <button id="issueNavNext" class="miniIcon" onclick="navigateIssueNavigator(1)" aria-label="Следующее замечание">›</button>
+        <button class="miniIcon" onclick="closeIssueNavigator()" aria-label="Закрыть">×</button>
+      </div>
+      <div id="issueNavDetail" class="issueNavDetail"></div>
+      <button id="issueNavContext" class="issueNavContext" type="button" onclick="jumpIssueNavigator()"></button>
+      <div class="repeatNavMeta">Листайте однотипные замечания стрелками. Фрагмент в редакторе выделяется автоматически.</div>
+    </div>
     <div id="spellPanel" class="replacePanel" aria-live="polite">
       <div class="replaceHead"><div class="replaceTitle">Орфография: <b id="spellWord">—</b><div id="spellCount"></div></div><button id="spellPrev" class="miniIcon" onclick="navigateSpellIssue(-1)" aria-label="Предыдущая ошибка">‹</button><button id="spellNext" class="miniIcon" onclick="navigateSpellIssue(1)" aria-label="Следующая ошибка">›</button><button class="miniIcon" onclick="closeSpellPanel()" aria-label="Закрыть">×</button></div>
       <div id="spellSuggestions" class="replaceChips"></div>
