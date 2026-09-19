@@ -119,7 +119,6 @@
     <section class="drawerCurrentBlock">
       <div class="drawerSectionLabel">Текущая статья</div>
       <nav class="drawerNav drawerActions">
-        <button type="button" class="drawerPrimary" onclick="createNewArticle()">＋ Новая статья</button>
         <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
         <button type="button" onclick="drawerCheck()">Проверить текст</button>
         <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
@@ -130,6 +129,8 @@
         <button type="button" class="drawerDanger" onclick="drawerClear()">Очистить текущую статью</button>
       </nav>
     </section>
+
+    <button class="drawerNewArticle" type="button" onclick="createNewArticle()">＋ Новая статья</button>
 
     <section class="drawerLibraryBlock">
       <div class="drawerSectionLabel">Библиотека</div>
