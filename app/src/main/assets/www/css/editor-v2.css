@@ -1052,3 +1052,275 @@ body.markdown-toolbar-visible .spellPanel{
   color:#b64b43!important;
 }
 
+/* Settings v2: cleaner cards, sticky controls, reliable system-bar contrast. */
+.systemBarScrim{
+  z-index:60!important;
+  height:calc(var(--systemBarTop) + 14px)!important;
+  background:linear-gradient(to bottom,rgba(0,0,0,.52),rgba(0,0,0,.24) 62%,transparent)!important;
+}
+
+.settingsSheet{
+  max-height:92vh!important;
+  padding:10px 14px calc(24px + env(safe-area-inset-bottom))!important;
+  border-radius:28px 28px 0 0!important;
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+.settingsSheet>.handle{
+  margin-bottom:4px!important;
+}
+.settingsSheet>.sheetHeader{
+  position:sticky!important;
+  top:-10px!important;
+  z-index:12!important;
+  margin:0 -14px 12px!important;
+  padding:12px 16px 10px!important;
+  background:color-mix(in srgb,var(--surface) 94%,transparent)!important;
+  border-bottom:1px solid color-mix(in srgb,var(--border) 70%,transparent);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+  box-shadow:0 7px 18px rgba(0,0,0,.05);
+}
+.settingsSheet>.sheetHeader h2{
+  margin:0!important;
+  font-size:22px!important;
+  font-weight:760!important;
+  letter-spacing:-.025em;
+}
+.settingsSheet>.sheetHeader .sheetClose{
+  width:38px!important;
+  height:38px!important;
+  background:var(--surface2)!important;
+  border:1px solid color-mix(in srgb,var(--border) 80%,transparent)!important;
+  box-shadow:none!important;
+}
+
+.settingsGroupWrap{
+  gap:12px!important;
+}
+.settingsGroup{
+  border:1px solid color-mix(in srgb,var(--border) 72%,transparent)!important;
+  border-radius:20px!important;
+  background:var(--surface)!important;
+  box-shadow:0 4px 14px rgba(0,0,0,.035);
+}
+.settingsGroup>summary{
+  min-height:68px!important;
+  padding:13px 16px!important;
+}
+.settingsGroup>summary span{
+  font-size:16px!important;
+  font-weight:720!important;
+}
+.settingsGroup>summary small{
+  font-size:12px!important;
+  line-height:1.35;
+}
+.settingsGroupBody{
+  padding:15px 16px 18px!important;
+  border-top-color:color-mix(in srgb,var(--border) 65%,transparent)!important;
+}
+.settingsGroupBody .subLabel{
+  margin-top:15px;
+  margin-bottom:7px;
+  font-size:13px;
+  font-weight:650;
+}
+.settingsGroupBody select,
+.settingsGroupBody input[type=text],
+.settingsGroupBody textarea{
+  width:100%;
+  min-height:46px;
+  border:1px solid color-mix(in srgb,var(--border) 82%,transparent)!important;
+  border-radius:13px!important;
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+  padding:0 13px!important;
+  font:500 15px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  outline:none;
+}
+.settingsGroupBody select{
+  appearance:none;
+  -webkit-appearance:none;
+  padding-right:40px!important;
+  background-image:
+    linear-gradient(45deg,transparent 50%,var(--muted) 50%),
+    linear-gradient(135deg,var(--muted) 50%,transparent 50%)!important;
+  background-position:
+    calc(100% - 18px) 19px,
+    calc(100% - 13px) 19px!important;
+  background-size:5px 5px,5px 5px!important;
+  background-repeat:no-repeat!important;
+}
+.settingsGroupBody select:focus,
+.settingsGroupBody input[type=text]:focus,
+.settingsGroupBody textarea:focus{
+  border-color:color-mix(in srgb,var(--accent) 62%,var(--border))!important;
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 12%,transparent);
+}
+.settingsGroupBody input[type=range]{
+  width:100%;
+  accent-color:var(--accent);
+  margin:3px 0 4px;
+}
+.settingsGroupBody input[type=range]::-webkit-slider-runnable-track{
+  height:5px;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--text) 13%,transparent);
+}
+.settingsGroupBody input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:20px;height:20px;
+  margin-top:-7.5px;
+  border:0;border-radius:50%;
+  background:var(--accent);
+  box-shadow:0 2px 7px rgba(0,0,0,.18);
+}
+.settingsGroupBody .switchRow{
+  min-height:46px!important;
+}
+.settingsGroupBody .switchRow span{
+  font-size:14px!important;
+  font-weight:600!important;
+  line-height:1.35;
+}
+.settingsGroupBody .switch{
+  flex:0 0 46px;
+  width:46px!important;
+  height:27px!important;
+}
+.nativeBtn{
+  min-height:42px!important;
+  border-radius:12px!important;
+  border-color:color-mix(in srgb,var(--border) 75%,transparent)!important;
+  background:var(--surface2)!important;
+  color:var(--text)!important;
+  font-weight:650!important;
+}
+.primarySettingBtn{
+  background:color-mix(in srgb,var(--accent) 12%,var(--surface))!important;
+  color:var(--accent)!important;
+  border-color:color-mix(in srgb,var(--accent) 28%,var(--border))!important;
+}
+.saveAlwaysRow{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  padding:12px 13px;
+  border-radius:13px;
+  background:color-mix(in srgb,var(--accent) 7%,var(--surface2));
+}
+.saveAlwaysRow b{font-size:13.5px}
+.saveAlwaysRow span{font-size:12px;color:var(--muted);line-height:1.4}
+
+/* Saved custom backgrounds */
+.customBackgroundLabel{margin-top:15px!important}
+.customBackgroundList{
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+}
+.backgroundEmpty{
+  padding:12px;
+  border-radius:12px;
+  background:var(--surface2);
+  color:var(--muted);
+  font-size:12px;
+}
+.backgroundItem{
+  display:flex;
+  align-items:stretch;
+  min-height:46px;
+  border:1px solid color-mix(in srgb,var(--border) 72%,transparent);
+  border-radius:13px;
+  overflow:hidden;
+  background:var(--surface2);
+}
+.backgroundItem.active{
+  border-color:color-mix(in srgb,var(--accent) 40%,var(--border));
+  background:color-mix(in srgb,var(--accent) 7%,var(--surface2));
+}
+.backgroundSelect{
+  min-width:0;
+  flex:1;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  padding:0 10px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  text-align:left;
+}
+.backgroundIcon{
+  color:var(--muted);
+  font-size:18px;
+}
+.backgroundName{
+  min-width:0;
+  flex:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:13px;
+  font-weight:600;
+}
+.backgroundActive{
+  color:var(--accent);
+  font-size:10.5px;
+  font-weight:700;
+}
+.backgroundDelete{
+  flex:0 0 42px;
+  border:0;
+  border-left:1px solid color-mix(in srgb,var(--border) 65%,transparent);
+  background:transparent;
+  color:#b64b43;
+  font-size:21px;
+}
+
+/* Version storage controls are visible before the version list. */
+.versionUsage{
+  margin:10px 0 12px;
+  padding:11px 12px;
+  border-radius:13px;
+  background:var(--surface2);
+}
+.versionUsageText{
+  font-size:12px;
+  font-weight:650;
+  color:var(--text);
+}
+.versionUsageTrack{
+  height:6px;
+  margin-top:8px;
+  border-radius:999px;
+  overflow:hidden;
+  background:color-mix(in srgb,var(--text) 10%,transparent);
+}
+.versionUsageTrack span{
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:var(--accent);
+  transition:width .18s ease;
+}
+.versionCleanup{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin:8px 0 14px;
+}
+.versionCleanup .dangerText{
+  grid-column:1/-1;
+  color:#b64b43!important;
+}
+
+/* Prevent the old Android-looking white controls in dark mode. */
+:root[data-theme="dark"] .settingsGroupBody select,
+:root[data-theme="dark"] .settingsGroupBody input[type=text],
+:root[data-theme="dark"] .settingsGroupBody textarea{
+  color-scheme:dark;
+}
+
