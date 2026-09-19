@@ -45,9 +45,13 @@ public final class DocumentStore {
 
     public synchronized String createArticle() {
         String id = "a_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().substring(0, 8);
-        try { writeUtf8(articleFile(id), ""); } catch (Exception ignored) { }
-        prefs.edit().putString(ACTIVE_KEY, id).apply();
-        return id;
+        try {
+            writeUtf8(articleFile(id), "");
+            prefs.edit().putString(ACTIVE_KEY, id).apply();
+            return id;
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     public synchronized String activeArticleId() {
@@ -109,10 +113,12 @@ public final class DocumentStore {
     public synchronized boolean deleteArticle(String rawId) {
         String id = safeId(rawId);
         if (id.isEmpty()) return false;
+        File article = articleFile(id);
+        boolean deleted = !article.exists() || article.delete();
+        if (!deleted) return false;
         deleteRecursively(versionDir(id));
-        boolean deleted = !articleFile(id).exists() || articleFile(id).delete();
         if (id.equals(prefs.getString(ACTIVE_KEY, ""))) prefs.edit().remove(ACTIVE_KEY).apply();
-        return deleted;
+        return true;
     }
 
     public synchronized String saveVersion(String rawArticleId, String reason, String text) {
@@ -383,17 +389,34 @@ public final class DocumentStore {
 
     private void writeBytes(File file, byte[] bytes) throws Exception {
         File parent = file.getParentFile();
-        if (parent != null) parent.mkdirs();
+        if (parent != null && !parent.exists() && !parent.mkdirs()) throw new Exception("mkdir");
         File temp = new File(file.getAbsolutePath() + ".tmp");
+        File backup = new File(file.getAbsolutePath() + ".bak");
+
         try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(temp))) {
             out.write(bytes);
             out.flush();
         }
-        if (file.exists() && !file.delete()) throw new Exception("replace");
-        if (!temp.renameTo(file)) {
-            try (BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(file))) { out.write(bytes); }
+
+        boolean hadOriginal = file.exists();
+        if (backup.exists() && !backup.delete()) {
             temp.delete();
+            throw new Exception("backup cleanup");
         }
+
+        if (hadOriginal && !file.renameTo(backup)) {
+            temp.delete();
+            throw new Exception("backup original");
+        }
+
+        if (temp.renameTo(file)) {
+            if (backup.exists()) backup.delete();
+            return;
+        }
+
+        if (hadOriginal && backup.exists()) backup.renameTo(file);
+        temp.delete();
+        throw new Exception("replace");
     }
 
     private boolean deleteIfExists(File file) { return file == null || !file.exists() || file.delete(); }
