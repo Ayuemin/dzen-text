@@ -20,21 +20,23 @@ function markdownPrefix(kind){
   const lines=block.split('\n');
   let replacement='';
 
-  if(kind==='h2'){
-    const allH2=lines.every(x=>/^\s*##\s+/.test(x));
-    replacement=lines.map(line=>{
-      if(allH2)return line.replace(/^(\s*)##\s+/,'$1');
-      return line.replace(/^(\s*)#{1,6}\s+/,'$1').replace(/^(\s*)/,'$1## ');
+  if(/^h[1-3]$/.test(kind)){
+    const level=Number(kind.slice(1));
+    const mark='#'.repeat(level);
+    const all=lines.every(function(x){return new RegExp('^\\\\s*'+mark+'\\\\s+').test(x)});
+    replacement=lines.map(function(line){
+      if(all)return line.replace(new RegExp('^(\\\\s*)'+mark+'\\\\s+'),'$1');
+      return line.replace(/^(\s*)#{1,6}\s+/,'$1').replace(/^(\s*)/,'$1'+mark+' ');
     }).join('\n');
   }else if(kind==='quote'){
-    const all=lines.every(x=>/^\s*>\s?/.test(x));
-    replacement=lines.map(line=>all?line.replace(/^(\s*)>\s?/,'$1'):line.replace(/^(\s*)/,'$1> ')).join('\n');
+    const all=lines.every(function(x){return /^\s*>\s?/.test(x)});
+    replacement=lines.map(function(line){return all?line.replace(/^(\s*)>\s?/,'$1'):line.replace(/^(\s*)/,'$1> ')}).join('\n');
   }else if(kind==='bullet'){
-    const all=lines.every(x=>/^\s*[-*+]\s+/.test(x));
-    replacement=lines.map(line=>all?line.replace(/^(\s*)[-*+]\s+/,'$1'):line.replace(/^(\s*)(?:\d+[.)]\s+)?/,'$1- ')).join('\n');
+    const all=lines.every(function(x){return /^\s*[-*+]\s+/.test(x)});
+    replacement=lines.map(function(line){return all?line.replace(/^(\s*)[-*+]\s+/,'$1'):line.replace(/^(\s*)(?:\d+[.)]\s+)?/,'$1- ')}).join('\n');
   }else if(kind==='number'){
-    const all=lines.every(x=>/^\s*\d+[.)]\s+/.test(x));
-    replacement=lines.map((line,i)=>{
+    const all=lines.every(function(x){return /^\s*\d+[.)]\s+/.test(x)});
+    replacement=lines.map(function(line,i){
       if(all)return line.replace(/^(\s*)\d+[.)]\s+/,'$1');
       return line.replace(/^(\s*)(?:[-*+]\s+)?/,'$1'+(i+1)+'. ');
     }).join('\n');
@@ -48,6 +50,7 @@ function applyMarkdown(action){
   editor.focus();
   if(action==='bold')markdownWrap('**','**','текст');
   else if(action==='italic')markdownWrap('*','*','текст');
+  else if(action==='strike')markdownWrap('~~','~~','текст');
   else if(action==='code'){
     const tick=String.fromCharCode(96);
     markdownWrap(tick,tick,'код');
@@ -58,7 +61,10 @@ function applyMarkdown(action){
     editor.setRangeText(replacement,start,end,'end');
     const urlStart=start+label.length+3;
     editor.setSelectionRange(urlStart,urlStart+8);
-  }else if(['h2','quote','bullet','number'].includes(action)){
+  }else if(action==='hr'){
+    const start=editor.selectionStart,end=editor.selectionEnd;
+    editor.setRangeText((start&&editor.value[start-1]!=='\n'?'\n':'')+'---\n',start,end,'end');
+  }else if(['h1','h2','h3','quote','bullet','number'].includes(action)){
     markdownPrefix(action);
   }
   render(false);
