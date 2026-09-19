@@ -33,6 +33,14 @@ function updateCustomFontStatus(){
   el.innerHTML=name?'Подключён: <b>'+escapeHtml(name)+'</b>':'Свой шрифт не подключён';
 }
 function chooseEditorFont(){if(window.AndroidFile&&typeof AndroidFile.pickFont==='function'){AndroidFile.pickFont();return}toast('Добавление своего шрифта доступно в установленном приложении')}
+function onFontSelectChanged(){
+  if(fontSelect.value==='custom'&&!readCustomFontName()){
+    fontSelect.value=settings.font==='custom'?'serif':settings.font;
+    chooseEditorFont();
+    return;
+  }
+  applySettings();
+}
 function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
 window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';localStorage.setItem('dzenSettings',JSON.stringify(settings));}else if(settings.font==='custom'){settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
 window.onNativeFontError=(msg)=>toast(msg||'Не удалось подключить шрифт');
