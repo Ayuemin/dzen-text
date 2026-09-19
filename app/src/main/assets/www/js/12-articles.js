@@ -122,7 +122,6 @@ function setEditorTextForArticle(text,focus){
       editor.focus();
       const pos=editor.value.length;
       editor.setSelectionRange(pos,pos);
-      if(typeof scheduleCaretFocus==='function')scheduleCaretFocus(true,60);
     },80);
   }
 }
