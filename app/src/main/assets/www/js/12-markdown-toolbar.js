@@ -75,10 +75,13 @@ function updateMarkdownToolbarVisibility(){
   const bar=document.getElementById('markdownToolbar');
   if(!bar)return;
   const edit=document.getElementById('editPane');
+  const focused=document.activeElement===editor;
+  const touchDevice=window.matchMedia?window.matchMedia('(pointer: coarse)').matches:('ontouchstart' in window);
+  const keyboardExpected=window.__keyboardOpen===true||(focused&&touchDevice);
   const visible=settings.markdownToolbar!==false&&
-    document.activeElement===editor&&
+    focused&&
     edit&&edit.classList.contains('active')&&
-    window.__keyboardOpen===true;
+    keyboardExpected;
   bar.classList.toggle('visible',visible);
   document.body.classList.toggle('markdown-toolbar-visible',visible);
 }
