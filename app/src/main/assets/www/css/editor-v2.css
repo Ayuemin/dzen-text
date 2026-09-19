@@ -1331,3 +1331,38 @@ body.markdown-toolbar-visible .spellPanel{
   appearance:none!important;
   background:transparent!important;
 }
+
+/* Editor viewport model: the Markdown bar is layout chrome, never an overlay.
+   With Android adjustResize the WebView shrinks for the IME; the flex editor then
+   shrinks by the toolbar height too, so the browser can keep the caret visible. */
+.markdownToolbar{
+  position:relative!important;
+  left:auto!important;
+  right:auto!important;
+  bottom:auto!important;
+  z-index:13!important;
+  flex:0 0 auto!important;
+  width:calc(100% - 14px)!important;
+  max-width:none!important;
+  margin:0 7px 5px!important;
+  box-sizing:border-box!important;
+}
+.markdownToolbar.visible{
+  display:block!important;
+}
+body.markdown-toolbar-visible .bottom{
+  display:none!important;
+}
+body.markdown-toolbar-visible .editor{
+  padding-bottom:34px!important;
+}
+
+/* Correction panels may overlay the editor, but never the in-flow Markdown bar. */
+body.markdown-toolbar-visible .issueNavPanel,
+body.markdown-toolbar-visible .repeatNavPanel,
+body.markdown-toolbar-visible .replacePanel,
+body.markdown-toolbar-visible .nearbyPanel,
+body.markdown-toolbar-visible .spellPanel{
+  bottom:calc(58px + var(--viewportBottomInset,0px))!important;
+}
+
