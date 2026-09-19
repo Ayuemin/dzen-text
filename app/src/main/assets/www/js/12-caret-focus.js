@@ -58,11 +58,15 @@ function ensureCaretVisible(force=false){
   }
   const visibleTop=caretTop-editor.scrollTop;
   const lineHeight=parseFloat(getComputedStyle(editor).lineHeight)||28;
+  const bar=document.getElementById('markdownToolbar');
+  const toolbarReserve=bar&&bar.classList.contains('visible')?Math.max(58,bar.offsetHeight+18):0;
   const topGuard=Math.max(88,editor.clientHeight*0.22);
-  const bottomGuard=editor.clientHeight-Math.max(86,lineHeight*2.8);
+  const bottomReserve=Math.max(86+toolbarReserve,lineHeight*2.8+toolbarReserve);
+  const bottomGuard=Math.max(topGuard+lineHeight*2,editor.clientHeight-bottomReserve);
 
   if(visibleTop<topGuard||visibleTop>bottomGuard||force){
-    const target=Math.max(topGuard,Math.min(bottomGuard,editor.clientHeight*0.46));
+    const preferred=editor.clientHeight*(toolbarReserve?0.40:0.46);
+    const target=Math.max(topGuard,Math.min(bottomGuard,preferred));
     const maxScroll=Math.max(0,editor.scrollHeight-editor.clientHeight);
     const next=Math.max(0,Math.min(maxScroll,caretTop-target));
     if(Math.abs(editor.scrollTop-next)>2)editor.scrollTop=next;
