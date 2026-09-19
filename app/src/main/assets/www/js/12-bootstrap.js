@@ -27,7 +27,9 @@ function bootstrapDzenText(){
     if(e.key==='Tab'){
       e.preventDefault();
       const s=editor.selectionStart,en=editor.selectionEnd;
+      if(typeof historyCheckpoint==='function')historyCheckpoint();
       editor.setRangeText('    ',s,en,'end');
+      afterProgrammaticEdit(false);
     }
   });
 
