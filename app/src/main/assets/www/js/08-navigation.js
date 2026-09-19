@@ -37,13 +37,17 @@ function renderIssueNavigator(){
   document.getElementById('issueNavType').textContent=issueTypeLabel(issue.type);
   document.getElementById('issueNavCount').textContent=(issueNavState.index+1)+' из '+total;
   document.getElementById('issueNavTitle').textContent=issue.title||'Замечание';
-  document.getElementById('issueNavDetail').textContent=issue.detail||'';
+  let detail=String(issue.detail||'').replace(/\s+/g,' ').trim();
+  if(detail.length>90)detail=detail.slice(0,90)+'…';
+  document.getElementById('issueNavDetail').textContent=detail;
   document.getElementById('issueNavPrev').disabled=total<2;
   document.getElementById('issueNavNext').disabled=total<2;
   const src=editor.value||'';
-  const a=Math.max(0,(Number(issue.start)||0)-90);
-  const b=Math.min(src.length,(Number(issue.end)||Number(issue.start)||0)+120);
-  document.getElementById('issueNavContext').textContent=src.slice(a,b).replace(/\s+/g,' ').trim();
+  const start=Number(issue.start)||0;
+  const end=Math.max(start,Number(issue.end)||start);
+  let context=src.slice(start,Math.min(src.length,Math.max(end,start+100))).replace(/\s+/g,' ').trim();
+  if(context.length>100)context=context.slice(0,100)+'…';
+  document.getElementById('issueNavContext').textContent=context||String(issue.title||'Замечание');
   panel.classList.add('open');
 }
 function navigateIssueNavigator(dir){
