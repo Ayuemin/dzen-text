@@ -1,9 +1,42 @@
 function runFullCheck(){
- const src=editor.value||'';if(!src.trim()){toast('Нет текста для проверки');return}
- clearOnlineSpelling();analyzeText();analysisMode='problems';document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode('problems');
- if(!settings.onlineSpelling){spellStatus='off';renderAnalysis();toast('Полная локальная проверка выполнена');return}
- if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){spellStatus='error';renderAnalysis();toast('Онлайн-проверка доступна только в установленном приложении');return}
- spellStatus='checking';spellRequestSource=src;spellRequestId=String(Date.now())+'_'+Math.random().toString(36).slice(2);setCheckRunning(true);renderAnalysis();AndroidSpell.check(src,spellRequestId)
+ const src=editor.value||'';
+ if(!src.trim()){toast('Нет текста для проверки');return}
+ editor.blur();
+ clearOnlineSpelling();
+ setCheckRunning(true);
+ toast(src.length>150000?'Проверяю большой текст…':'Проверяю текст…');
+ setTimeout(()=>{
+   try{
+     analyzeText();
+     analysisMode='problems';
+     document.getElementById('analysisBackdrop').classList.add('open');
+     setAnalysisMode('problems');
+
+     if(!settings.onlineSpelling){
+       spellStatus='off';
+       renderAnalysis();
+       setCheckRunning(false);
+       toast('Полная локальная проверка выполнена');
+       return;
+     }
+     if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){
+       spellStatus='error';
+       renderAnalysis();
+       setCheckRunning(false);
+       toast('Онлайн-проверка доступна только в установленном приложении');
+       return;
+     }
+     spellStatus='checking';
+     spellRequestSource=src;
+     spellRequestId=String(Date.now())+'_'+Math.random().toString(36).slice(2);
+     renderAnalysis();
+     AndroidSpell.check(src,spellRequestId);
+   }catch(e){
+     setCheckRunning(false);
+     toast('Не удалось завершить проверку');
+     console.error(e);
+   }
+ },60);
 }
 window.onNativeSpellResult=(requestId,items)=>{if(String(requestId)!==String(spellRequestId))return;setCheckRunning(false);if(editor.value!==spellRequestSource){spellStatus='stale';toast('Текст изменился во время проверки — результат отброшен');return}onlineSpellIssues=(Array.isArray(items)?items:[]).map(x=>({start:+x.start||0,end:+x.end||0,word:String(x.word||''),suggestions:Array.isArray(x.suggestions)?x.suggestions.map(String):[],code:+x.code||0})).filter(x=>x.end>x.start&&!spellIgnoreWords.has(spellKey(x.word||editor.value.slice(x.start,x.end))));onlineSpellSource=editor.value;spellStatus='done';analyzeText();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode('problems');toast(onlineSpellIssues.length?`Орфография: найдено ${onlineSpellIssues.length}`:'Орфографических ошибок не найдено')};
 window.onNativeSpellError=(requestId,msg)=>{if(String(requestId)!==String(spellRequestId))return;setCheckRunning(false);spellStatus='error';onlineSpellIssues=[];onlineSpellSource='';renderAnalysis();toast(msg||'Не удалось выполнить онлайн-проверку')};
@@ -15,5 +48,5 @@ function applySpellSuggestion(text){if(!spellNavState||!text)return;const it=spe
 function ignoreCurrentSpellWord(){if(!spellNavState||!spellNavState.issues.length)return;const it=spellNavState.issues[spellNavState.index],word=editor.value.slice(it.start,it.end)||it.word,key=spellKey(word);if(!key)return;spellIgnoreWords.add(key);saveSpellIgnoreWords();updateSpellIgnoreStatus();onlineSpellIssues=onlineSpellIssues.filter(x=>spellKey(x.word||editor.value.slice(x.start,x.end))!==key);onlineSpellSource=editor.value;spellStatus='done';spellNavState=null;document.getElementById('spellPanel').classList.remove('open');analyzeText();toast(`Запомнил: «${word}» — не ошибка`);const next=currentAnalysis.issues.find(x=>x.type==='spelling');if(next)openSpellIssue(currentAnalysis.issues.indexOf(next))}
 function closeSpellPanel(){spellNavState=null;const p=document.getElementById('spellPanel');if(p)p.classList.remove('open')}
 function closeAnalysis(){document.getElementById('analysisBackdrop').classList.remove('open')}
-function openAnalysis(){analyzeText();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}
+function openAnalysis(){editor.blur();setCheckRunning(true);setTimeout(()=>{try{analyzeText();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}finally{setCheckRunning(false)}},40)}
 function analysisBackdropClick(e){if(e.target.id==='analysisBackdrop')closeAnalysis()}
