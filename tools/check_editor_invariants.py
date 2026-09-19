@@ -25,9 +25,19 @@ if "nativeKeyboardKnown" in core:
     errors.append("keyboard fallback must never be permanently disabled by an initial native signal")
 if "nativeKeyboardOpen||fallbackKeyboardOpen" not in core.replace(" ", ""):
     errors.append("keyboard state must combine native and viewport signals")
+if "nativeKeyboardInsetCss" not in core or "setProperty('--keyboardInset'" not in core:
+    errors.append("native IME height must feed the CSS keyboard inset")
+if "layoutBaselineHeight" not in core or "reported-layoutShrink" not in core.replace(" ", ""):
+    errors.append("IME avoidance must subtract layout resize to prevent double padding")
 
 if "js/12-caret-focus.js" in html or (JS / "12-caret-focus.js").exists():
     errors.append("legacy caret auto-scroll controller must stay removed")
+
+compact_css = re.sub(r"\s+", "", css)
+if "body.keyboard-open.app{padding-bottom:calc(env(safe-area-inset-bottom)+var(--keyboardInset))!important}" not in compact_css:
+    errors.append("editor layout must reserve unresolved Android keyboard overlap")
+if "bottom:calc(8px+env(safe-area-inset-bottom)+var(--keyboardInset))!important" not in compact_css:
+    errors.append("fixed editor panels must stay above the Android keyboard")
 
 for block in re.findall(r"\.markdownToolbar\s*\{([^}]*)\}", css, re.S):
     if re.search(r"position\s*:\s*fixed", block):
@@ -56,6 +66,12 @@ if "markdown-toolbar-visible .bottom{display:none" not in css.replace("\n", "").
     compact = re.sub(r"\s+", "", css)
     if "body.markdown-toolbar-visible.bottom{display:none!important}" in compact:
         pass
+
+toolbar = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
+if "touchDevice" not in toolbar or "keyboardExpected" not in toolbar:
+    errors.append("Markdown toolbar needs a touch-focus fallback when IME callbacks are delayed")
+if 'placeholder="Начните писать…"' not in html:
+    errors.append("empty editor invitation is missing")
 
 scripts = re.findall(r'<script\s+src="([^"]+)"', html)
 if not scripts or scripts[-1] != "js/12-bootstrap.js":
