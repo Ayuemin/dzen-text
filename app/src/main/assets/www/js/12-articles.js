@@ -134,9 +134,6 @@ function createNewArticle(){
   if(hadText&&!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;
 
   if(documentsAvailable()){
-    if(!hadText&&previousId){
-      try{AndroidDocuments.deleteArticle(previousId)}catch(e){}
-    }
     activeArticleId=String(AndroidDocuments.createArticle()||'');
     if(!activeArticleId){
       toast('Не удалось создать новую статью');
