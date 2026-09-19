@@ -1,19 +1,28 @@
+let keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
 function updateKeyboardInset(){
   const vv=window.visualViewport;
-  let inset=0;
+  const current=Math.round((vv&&vv.height)||window.innerHeight||document.documentElement.clientHeight||0);
+  if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
+
+  let inset=Math.max(0,Math.round(keyboardBaselineHeight-current));
   if(vv){
     const layoutH=window.innerHeight||document.documentElement.clientHeight||0;
-    inset=Math.max(0,Math.round(layoutH-vv.height-vv.offsetTop));
-    // Tiny viewport differences are browser chrome, not the keyboard.
-    if(inset<80)inset=0;
+    inset=Math.max(inset,Math.round(layoutH-vv.height-vv.offsetTop));
   }
-  window.__keyboardInset=inset;document.documentElement.style.setProperty('--keyboardInset',inset+'px');window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:inset}));
+
+  // A real Android keyboard changes the viewport by much more than browser chrome.
+  if(inset<100)inset=0;
+  window.__keyboardInset=inset;
+  window.__keyboardOpen=inset>=100;
+  document.documentElement.style.setProperty('--keyboardInset',inset+'px');
+  window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:inset}));
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',updateKeyboardInset);
   window.visualViewport.addEventListener('scroll',updateKeyboardInset);
 }
 window.addEventListener('resize',updateKeyboardInset);
+window.addEventListener('orientationchange',()=>{keyboardBaselineHeight=0;setTimeout(updateKeyboardInset,350)});
 document.addEventListener('focusin',()=>setTimeout(updateKeyboardInset,60));
 document.addEventListener('focusout',()=>setTimeout(updateKeyboardInset,120));
 setTimeout(updateKeyboardInset,0);
