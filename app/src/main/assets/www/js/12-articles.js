@@ -44,6 +44,10 @@ function initArticleWorkspace(){
   }
 
   activeArticleId=String(AndroidDocuments.ensureActiveArticle()||'');
+  if(!activeArticleId){
+    toast('Не удалось открыть хранилище статей');
+    return false;
+  }
   let text=String(AndroidDocuments.loadArticle(activeArticleId)||'');
   const legacy=localStorage.getItem('dzenDraft')||'';
   if(!text&&legacy){
@@ -98,6 +102,7 @@ function preserveCurrentArticleBeforeSwitch(reason){
     }
     let saved=false;
     try{saved=!!AndroidDocuments.saveArticle(activeArticleId,text)}catch(e){saved=false}
+    if(saved)articleDirty=false;
     if(!saved){
       toast('Не удалось сохранить текущую статью. Переход отменён');
       return false;
@@ -148,11 +153,12 @@ function createNewArticle(){
   if(hadText&&!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;
 
   if(documentsAvailable()){
-    activeArticleId=String(AndroidDocuments.createArticle()||'');
-    if(!activeArticleId){
+    const newId=String(AndroidDocuments.createArticle()||'');
+    if(!newId){
       toast('Не удалось создать новую статью');
       return;
     }
+    activeArticleId=newId;
   }else{
     activeArticleId='local_'+Date.now();
   }
@@ -169,9 +175,15 @@ function openSavedArticle(id){
   const next=String(id||'');
   if(!next||next===activeArticleId){closeSideDrawer();return}
   if(editor.value.trim()&&!preserveCurrentArticleBeforeSwitch('Перед сменой статьи'))return;
-  if(!AndroidDocuments.setActiveArticle(next)){toast('Не удалось открыть статью');return}
+  let activated=false;
+  try{activated=!!AndroidDocuments.setActiveArticle(next)}catch(e){activated=false}
+  if(!activated){toast('Не удалось открыть статью');return}
   activeArticleId=next;
-  const text=String(AndroidDocuments.loadArticle(next)||'');
+  let text='';
+  try{text=String(AndroidDocuments.loadArticle(next)||'')}catch(e){
+    toast('Не удалось прочитать статью');
+    return;
+  }
   setEditorTextForArticle(text,false);
   closeSideDrawer();
   updateCurrentArticleUi();
@@ -188,6 +200,13 @@ async function deleteSavedArticle(id){
   if(!AndroidDocuments.deleteArticle(id)){toast('Не удалось удалить статью');return}
   if(wasActive){
     activeArticleId=String(AndroidDocuments.createArticle()||'');
+    if(!activeArticleId){
+      setEditorTextForArticle('',false);
+      toast('Статья удалена, но не удалось создать новое рабочее окно');
+      renderSavedArticles();
+      updateCurrentArticleUi();
+      return;
+    }
     setEditorTextForArticle('',true);
   }
   renderSavedArticles();
