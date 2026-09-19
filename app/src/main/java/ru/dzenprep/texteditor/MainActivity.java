@@ -56,7 +56,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final int MAX_FONT_BYTES = 6 * 1024 * 1024;
     private static final String DICT_FILE = "user_synonyms.dat";
-    private static final String BACKGROUND_FILE = "editor_background.jpg";
+    private static final String BACKGROUND_FILE = "editor_background.jpg"; // legacy single background\n    private static final String BACKGROUND_DIR = "editor_backgrounds";\n    private static final String BACKGROUND_ACTIVE_KEY = "background_active_id";
     private static final String FONT_FILE = "editor_font.dat";
 
     private WebView web;
@@ -197,21 +197,53 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
         @JavascriptInterface
         public String backgroundData() {
-            File f = new File(getFilesDir(), BACKGROUND_FILE);
-            if (!f.exists()) return "";
-            try (FileInputStream in = new FileInputStream(f); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-                byte[] buf = new byte[8192]; int n;
-                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
-                return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
-            } catch (Exception e) {
-                return "";
+            return backgroundDataFor(activeBackgroundId());
+        }
+
+        @JavascriptInterface
+        public String backgroundDataById(String id) {
+            return backgroundDataFor(id);
+        }
+
+        @JavascriptInterface
+        public String backgroundList() {
+            return backgroundListJson();
+        }
+
+        @JavascriptInterface
+        public String activeBackgroundId() {
+            return MainActivity.this.activeBackgroundId();
+        }
+
+        @JavascriptInterface
+        public boolean selectBackground(String id) {
+            String safe = safeBackgroundId(id);
+            File file = backgroundFile(safe);
+            if (safe.isEmpty() || !file.exists()) return false;
+            setActiveBackgroundId(safe);
+            runJs("window.onNativeBackgroundSelected && window.onNativeBackgroundSelected(" + JSONObject.quote(safe) + ")");
+            return true;
+        }
+
+        @JavascriptInterface
+        public boolean deleteBackground(String id) {
+            String safe = safeBackgroundId(id);
+            if (safe.isEmpty()) return false;
+            File file = backgroundFile(safe);
+            boolean ok = !file.exists() || file.delete();
+            getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("background_name_" + safe).apply();
+            if (safe.equals(MainActivity.this.activeBackgroundId())) {
+                String next = newestBackgroundId();
+                setActiveBackgroundId(next);
+                runJs("window.onNativeBackgroundSelected && window.onNativeBackgroundSelected(" + JSONObject.quote(next) + ")");
             }
+            return ok;
         }
 
         @JavascriptInterface
         public void clearBackground() {
-            try { new File(getFilesDir(), BACKGROUND_FILE).delete(); } catch (Exception ignored) { }
-            runJs("window.onNativeBackgroundChanged && window.onNativeBackgroundChanged()");
+            String active = MainActivity.this.activeBackgroundId();
+            if (!active.isEmpty()) deleteBackground(active);
         }
 
         @JavascriptInterface
@@ -432,8 +464,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
         if (requestCode == REQUEST_OPEN_BACKGROUND) {
             try {
-                saveEditorBackground(uri);
-                runJs("window.onNativeBackgroundChanged && window.onNativeBackgroundChanged()");
+                String id = saveEditorBackground(uri);
+                String name = getSharedPreferences("dzen_text", MODE_PRIVATE).getString("background_name_" + id, "Свой фон");
+                runJs("window.onNativeBackgroundAdded && window.onNativeBackgroundAdded(" + JSONObject.quote(id) + "," + JSONObject.quote(name) + ")");
             } catch (Exception e) {
                 runJs("window.onNativeFileError && window.onNativeFileError('Не удалось использовать выбранное изображение')");
             }
@@ -527,7 +560,114 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         });
     }
 
-    private void saveEditorBackground(Uri uri) throws Exception {
+    private File backgroundDirectory() {
+        File dir = new File(getFilesDir(), BACKGROUND_DIR);
+        dir.mkdirs();
+        migrateLegacyBackground(dir);
+        return dir;
+    }
+
+    private void migrateLegacyBackground(File dir) {
+        File legacy = new File(getFilesDir(), BACKGROUND_FILE);
+        if (!legacy.exists()) return;
+        File[] existing = dir.listFiles((d, n) -> n.endsWith(".jpg"));
+        if (existing != null && existing.length > 0) {
+            legacy.delete();
+            return;
+        }
+        String id = "bg_legacy";
+        File target = new File(dir, id + ".jpg");
+        boolean moved = legacy.renameTo(target);
+        if (!moved) {
+            try (FileInputStream in = new FileInputStream(legacy); FileOutputStream out = new FileOutputStream(target)) {
+                byte[] buf = new byte[8192]; int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                moved = true;
+            } catch (Exception ignored) { }
+            if (moved) legacy.delete();
+        }
+        if (moved) {
+            getSharedPreferences("dzen_text", MODE_PRIVATE).edit()
+                    .putString(BACKGROUND_ACTIVE_KEY, id)
+                    .putString("background_name_" + id, "Свой фон")
+                    .apply();
+        }
+    }
+
+    private String safeBackgroundId(String raw) {
+        String value = raw == null ? "" : raw.trim();
+        return value.matches("[A-Za-z0-9_-]{1,96}") ? value : "";
+    }
+
+    private File backgroundFile(String id) {
+        String safe = safeBackgroundId(id);
+        return new File(backgroundDirectory(), safe + ".jpg");
+    }
+
+    private String activeBackgroundId() {
+        backgroundDirectory();
+        String id = safeBackgroundId(getSharedPreferences("dzen_text", MODE_PRIVATE).getString(BACKGROUND_ACTIVE_KEY, ""));
+        if (!id.isEmpty() && backgroundFile(id).exists()) return id;
+        String next = newestBackgroundId();
+        if (!next.isEmpty()) setActiveBackgroundId(next);
+        return next;
+    }
+
+    private void setActiveBackgroundId(String id) {
+        String safe = safeBackgroundId(id);
+        SharedPreferences.Editor editor = getSharedPreferences("dzen_text", MODE_PRIVATE).edit();
+        if (safe.isEmpty()) editor.remove(BACKGROUND_ACTIVE_KEY); else editor.putString(BACKGROUND_ACTIVE_KEY, safe);
+        editor.apply();
+    }
+
+    private String newestBackgroundId() {
+        File[] files = backgroundDirectory().listFiles((d, n) -> n.endsWith(".jpg"));
+        if (files == null || files.length == 0) return "";
+        File newest = files[0];
+        for (File file : files) if (file.lastModified() > newest.lastModified()) newest = file;
+        String name = newest.getName();
+        return name.substring(0, name.length() - 4);
+    }
+
+    private String backgroundListJson() {
+        JSONArray out = new JSONArray();
+        File[] files = backgroundDirectory().listFiles((d, n) -> n.endsWith(".jpg"));
+        if (files == null) return out.toString();
+        List<File> list = new ArrayList<>();
+        for (File file : files) list.add(file);
+        list.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
+        String active = activeBackgroundId();
+        SharedPreferences prefs = getSharedPreferences("dzen_text", MODE_PRIVATE);
+        for (File file : list) {
+            try {
+                String name = file.getName();
+                String id = name.substring(0, name.length() - 4);
+                JSONObject item = new JSONObject();
+                item.put("id", id);
+                item.put("name", prefs.getString("background_name_" + id, "Свой фон"));
+                item.put("size", file.length());
+                item.put("active", id.equals(active));
+                out.put(item);
+            } catch (Exception ignored) { }
+        }
+        return out.toString();
+    }
+
+    private String backgroundDataFor(String rawId) {
+        String id = safeBackgroundId(rawId);
+        if (id.isEmpty()) return "";
+        File file = backgroundFile(id);
+        if (!file.exists()) return "";
+        try (FileInputStream in = new FileInputStream(file); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192]; int n;
+            while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+            return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+        } catch (Exception e) {
+            return "";
+        }
+    }
+
+    private String saveEditorBackground(Uri uri) throws Exception {
         BitmapFactory.Options bounds = new BitmapFactory.Options();
         bounds.inJustDecodeBounds = true;
         try (InputStream in = getContentResolver().openInputStream(uri)) {
@@ -560,12 +700,22 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             );
         }
 
-        try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), BACKGROUND_FILE))) {
+        String id = "bg_" + System.currentTimeMillis();
+        File target = backgroundFile(id);
+        try (FileOutputStream out = new FileOutputStream(target)) {
             if (!output.compress(Bitmap.CompressFormat.JPEG, 82, out)) throw new Exception("compress");
         } finally {
             if (output != bitmap) output.recycle();
             bitmap.recycle();
         }
+
+        String name = readDisplayName(uri);
+        if (name == null || name.trim().isEmpty()) name = "Свой фон";
+        getSharedPreferences("dzen_text", MODE_PRIVATE).edit()
+                .putString(BACKGROUND_ACTIVE_KEY, id)
+                .putString("background_name_" + id, name)
+                .apply();
+        return id;
     }
 
     private void loadSavedDictionary() {
