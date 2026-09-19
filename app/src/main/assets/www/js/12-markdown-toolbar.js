@@ -76,7 +76,8 @@ function updateMarkdownToolbarVisibility(){
   const bar=document.getElementById('markdownToolbar');
   if(!bar)return;
   const edit=document.getElementById('editPane');
-  const visible=document.activeElement===editor&&
+  const visible=settings.markdownToolbar!==false&&
+    document.activeElement===editor&&
     edit&&edit.classList.contains('active')&&
     window.__keyboardOpen===true;
   bar.classList.toggle('visible',visible);
