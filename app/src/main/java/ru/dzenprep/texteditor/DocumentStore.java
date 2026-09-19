@@ -303,26 +303,42 @@ public final class DocumentStore {
     private void recoverAtomicFiles(File root) {
         File[] children = root == null ? null : root.listFiles();
         if (children == null) return;
+
+        // Recurse first; recovery rules apply independently inside every folder.
         for (File child : children) {
-            if (child.isDirectory()) {
-                recoverAtomicFiles(child);
-                continue;
-            }
+            if (child.isDirectory()) recoverAtomicFiles(child);
+        }
+
+        children = root.listFiles();
+        if (children == null) return;
+
+        // Prefer a fully written .tmp file over the older .bak copy. This preserves
+        // the newest edit if the process died after moving the original to backup.
+        for (File child : children) {
+            if (child.isDirectory()) continue;
             String name = child.getName();
+            if (!name.endsWith(".tmp")) continue;
             try {
-                if (name.endsWith(".bak")) {
-                    File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
-                    if (target.exists()) {
-                        child.delete();
-                    } else {
-                        child.renameTo(target);
-                    }
-                } else if (name.endsWith(".tmp")) {
-                    File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
-                    if (target.exists()) {
-                        child.delete();
-                    }
+                File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
+                File backup = new File(target.getAbsolutePath() + ".bak");
+                if (target.exists()) {
+                    child.delete();
+                } else if (child.renameTo(target)) {
+                    if (backup.exists()) backup.delete();
                 }
+            } catch (Exception ignored) { }
+        }
+
+        children = root.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (child.isDirectory()) continue;
+            String name = child.getName();
+            if (!name.endsWith(".bak")) continue;
+            try {
+                File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
+                if (target.exists()) child.delete();
+                else child.renameTo(target);
             } catch (Exception ignored) { }
         }
     }
