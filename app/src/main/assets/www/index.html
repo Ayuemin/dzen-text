@@ -114,6 +114,35 @@
 
 <div class="sheetBackdrop" id="settingsBackdrop" onclick="backdropClick(event)"><div class="sheet">
   <div class="handle"></div><div class="sheetHeader"><h2>Настройки</h2><button class="sheetClose" type="button" onclick="closeSettings()" aria-label="Закрыть настройки">×</button></div>
+
+  <div class="setting appearanceSetting">
+    <details open>
+      <summary>Оформление редактора</summary>
+      <div class="subLabel"><span>Фон</span></div>
+      <select id="paperSelect" onchange="applySettings()">
+        <option value="white">Белый лист</option>
+        <option value="gray">Светло-серый</option>
+        <option value="old">Старая бумага</option>
+        <option value="news">Газетный лист</option>
+        <option value="dark">Тёмный</option>
+        <option value="custom">Свой фон</option>
+      </select>
+      <div class="settingActions backgroundActions">
+        <button class="nativeBtn" type="button" onclick="chooseBackground()">Выбрать изображение</button>
+        <button class="nativeBtn" type="button" onclick="clearCustomBackground()">Удалить свой фон</button>
+      </div>
+      <div class="subLabel"><span>Подложка своего фона</span><span class="val" id="backgroundVeilVal"></span></div>
+      <input id="backgroundVeil" type="range" min="0" max="0.9" step="0.05" oninput="applySettings()">
+      <div class="subLabel"><span>Текст на своём фоне</span></div>
+      <select id="backgroundTextSelect" onchange="applySettings()">
+        <option value="dark">Тёмный</option>
+        <option value="light">Светлый</option>
+      </select>
+      <div class="subLabel"><span>Акцентный цвет</span></div>
+      <div class="accentRow"><input id="accentHex" type="text" inputmode="text" maxlength="7" placeholder="#D65C43" onchange="applySettings()"><span id="accentPreview" class="accentPreview"></span></div>
+      <div class="smallNote">Акцент влияет только на кнопки и выделения. Цвет основного текста задаётся фоном отдельно, поэтому читаемость не зависит от выбранного акцента.</div>
+    </details>
+  </div>
   <div class="setting"><label>Шрифт <span class="val" id="fontVal"></span></label><select id="fontSelect" onchange="applySettings()"><option value="system">Системный</option><option value="serif">Книжный</option><option value="sans">Нейтральный</option><option value="mono">Моноширинный</option></select></div>
   <div class="setting"><label>Размер текста <span class="val" id="sizeVal"></span></label><input id="sizeRange" type="range" min="14" max="26" step="1" oninput="applySettings()"></div>
   <div class="setting"><label>Межстрочный интервал <span class="val" id="lineVal"></span></label><input id="lineRange" type="range" min="1.25" max="2.0" step="0.05" oninput="applySettings()"></div>

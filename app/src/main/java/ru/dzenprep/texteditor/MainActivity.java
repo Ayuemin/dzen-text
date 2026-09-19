@@ -15,6 +15,9 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.util.JsonReader;
+import android.util.Base64;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 import org.json.JSONObject;
 import org.json.JSONArray;
@@ -25,6 +28,7 @@ import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -43,9 +47,11 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int REQUEST_OPEN_TEXT = 1907;
     private static final int REQUEST_OPEN_DICTIONARY = 1908;
     private static final int REQUEST_SAVE_REPORT = 1909;
+    private static final int REQUEST_OPEN_BACKGROUND = 1910;
     private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final String DICT_FILE = "user_synonyms.dat";
+    private static final String BACKGROUND_FILE = "editor_background.jpg";
 
     private WebView web;
     private TextToSpeech tts;
@@ -161,6 +167,39 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     runJs("window.onNativeFileError && window.onNativeFileError('Не удалось открыть выбор файла')");
                 }
             });
+        }
+
+        @JavascriptInterface
+        public void pickBackground() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("image/*");
+                try {
+                    startActivityForResult(intent, REQUEST_OPEN_BACKGROUND);
+                } catch (Exception e) {
+                    runJs("window.onNativeFileError && window.onNativeFileError('Не удалось открыть выбор изображения')");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String backgroundData() {
+            File f = new File(getFilesDir(), BACKGROUND_FILE);
+            if (!f.exists()) return "";
+            try (FileInputStream in = new FileInputStream(f); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buf = new byte[8192]; int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                return "data:image/jpeg;base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void clearBackground() {
+            try { new File(getFilesDir(), BACKGROUND_FILE).delete(); } catch (Exception ignored) { }
+            runJs("window.onNativeBackgroundChanged && window.onNativeBackgroundChanged()");
         }
 
         @JavascriptInterface
@@ -280,6 +319,16 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             return;
         }
 
+        if (requestCode == REQUEST_OPEN_BACKGROUND) {
+            try {
+                saveEditorBackground(uri);
+                runJs("window.onNativeBackgroundChanged && window.onNativeBackgroundChanged()");
+            } catch (Exception e) {
+                runJs("window.onNativeFileError && window.onNativeFileError('Не удалось использовать выбранное изображение')");
+            }
+            return;
+        }
+
         if (requestCode == REQUEST_OPEN_TEXT) {
             try {
                 String name = readDisplayName(uri);
@@ -310,6 +359,48 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             } catch (Exception e) {
                 runJs("window.onNativeDictionaryError && window.onNativeDictionaryError('Не удалось разобрать словарь. Нужен JSON/TXT до 16 МБ.')");
             }
+        }
+    }
+
+
+    private void saveEditorBackground(Uri uri) throws Exception {
+        BitmapFactory.Options bounds = new BitmapFactory.Options();
+        bounds.inJustDecodeBounds = true;
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new Exception("stream");
+            BitmapFactory.decodeStream(in, null, bounds);
+        }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw new Exception("image");
+
+        int sample = 1;
+        while (Math.max(bounds.outWidth / sample, bounds.outHeight / sample) > 2200) sample *= 2;
+
+        BitmapFactory.Options options = new BitmapFactory.Options();
+        options.inSampleSize = sample;
+        Bitmap bitmap;
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            if (in == null) throw new Exception("stream");
+            bitmap = BitmapFactory.decodeStream(in, null, options);
+        }
+        if (bitmap == null) throw new Exception("decode");
+
+        Bitmap output = bitmap;
+        int max = Math.max(bitmap.getWidth(), bitmap.getHeight());
+        if (max > 1600) {
+            float scale = 1600f / max;
+            output = Bitmap.createScaledBitmap(
+                    bitmap,
+                    Math.max(1, Math.round(bitmap.getWidth() * scale)),
+                    Math.max(1, Math.round(bitmap.getHeight() * scale)),
+                    true
+            );
+        }
+
+        try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), BACKGROUND_FILE))) {
+            if (!output.compress(Bitmap.CompressFormat.JPEG, 82, out)) throw new Exception("compress");
+        } finally {
+            if (output != bitmap) output.recycle();
+            bitmap.recycle();
         }
     }
 

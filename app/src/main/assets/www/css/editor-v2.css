@@ -127,3 +127,9 @@
 @media (min-width:700px){
   .editor{padding-left:max(24px,calc((100vw - 760px)/2));padding-right:max(24px,calc((100vw - 760px)/2))}
 }
+
+.appearanceSetting summary{font-weight:750}
+.backgroundActions{margin:10px 0 3px}
+.accentRow{display:flex;align-items:center;gap:10px}
+.accentRow input{flex:1;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:10px 11px;font:14px ui-monospace,monospace;text-transform:uppercase}
+.accentPreview{width:32px;height:32px;border-radius:50%;border:1px solid var(--border);display:block;flex:0 0 auto}
