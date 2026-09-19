@@ -67,8 +67,7 @@ function applyMarkdown(action){
   }else if(['h1','h2','h3','h4','h5','h6','quote','bullet','number'].includes(action)){
     markdownPrefix(action);
   }
-  render(false);
-  markAnalysisStale();
+  afterProgrammaticEdit(false);
   updateMarkdownToolbarVisibility();
 }
 
