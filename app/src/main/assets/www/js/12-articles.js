@@ -79,6 +79,7 @@ function flushArticleAutosave(){
 }
 
 function scheduleArticleSave(){
+  if(!documentsAvailable()||!activeArticleId)return;
   articleDirty=true;
   clearTimeout(articleSaveTimer);
   articleSaveTimer=setTimeout(flushArticleAutosave,900);
