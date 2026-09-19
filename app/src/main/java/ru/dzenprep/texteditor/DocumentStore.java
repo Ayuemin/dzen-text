@@ -309,14 +309,14 @@ public final class DocumentStore {
 
     private String deriveTitle(String text) {
         if (text == null) return "Без названия";
-        String[] lines = text.split("\\\\r?\\\\n");
+        String[] lines = text.split("\\r?\\n");
         for (String raw : lines) {
             String line = raw.trim();
             if (line.isEmpty()) continue;
-            line = line.replaceFirst("^\\\\s*(?:#{1,6}|>|[-*+]|\\\\d+[.)])\\\\s*", "");
-            line = line.replaceAll("\\\\[([^\\\\]]+)\\\\]\\\\([^)]*\\\\)", "$1");
-            line = line.replaceAll("[*_~\\\\x60#]", "");
-            line = line.replaceAll("\\\\s+", " ").trim();
+            line = line.replaceFirst("^\\s*(?:#{1,6}|>|[-*+]|\\d+[.)])\\s*", "");
+            line = line.replaceAll("\\[([^\\]]+)\\]\\([^)]*\\)", "$1");
+            line = line.replaceAll("[*_~`#]", "");
+            line = line.replaceAll("\\s+", " ").trim();
             if (line.isEmpty()) continue;
             return line.length() > 72 ? line.substring(0, 72) + "…" : line;
         }
@@ -324,7 +324,7 @@ public final class DocumentStore {
     }
 
     private String compactPreview(String text) {
-        String s = text == null ? "" : text.replaceAll("\\\\s+", " ").trim();
+        String s = text == null ? "" : text.replaceAll("\\s+", " ").trim();
         if (s.length() > 150) s = s.substring(0, 150) + "…";
         return s;
     }
