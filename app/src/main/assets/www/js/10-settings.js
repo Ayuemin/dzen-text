@@ -152,11 +152,6 @@ window.onNativeBackgroundSelected=(id)=>{
 };
 let cachedCustomFontData='';
 let cachedCustomFontName='';
-function normalizeAccentHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:'#D65C43'}
-function readCustomBackground(){if(cachedCustomBackground)return cachedCustomBackground;try{if(window.AndroidFile&&typeof AndroidFile.backgroundData==='function')cachedCustomBackground=AndroidFile.backgroundData()||''}catch(e){}return cachedCustomBackground}
-function chooseBackground(){if(window.AndroidFile&&typeof AndroidFile.pickBackground==='function'){AndroidFile.pickBackground();return}toast('Выбор собственного фона доступен в установленном приложении')}
-function clearCustomBackground(){try{if(window.AndroidFile&&typeof AndroidFile.clearBackground==='function')AndroidFile.clearBackground()}catch(e){}cachedCustomBackground='';settings.paper='gray';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Свой фон удалён')}
-window.onNativeBackgroundChanged=()=>{cachedCustomBackground='';settings.paper='custom';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Фон обновлён')};
 function readCustomFontData(){if(cachedCustomFontData)return cachedCustomFontData;try{if(window.AndroidFile&&typeof AndroidFile.fontData==='function')cachedCustomFontData=AndroidFile.fontData()||''}catch(e){}return cachedCustomFontData}
 function readCustomFontName(){if(cachedCustomFontName)return cachedCustomFontName;try{if(window.AndroidFile&&typeof AndroidFile.fontName==='function')cachedCustomFontName=AndroidFile.fontName()||''}catch(e){}return cachedCustomFontName}
 function ensureCustomFontFace(){
@@ -251,7 +246,9 @@ async function applySettings(){
   if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);
   localStorage.setItem('dzenSettings',JSON.stringify(settings));
   applyVisualSettings();
-  render(false,document.getElementById('previewPane').classList.contains('active'));
+  render(false,false);
+  const code=document.getElementById('htmlCode');
+  if(code)code.style.display=settings.showCode?'block':'none';
   updateSettingLabels();
   if(typeof updateMarkdownToolbarVisibility==='function')updateMarkdownToolbarVisibility();
 }
