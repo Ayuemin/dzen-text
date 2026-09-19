@@ -84,3 +84,24 @@ document.addEventListener('touchend',e=>{
   }
   sideTouch=null
 },{passive:true});
+
+function handleNativeBack(){
+  const quick=document.getElementById('quickMenu');
+  if(quick&&quick.classList.contains('open')){closeQuickMenu();return true}
+  const side=document.getElementById('sideBackdrop');
+  if(side&&side.classList.contains('open')){closeSideDrawer();return true}
+  const ideas=document.getElementById('ideasBackdrop');
+  if(ideas&&ideas.classList.contains('open')){closeIdeas();return true}
+  const settingsSheet=document.getElementById('settingsBackdrop');
+  if(settingsSheet&&settingsSheet.classList.contains('open')){closeSettings();return true}
+  const analysis=document.getElementById('analysisBackdrop');
+  if(analysis&&analysis.classList.contains('open')){closeAnalysis();return true}
+  if(typeof spellNavState!=='undefined'&&spellNavState){closeSpellPanel();return true}
+  if(typeof replacementState!=='undefined'&&replacementState){closeReplacement();return true}
+  if(typeof nearbyState!=='undefined'&&nearbyState){closeNearbyRepeat();return true}
+  if(typeof repeatNavState!=='undefined'&&repeatNavState){closeRepeatNavigator();return true}
+  const previewPane=document.getElementById('previewPane');
+  if(previewPane&&previewPane.classList.contains('active')){showPane('edit');return true}
+  return false
+}
+window.handleNativeBack=handleNativeBack;
