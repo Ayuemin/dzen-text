@@ -47,9 +47,15 @@ function ensureCaretVisible(force=false){
   if(editor.selectionStart!==editor.selectionEnd)return;
   if(editor.clientHeight<120)return;
 
-  syncCaretMirror();
-
-  const caretTop=caretMarker.offsetTop;
+  let caretTop=0;
+  const size=editor.value.length;
+  if(size>120000){
+    const ratio=size?editor.selectionEnd/size:0;
+    caretTop=Math.max(0,ratio*Math.max(editor.scrollHeight,editor.clientHeight));
+  }else{
+    syncCaretMirror();
+    caretTop=caretMarker.offsetTop;
+  }
   const visibleTop=caretTop-editor.scrollTop;
   const lineHeight=parseFloat(getComputedStyle(editor).lineHeight)||28;
   const topGuard=Math.max(88,editor.clientHeight*0.22);
