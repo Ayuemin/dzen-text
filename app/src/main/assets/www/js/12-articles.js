@@ -65,12 +65,13 @@ function persistCurrentArticleNow(){
 }
 
 function scheduleArticleSave(){
-  if(!settings.autosave)return;
   clearTimeout(articleSaveTimer);
   articleSaveTimer=setTimeout(function(){
     persistCurrentArticleNow();
     updateCurrentArticleUi();
-  },1100);
+    const side=document.getElementById('sideBackdrop');
+    if(side&&side.classList.contains('open'))renderSavedArticles();
+  },900);
 }
 
 function preserveCurrentArticleBeforeSwitch(reason){
