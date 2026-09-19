@@ -62,6 +62,47 @@ for name in ["07-spelling.js", "08-navigation.js", "11-ui.js", "12-markdown-tool
     if "editor.setRangeText(" in text and "afterProgrammaticEdit(" not in text:
         errors.append(name + " changes editor text without afterProgrammaticEdit()")
 
+
+# Destructive article replacement must be protected by a version snapshot.
+editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
+history_js = (JS / "12-history.js").read_text(encoding="utf-8")
+bootstrap_js = (JS / "12-bootstrap.js").read_text(encoding="utf-8")
+articles_js = (JS / "12-articles.js").read_text(encoding="utf-8")
+
+for fn, marker in [
+    ("clearEditor", "ensureProtectiveVersion('Перед очисткой')"),
+    ("loadFileText", "ensureProtectiveVersion('Перед импортом')"),
+]:
+    start = editor_js.find("function " + fn) if fn == "clearEditor" else editor_js.find("async function " + fn)
+    if start < 0:
+        errors.append("missing " + fn)
+    else:
+        block = editor_js[start:start + 2600]
+        if marker not in block:
+            errors.append(fn + " may overwrite text without a protective version")
+
+restore_start = history_js.find("async function restoreVersion")
+if restore_start < 0 or "ensureProtectiveVersion('Перед восстановлением')" not in history_js[restore_start:restore_start + 2600]:
+    errors.append("restoreVersion may overwrite text without a protective version")
+
+if "autoVersionInterval" in history_js or "setInterval(function(){" in history_js:
+    errors.append("auto-versioning must use one article-local timeout scheduler, not a global interval")
+
+if "if(repeatNavState)closeRepeatNavigator()" in bootstrap_js:
+    errors.append("manual editing must refresh repeat navigation instead of closing it")
+if "scheduleRepeatNavigatorRefresh" not in bootstrap_js:
+    errors.append("repeat navigation refresh hook is missing")
+
+if "function scheduleArticleSave()" not in articles_js or "articleDirty=true" not in articles_js:
+    errors.append("native article autosave dirty-state scheduler is missing")
+
+# Zero-argument render() runs a full analysis by default and is forbidden in
+# routine UI/storage flows.
+for path in sorted(JS.glob("*.js")):
+    text = path.read_text(encoding="utf-8")
+    if re.search(r'\brender\s*\(\s*\)', text):
+        errors.append(path.name + " contains render() which triggers an implicit full analysis")
+
 if errors:
     raise SystemExit("\n".join("APP LOGIC: " + e for e in errors))
 
