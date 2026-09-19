@@ -16,6 +16,16 @@ manifest = (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8
 if 'android:windowSoftInputMode="adjustResize"' not in manifest:
     errors.append("MainActivity must use adjustResize")
 
+main_activity = (ROOT / "app/src/main/java/ru/dzenprep/texteditor/MainActivity.java").read_text(encoding="utf-8")
+if "WindowInsets.Type.ime()" not in main_activity:
+    errors.append("Android 11+ must detect the IME through WindowInsets.Type.ime()")
+
+core = (JS / "01-core.js").read_text(encoding="utf-8")
+if "nativeKeyboardKnown" in core:
+    errors.append("keyboard fallback must never be permanently disabled by an initial native signal")
+if "nativeKeyboardOpen||fallbackKeyboardOpen" not in core.replace(" ", ""):
+    errors.append("keyboard state must combine native and viewport signals")
+
 if "js/12-caret-focus.js" in html or (JS / "12-caret-focus.js").exists():
     errors.append("legacy caret auto-scroll controller must stay removed")
 
