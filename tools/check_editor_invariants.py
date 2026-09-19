@@ -34,7 +34,7 @@ if "js/12-caret-focus.js" in html or (JS / "12-caret-focus.js").exists():
     errors.append("legacy caret auto-scroll controller must stay removed")
 
 compact_css = re.sub(r"\s+", "", css)
-if "body.keyboard-open.app{padding-bottom:calc(env(safe-area-inset-bottom)+var(--keyboardInset))!important}" not in compact_css:
+if "body.keyboard-open.app{padding-bottom:calc(env(safe-area-inset-bottom)+var(--keyboardInset))!important;" not in compact_css:
     errors.append("editor layout must reserve unresolved Android keyboard overlap")
 if "bottom:calc(8px+env(safe-area-inset-bottom)+var(--keyboardInset))!important" not in compact_css:
     errors.append("fixed editor panels must stay above the Android keyboard")
