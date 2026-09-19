@@ -92,14 +92,45 @@ function scheduleArticleSave(){
   }
 }
 
+function resetArticleAutosaveState(){
+  clearTimeout(articleSaveTimer);
+  articleSaveTimer=null;
+  articleDirty=false;
+}
+
 function preserveCurrentArticleBeforeSwitch(reason){
   const text=editor.value||'';
-  if(!text.trim())return true;
+  const versionReason=reason||'Перед сменой статьи';
 
   if(documentsAvailable()){
     if(!activeArticleId){
       try{activeArticleId=String(AndroidDocuments.ensureActiveArticle()||'')}catch(e){}
     }
+    if(!activeArticleId){
+      toast('Не удалось определить текущую статью. Переход отменён');
+      return false;
+    }
+
+    // Если пользователь только что удалил весь текст, на диске ещё может
+    // оставаться предыдущая непустая редакция. Сохраняем её в историю до
+    // записи пустого состояния, иначе быстрый переход на другую статью
+    // может сделать это состояние невосстановимым.
+    if(!text.trim()&&articleDirty&&typeof AndroidDocuments.loadArticle==='function'&&typeof AndroidDocuments.saveVersion==='function'){
+      try{
+        const previousText=String(AndroidDocuments.loadArticle(activeArticleId)||'');
+        if(previousText.trim()){
+          const result=JSON.parse(AndroidDocuments.saveVersion(activeArticleId,versionReason,previousText)||'{}');
+          if(!(result.ok||result.duplicate)){
+            toast('Не удалось сохранить защитную версию. Переход отменён');
+            return false;
+          }
+        }
+      }catch(e){
+        toast('Не удалось сохранить защитную версию. Переход отменён');
+        return false;
+      }
+    }
+
     let saved=false;
     try{saved=!!AndroidDocuments.saveArticle(activeArticleId,text)}catch(e){saved=false}
     if(saved)articleDirty=false;
@@ -108,14 +139,17 @@ function preserveCurrentArticleBeforeSwitch(reason){
       return false;
     }
   }else{
-    try{localStorage.setItem('dzenDraft',text)}catch(e){
+    try{
+      if(text)localStorage.setItem('dzenDraft',text);
+      else localStorage.removeItem('dzenDraft');
+    }catch(e){
       toast('Не удалось сохранить текущую статью. Переход отменён');
       return false;
     }
   }
 
-  if(typeof saveVersionSnapshot==='function'){
-    saveVersionSnapshot(reason||'Перед сменой статьи',true);
+  if(text.trim()&&typeof saveVersionSnapshot==='function'){
+    saveVersionSnapshot(versionReason,true);
   }
   return true;
 }
@@ -132,6 +166,7 @@ function resetEditorPanels(){
 }
 
 function setEditorTextForArticle(text,focus){
+  resetArticleAutosaveState();
   editor.value=String(text||'');
   resetEditorPanels();
   markAnalysisStale();
@@ -147,10 +182,7 @@ function setEditorTextForArticle(text,focus){
 }
 
 function createNewArticle(){
-  const previousId=activeArticleId;
-  const hadText=!!editor.value.trim();
-
-  if(hadText&&!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;
+  if(!preserveCurrentArticleBeforeSwitch('Перед новой статьёй'))return;
 
   if(documentsAvailable()){
     const newId=String(AndroidDocuments.createArticle()||'');
@@ -174,16 +206,19 @@ function openSavedArticle(id){
   if(!documentsAvailable())return;
   const next=String(id||'');
   if(!next||next===activeArticleId){closeSideDrawer();return}
-  if(editor.value.trim()&&!preserveCurrentArticleBeforeSwitch('Перед сменой статьи'))return;
-  let activated=false;
-  try{activated=!!AndroidDocuments.setActiveArticle(next)}catch(e){activated=false}
-  if(!activated){toast('Не удалось открыть статью');return}
-  activeArticleId=next;
+  if(!preserveCurrentArticleBeforeSwitch('Перед сменой статьи'))return;
+
+  // Сначала читаем цель и только после этого меняем активный ID. Так ошибка
+  // чтения не оставит старый текст привязанным к другой статье.
   let text='';
   try{text=String(AndroidDocuments.loadArticle(next)||'')}catch(e){
     toast('Не удалось прочитать статью');
     return;
   }
+  let activated=false;
+  try{activated=!!AndroidDocuments.setActiveArticle(next)}catch(e){activated=false}
+  if(!activated){toast('Не удалось открыть статью');return}
+  activeArticleId=next;
   setEditorTextForArticle(text,false);
   closeSideDrawer();
   updateCurrentArticleUi();
