@@ -6,6 +6,7 @@ let lastTypingAt=0;
 let autoVersionTimer=null;
 let autoVersionInterval=null;
 let autoVersionDirty=false;
+let lastAutoVersionAt=0;
 let historyRestoring=false;
 let lastLargeSnapshotAt=0;
 
@@ -61,12 +62,15 @@ function restoreEditorSnapshot(snapshot){
   const start=Math.max(0,Math.min(max,Number(snapshot.start)||0));
   const end=Math.max(start,Math.min(max,Number(snapshot.end)||start));
   clearOnlineSpelling();
-  markAnalysisStale();
-  render(false);
-  if(typeof scheduleArticleSave==='function')scheduleArticleSave();
+  historyRestoring=false;
+  if(typeof afterProgrammaticEdit==='function')afterProgrammaticEdit(false);
+  else{
+    markAnalysisStale();
+    render(false);
+    if(typeof scheduleArticleSave==='function')scheduleArticleSave();
+  }
   editor.focus();
   editor.setSelectionRange(start,end);
-  historyRestoring=false;
 }
 
 function undoEdit(){
@@ -235,9 +239,13 @@ async function restoreVersion(id){
   editor.value=text;
   historyRestoring=false;
   clearOnlineSpelling();
-  markAnalysisStale();
-  render(false);
+  if(typeof afterProgrammaticEdit==='function')afterProgrammaticEdit(false);
+  else{
+    markAnalysisStale();
+    render(false);
+  }
   if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
+  if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
   closeVersions();
   showPane('edit');
   editor.focus();
@@ -284,23 +292,39 @@ async function cleanupVersions(mode){
 }
 
 function flushAutoVersion(){
-  if(!autoVersionDirty)return;
-  if(saveVersionSnapshot('Авто',true))autoVersionDirty=false;
+  if(!autoVersionDirty)return false;
+  const now=Date.now();
+  const minGap=60000;
+  if(lastAutoVersionAt&&now-lastAutoVersionAt<minGap)return false;
+  if(saveVersionSnapshot('Авто',true)){
+    autoVersionDirty=false;
+    lastAutoVersionAt=now;
+    return true;
+  }
+  return false;
 }
 
 function scheduleAutoVersion(){
   autoVersionDirty=true;
+  if(autoVersionTimer)return;
 
-  if(!autoVersionTimer){
-    autoVersionTimer=setTimeout(function(){
-      autoVersionTimer=null;
-      flushAutoVersion();
-    },12000);
-  }
+  const now=Date.now();
+  const firstDelay=15000;
+  const minGap=60000;
+  const wait=lastAutoVersionAt
+    ? Math.max(1000,minGap-(now-lastAutoVersionAt))
+    : firstDelay;
+
+  autoVersionTimer=setTimeout(function(){
+    autoVersionTimer=null;
+    flushAutoVersion();
+    if(autoVersionDirty)scheduleAutoVersion();
+  },wait);
 
   if(!autoVersionInterval){
     autoVersionInterval=setInterval(function(){
-      flushAutoVersion();
+      if(flushAutoVersion())clearTimeout(autoVersionTimer);
+      if(autoVersionDirty&&!autoVersionTimer)scheduleAutoVersion();
     },60000);
   }
 }
