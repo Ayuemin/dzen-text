@@ -351,11 +351,14 @@
 
 /* Markdown bar: appears while editing and sits above the keyboard. */
 .markdownToolbar{
-  position:fixed;
-  left:7px;right:7px;
-  bottom:calc(var(--keyboardInset) + 5px);
+  position:relative;
+  left:auto;right:auto;bottom:auto;
   z-index:13;
   display:none;
+  flex:0 0 auto;
+  width:calc(100% - 14px);
+  margin:0 7px 5px;
+  box-sizing:border-box;
   padding:5px;
   border:1px solid color-mix(in srgb,var(--paper-text) 12%,transparent);
   border-radius:14px;
@@ -388,12 +391,7 @@
 }
 .mdBtn:active{background:color-mix(in srgb,var(--paper-text) 10%,transparent)}
 .mdStrong{font-weight:800}.mdItalic{font-style:italic}.mdCode{font-family:ui-monospace,monospace;font-size:12px}
-body.markdown-toolbar-visible .bottom{opacity:0;pointer-events:none}
-body.markdown-toolbar-visible .replacePanel,
-body.markdown-toolbar-visible .nearbyPanel,
-body.markdown-toolbar-visible .repeatNavPanel{
-  bottom:calc(var(--keyboardInset) + 57px)!important;
-}
+body.markdown-toolbar-visible .bottom{display:none!important}
 
 /* Paper presets stay subtle enough for long reading sessions. */
 :root[data-paper="old"]{
@@ -663,15 +661,6 @@ html,body,.app{background:var(--paper-bg)!important}
 }
 .sideDrawer{
   background:color-mix(in srgb,var(--paper-bg) 82%,transparent)!important;
-}
-
-.markdownToolbar{
-  bottom:5px!important;
-}
-body.markdown-toolbar-visible .replacePanel,
-body.markdown-toolbar-visible .nearbyPanel,
-body.markdown-toolbar-visible .repeatNavPanel{
-  bottom:57px!important;
 }
 
 .editor{
@@ -960,13 +949,13 @@ body.markdown-toolbar-visible .issueNavPanel{bottom:57px}
   flex:0 0 36px;
 }
 
-/* Correction/navigation panels must stay compact and above the visible viewport bottom. */
+/* Correction/navigation panels stay above the resized WebView bottom. */
 .issueNavPanel,
 .repeatNavPanel,
 .replacePanel,
 .nearbyPanel,
 .spellPanel{
-  bottom:calc(8px + var(--viewportBottomInset,0px) + env(safe-area-inset-bottom))!important;
+  bottom:calc(8px + env(safe-area-inset-bottom))!important;
   max-height:min(190px,38vh)!important;
   overflow:auto;
 }
@@ -975,7 +964,7 @@ body.markdown-toolbar-visible .repeatNavPanel,
 body.markdown-toolbar-visible .replacePanel,
 body.markdown-toolbar-visible .nearbyPanel,
 body.markdown-toolbar-visible .spellPanel{
-  bottom:calc(55px + var(--viewportBottomInset,0px))!important;
+  bottom:58px!important;
 }
 .issueNavDetail{
   white-space:nowrap;
@@ -1000,12 +989,6 @@ body.markdown-toolbar-visible .spellPanel{
 }
 .replaceNote,.repeatNavMeta{
   display:none!important;
-}
-
-/* Markdown bar follows the visible WebView bottom and never remains after the IME closes. */
-.markdownToolbar{
-  bottom:calc(5px + var(--viewportBottomInset,0px))!important;
-  max-width:calc(100vw - 14px);
 }
 
 /* Drawer and version-storage finishing touches. */
@@ -1332,37 +1315,4 @@ body.markdown-toolbar-visible .spellPanel{
   background:transparent!important;
 }
 
-/* Editor viewport model: the Markdown bar is layout chrome, never an overlay.
-   With Android adjustResize the WebView shrinks for the IME; the flex editor then
-   shrinks by the toolbar height too, so the browser can keep the caret visible. */
-.markdownToolbar{
-  position:relative!important;
-  left:auto!important;
-  right:auto!important;
-  bottom:auto!important;
-  z-index:13!important;
-  flex:0 0 auto!important;
-  width:calc(100% - 14px)!important;
-  max-width:none!important;
-  margin:0 7px 5px!important;
-  box-sizing:border-box!important;
-}
-.markdownToolbar.visible{
-  display:block!important;
-}
-body.markdown-toolbar-visible .bottom{
-  display:none!important;
-}
-body.markdown-toolbar-visible .editor{
-  padding-bottom:34px!important;
-}
-
-/* Correction panels may overlay the editor, but never the in-flow Markdown bar. */
-body.markdown-toolbar-visible .issueNavPanel,
-body.markdown-toolbar-visible .repeatNavPanel,
-body.markdown-toolbar-visible .replacePanel,
-body.markdown-toolbar-visible .nearbyPanel,
-body.markdown-toolbar-visible .spellPanel{
-  bottom:calc(58px + var(--viewportBottomInset,0px))!important;
-}
 
