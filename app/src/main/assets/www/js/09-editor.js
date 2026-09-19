@@ -1,6 +1,7 @@
 function afterProgrammaticEdit(runAnalysis=false){
   markAnalysisStale();
   render(!!runAnalysis);
+  if(typeof scheduleArticleSave==='function')scheduleArticleSave();
   if(typeof scheduleAutoVersion==='function')scheduleAutoVersion();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
 }
@@ -113,9 +114,7 @@ function render(runAnalysis=true,forcePreview=false){
   if(forcePreview||previewActive)renderPreview();
   scheduleStatsUpdate(runAnalysis||forcePreview);
   if(runAnalysis)analyzeText();
-  if(typeof documentsAvailable==='function'&&documentsAvailable()){
-    if(typeof scheduleArticleSave==='function')scheduleArticleSave();
-  }else if(settings.autosave){
+  if(!(typeof documentsAvailable==='function'&&documentsAvailable())&&settings.autosave){
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
   }
