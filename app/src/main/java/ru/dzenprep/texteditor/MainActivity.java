@@ -48,10 +48,13 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int REQUEST_OPEN_DICTIONARY = 1908;
     private static final int REQUEST_SAVE_REPORT = 1909;
     private static final int REQUEST_OPEN_BACKGROUND = 1910;
+    private static final int REQUEST_OPEN_FONT = 1911;
     private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
+    private static final int MAX_FONT_BYTES = 6 * 1024 * 1024;
     private static final String DICT_FILE = "user_synonyms.dat";
     private static final String BACKGROUND_FILE = "editor_background.jpg";
+    private static final String FONT_FILE = "editor_font.dat";
 
     private WebView web;
     private TextToSpeech tts;
@@ -203,6 +206,54 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
 
         @JavascriptInterface
+        public void pickFont() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                        "font/ttf", "font/otf", "font/woff", "font/woff2",
+                        "application/x-font-ttf", "application/x-font-opentype",
+                        "application/font-woff", "application/octet-stream"
+                });
+                try {
+                    startActivityForResult(intent, REQUEST_OPEN_FONT);
+                } catch (Exception e) {
+                    runJs("window.onNativeFontError && window.onNativeFontError('Не удалось открыть выбор шрифта')");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public String fontName() {
+            return getSharedPreferences("dzen_text", MODE_PRIVATE).getString("font_name", "");
+        }
+
+        @JavascriptInterface
+        public String fontData() {
+            File file = new File(getFilesDir(), FONT_FILE);
+            if (!file.exists()) return "";
+            String name = fontName().toLowerCase(Locale.ROOT);
+            String mime = name.endsWith(".otf") ? "font/otf" :
+                    name.endsWith(".woff2") ? "font/woff2" :
+                    name.endsWith(".woff") ? "font/woff" : "font/ttf";
+            try (FileInputStream in = new FileInputStream(file); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                byte[] buf = new byte[8192]; int n;
+                while ((n = in.read(buf)) != -1) out.write(buf, 0, n);
+                return "data:" + mime + ";base64," + Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP);
+            } catch (Exception e) {
+                return "";
+            }
+        }
+
+        @JavascriptInterface
+        public void clearFont() {
+            try { new File(getFilesDir(), FONT_FILE).delete(); } catch (Exception ignored) { }
+            getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("font_name").apply();
+            runJs("window.onNativeFontChanged && window.onNativeFontChanged('')");
+        }
+
+        @JavascriptInterface
         public void saveReport(final String text, final String fileName) {
             runOnUiThread(() -> {
                 pendingReportText = text == null ? "" : text;
@@ -325,6 +376,26 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 runJs("window.onNativeBackgroundChanged && window.onNativeBackgroundChanged()");
             } catch (Exception e) {
                 runJs("window.onNativeFileError && window.onNativeFileError('Не удалось использовать выбранное изображение')");
+            }
+            return;
+        }
+
+        if (requestCode == REQUEST_OPEN_FONT) {
+            try {
+                String name = readDisplayName(uri);
+                String lower = name == null ? "" : name.toLowerCase(Locale.ROOT);
+                if (!(lower.endsWith(".ttf") || lower.endsWith(".otf") || lower.endsWith(".woff") || lower.endsWith(".woff2"))) {
+                    throw new Exception("unsupported font");
+                }
+                byte[] bytes = readLimited(uri, MAX_FONT_BYTES);
+                if (bytes.length < 256) throw new Exception("font too small");
+                try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), FONT_FILE))) {
+                    out.write(bytes);
+                }
+                getSharedPreferences("dzen_text", MODE_PRIVATE).edit().putString("font_name", name).apply();
+                runJs("window.onNativeFontChanged && window.onNativeFontChanged(" + JSONObject.quote(name) + ")");
+            } catch (Exception e) {
+                runJs("window.onNativeFontError && window.onNativeFontError('Не удалось подключить шрифт. Поддерживаются TTF, OTF, WOFF и WOFF2 до 6 МБ.')");
             }
             return;
         }
