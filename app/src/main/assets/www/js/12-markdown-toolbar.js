@@ -20,7 +20,7 @@ function markdownPrefix(kind){
   const lines=block.split('\n');
   let replacement='';
 
-  if(/^h[1-3]$/.test(kind)){
+  if(/^h[1-6]$/.test(kind)){
     const level=Number(kind.slice(1));
     const mark='#'.repeat(level);
     const all=lines.every(function(x){return new RegExp('^\\\\s*'+mark+'\\\\s+').test(x)});
@@ -64,7 +64,7 @@ function applyMarkdown(action){
   }else if(action==='hr'){
     const start=editor.selectionStart,end=editor.selectionEnd;
     editor.setRangeText((start&&editor.value[start-1]!=='\n'?'\n':'')+'---\n',start,end,'end');
-  }else if(['h1','h2','h3','quote','bullet','number'].includes(action)){
+  }else if(['h1','h2','h3','h4','h5','h6','quote','bullet','number'].includes(action)){
     markdownPrefix(action);
   }
   render(false);
