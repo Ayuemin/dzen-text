@@ -98,12 +98,53 @@ function closeIssueNavigator(){
 }
 
 let repeatNavState=null;
+let repeatNavRefreshTimer=null;
+
+function scheduleRepeatNavigatorRefresh(){
+  if(!repeatNavState)return;
+  const state={...repeatNavState};
+  const current=state.occurrences[state.index]||null;
+  const anchor=current&&Number.isFinite(current.start)?current.start:(editor.selectionStart||0);
+  clearTimeout(repeatNavRefreshTimer);
+  const delay=editor.value.length>120000?1100:520;
+  repeatNavRefreshTimer=setTimeout(function(){
+    if(!repeatNavState||repeatNavState.type!==state.type)return;
+    try{analyzeText()}catch(e){return}
+    const candidates=currentAnalysis.issues.filter(function(issue){
+      return issue.type===state.type&&Array.isArray(issue.occurrences)&&issue.occurrences.length>1;
+    });
+    if(!candidates.length){
+      closeRepeatNavigator();
+      toast('Совпадения этого типа исправлены');
+      return;
+    }
+    let issue=candidates.find(function(x){
+      return (x.navTitle||x.title)===state.title;
+    })||candidates.find(function(x){
+      return x.occurrences.some(function(o){return Number(o.start)>=Math.max(0,anchor-2)});
+    })||candidates[0];
+
+    const occ=issue.occurrences;
+    let index=occ.findIndex(function(o){return Number(o.start)>anchor+1});
+    if(index<0)index=occ.findIndex(function(o){return Number(o.start)>=Math.max(0,anchor-2)});
+    if(index<0)index=0;
+    repeatNavState={
+      type:issue.type,
+      issueIndex:currentAnalysis.issues.indexOf(issue),
+      index:index,
+      occurrences:occ,
+      title:issue.navTitle||issue.title
+    };
+    renderRepeatNavigator();
+  },delay);
+}
+
 function repeatContextMarkup(occ){const src=editor.value||'';let a=Number.isFinite(occ.contextStart)?occ.contextStart:Math.max(0,occ.start-90),b=Number.isFinite(occ.contextEnd)?occ.contextEnd:Math.min(src.length,occ.end+110);if(!Number.isFinite(occ.contextStart)){const left=src.lastIndexOf('\n',occ.start-1);if(left>=0)a=Math.max(a,left+1);const right=src.indexOf('\n',occ.end);if(right>=0)b=Math.min(b,right)}const full=src.slice(a,b).replace(/^\s+|\s+$/g,'');const trimLeft=src.slice(a,b).indexOf(full),base=a+Math.max(0,trimLeft),hs=Math.max(0,occ.start-base),he=Math.max(hs,Math.min(full.length,occ.end-base));return `${escapeHtml(full.slice(0,hs))}<span class="repeatNavHit">${escapeHtml(full.slice(hs,he))}</span>${escapeHtml(full.slice(he))}`}
-function openRepeatNavigator(issueIndex){const issue=currentAnalysis.issues[issueIndex];if(!issue||!Array.isArray(issue.occurrences)||issue.occurrences.length<2){if(issue)jumpTo(issue.start,issue.end);return}closeAnalysis();if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();repeatNavState={issueIndex,index:0,occurrences:issue.occurrences,title:issue.navTitle||issue.title};showPane('edit');renderRepeatNavigator();jumpRepeatOccurrence(true)}
+function openRepeatNavigator(issueIndex){const issue=currentAnalysis.issues[issueIndex];if(!issue||!Array.isArray(issue.occurrences)||issue.occurrences.length<2){if(issue)jumpTo(issue.start,issue.end);return}closeAnalysis();if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();repeatNavState={type:issue.type,issueIndex,index:0,occurrences:issue.occurrences,title:issue.navTitle||issue.title};showPane('edit');renderRepeatNavigator();jumpRepeatOccurrence(true)}
 function renderRepeatNavigator(){const panel=document.getElementById('repeatNavPanel');if(!repeatNavState){panel.classList.remove('open');return}const total=repeatNavState.occurrences.length;repeatNavState.index=((repeatNavState.index%total)+total)%total;const occ=repeatNavState.occurrences[repeatNavState.index];document.getElementById('repeatNavTitle').textContent=repeatNavState.title;document.getElementById('repeatNavCount').textContent=`${repeatNavState.index+1} из ${total} совпадений`;document.getElementById('repeatNavPrev').disabled=total<2;document.getElementById('repeatNavNext').disabled=total<2;document.getElementById('repeatNavContext').innerHTML=repeatContextMarkup(occ);panel.classList.add('open')}
 function navigateRepeatOccurrence(dir){if(!repeatNavState)return;repeatNavState.index+=dir;renderRepeatNavigator();jumpRepeatOccurrence(true)}
 function jumpRepeatOccurrence(quiet=false){if(!repeatNavState)return;const occ=repeatNavState.occurrences[repeatNavState.index];jumpTo(occ.start,occ.end,true);if(!quiet)toast(`${repeatNavState.index+1} из ${repeatNavState.occurrences.length}`)}
-function closeRepeatNavigator(){repeatNavState=null;document.getElementById('repeatNavPanel').classList.remove('open')}
+function closeRepeatNavigator(){clearTimeout(repeatNavRefreshTimer);repeatNavState=null;document.getElementById('repeatNavPanel').classList.remove('open')}
 let nearbyState=null;
 function nearbySentenceMarkup(sentenceStart,sentenceEnd,wordStart,wordEnd,label){const src=editor.value||'',full=src.slice(sentenceStart,sentenceEnd),a=Math.max(0,Math.min(full.length,wordStart-sentenceStart)),b=Math.max(a,Math.min(full.length,wordEnd-sentenceStart));return `<span class="nearbyLabel">${label}</span>${escapeHtml(full.slice(0,a))}<span class="nearbyHit">${escapeHtml(full.slice(a,b))}</span>${escapeHtml(full.slice(b))}`}
 function openNearbyRepeat(pairStart,pairEnd,start,end,firstSentenceStart,firstSentenceEnd,secondSentenceStart,secondSentenceEnd,word){document.getElementById('analysisBackdrop').classList.remove('open');if(replacementState)closeReplacement();nearbyState={pairStart,pairEnd,start,end,firstSentenceStart,firstSentenceEnd,secondSentenceStart,secondSentenceEnd,word};showPane('edit');renderNearbyRepeat();jumpTo(start,end,true)}
