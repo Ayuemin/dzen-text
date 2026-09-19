@@ -100,7 +100,10 @@ async function deleteCustomBackground(id){
   }catch(e){}
   if(!deleted){toast('Не удалось удалить фон');return}
   if(String(settings.customBackgroundId||'')===String(id)){
-    const next=currentBackgroundId();
+    let next='';
+    try{
+      if(window.AndroidFile&&typeof AndroidFile.activeBackgroundId==='function')next=String(AndroidFile.activeBackgroundId()||'');
+    }catch(e){}
     settings.customBackgroundId=next;
     if(!next)settings.paper='gray';
   }
