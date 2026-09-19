@@ -14,7 +14,9 @@ function updateKeyboardInset(){
   if(inset<100)inset=0;
   window.__keyboardInset=inset;
   window.__keyboardOpen=inset>=100;
-  document.documentElement.style.setProperty('--keyboardInset',inset+'px');
+  // This APK uses adjustResize: the WebView itself already ends above the IME.
+  // Keep CSS bottom offsets at zero and use the measured inset only as an open/closed signal.
+  document.documentElement.style.setProperty('--keyboardInset','0px');
   window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:inset}));
 }
 if(window.visualViewport){
