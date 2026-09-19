@@ -12,6 +12,7 @@ function drawerEditor(){closeSideDrawer();showPane('edit')}
 function drawerPreview(){closeSideDrawer();showPane('preview')}
 function drawerImport(){closeSideDrawer();chooseFile()}
 function drawerCheck(){closeSideDrawer();runFullCheck()}
+function drawerVersions(){closeSideDrawer();openVersions()}
 function drawerSettings(){closeSideDrawer();openSettings()}
 
 function quickPreview(){closeQuickMenu();showPane('preview')}
@@ -78,8 +79,8 @@ document.addEventListener('touchstart',e=>{
 document.addEventListener('touchend',e=>{
   if(!sideTouch||!e.changedTouches.length)return;
   const t=e.changedTouches[0],dx=t.clientX-sideTouch.x,dy=t.clientY-sideTouch.y;
-  if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.4){
-    if(!sideTouch.drawer&&sideTouch.x<Math.min(150,window.innerWidth*0.34)&&dx>0)openSideDrawer();
+  if(Math.abs(dx)>55&&Math.abs(dx)>Math.abs(dy)*1.35){
+    if(!sideTouch.drawer&&sideTouch.x<Math.min(180,window.innerWidth*0.38)&&dx>0)openSideDrawer();
     else if(sideTouch.drawer&&dx<0)closeSideDrawer()
   }
   sideTouch=null
