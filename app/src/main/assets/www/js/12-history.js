@@ -1,7 +1,4 @@
-const EDIT_VERSIONS_KEY='dzenTextVersionsV1';
-const MAX_UNDO_STATES=80;
-const MAX_VERSIONS=20;
-const MAX_VERSION_CHARS=650000;
+const LEGACY_VERSIONS_KEY='dzenTextVersionsV1';
 let undoStack=[];
 let redoStack=[];
 let beforeInputSnapshot=null;
@@ -10,15 +7,19 @@ let autoVersionTimer=null;
 let historyRestoring=false;
 
 function editorSnapshot(){
-  return {
-    text:editor.value,
-    start:editor.selectionStart||0,
-    end:editor.selectionEnd||0
-  };
+  return {text:editor.value,start:editor.selectionStart||0,end:editor.selectionEnd||0};
 }
 
 function sameSnapshot(a,b){
   return !!a&&!!b&&a.text===b.text&&a.start===b.start&&a.end===b.end;
+}
+
+function undoLimitForText(text){
+  const size=String(text||'').length;
+  if(size>300000)return 10;
+  if(size>150000)return 18;
+  if(size>60000)return 35;
+  return 70;
 }
 
 function pushUndoSnapshot(snapshot){
@@ -26,7 +27,16 @@ function pushUndoSnapshot(snapshot){
   const last=undoStack[undoStack.length-1];
   if(last&&sameSnapshot(last,snapshot))return;
   undoStack.push(snapshot);
-  if(undoStack.length>MAX_UNDO_STATES)undoStack.splice(0,undoStack.length-MAX_UNDO_STATES);
+  const limit=undoLimitForText(snapshot.text);
+  if(undoStack.length>limit)undoStack.splice(0,undoStack.length-limit);
+}
+
+function resetUndoHistory(){
+  undoStack=[];
+  redoStack=[];
+  beforeInputSnapshot=null;
+  lastTypingAt=0;
+  updateHistoryButtons();
 }
 
 function historyCheckpoint(){
@@ -44,8 +54,9 @@ function restoreEditorSnapshot(snapshot){
   const start=Math.max(0,Math.min(max,Number(snapshot.start)||0));
   const end=Math.max(start,Math.min(max,Number(snapshot.end)||start));
   clearOnlineSpelling();
-  render(true);
   markAnalysisStale();
+  render(false);
+  if(typeof scheduleArticleSave==='function')scheduleArticleSave();
   editor.focus();
   editor.setSelectionRange(start,end);
   historyRestoring=false;
@@ -76,79 +87,107 @@ function updateHistoryButtons(){
   if(redo)redo.disabled=!redoStack.length;
 }
 
-function loadVersions(){
+function nativeVersionsAvailable(){
+  return !!(window.AndroidDocuments&&typeof AndroidDocuments.saveVersion==='function'&&activeArticleId);
+}
+
+function legacyVersions(){
   try{
-    const value=JSON.parse(localStorage.getItem(EDIT_VERSIONS_KEY)||'[]');
+    const value=JSON.parse(localStorage.getItem(LEGACY_VERSIONS_KEY)||'[]');
     return Array.isArray(value)?value:[];
   }catch(e){return []}
 }
 
-function storeVersions(items){
+function migrateLegacyVersions(){
+  if(!nativeVersionsAvailable())return;
+  const old=legacyVersions();
+  if(!old.length)return;
+  for(const item of old.slice(0,12)){
+    try{AndroidDocuments.saveVersion(activeArticleId,item.reason||'Перенесено',item.text||'')}catch(e){}
+  }
+  localStorage.removeItem(LEGACY_VERSIONS_KEY);
+}
+
+function saveVersionSnapshot(reason,silent){
+  reason=reason||'Авто';
+  silent=silent!==false;
+  const text=editor.value||'';
+  if(!text.trim())return false;
+
+  if(nativeVersionsAvailable()){
+    try{
+      const result=JSON.parse(AndroidDocuments.saveVersion(activeArticleId,String(reason),text)||'{}');
+      if(result.limit&&!silent)toast('История версий достигла лимита 100 МБ');
+      if(result.ok&&!silent)toast('Версия сохранена');
+      return !!result.ok;
+    }catch(e){
+      if(!silent)toast('Не удалось сохранить версию');
+      return false;
+    }
+  }
+
   try{
-    localStorage.setItem(EDIT_VERSIONS_KEY,JSON.stringify(items));
+    const list=legacyVersions();
+    if(list[0]&&list[0].text===text)return false;
+    list.unshift({id:String(Date.now()),ts:Date.now(),reason:String(reason),text:text});
+    while(list.length>12)list.pop();
+    localStorage.setItem(LEGACY_VERSIONS_KEY,JSON.stringify(list));
+    if(!silent)toast('Версия сохранена');
     return true;
   }catch(e){
     return false;
   }
 }
 
-function trimVersions(items){
-  const out=items.slice(0,MAX_VERSIONS);
-  let total=0;
-  const kept=[];
-  for(const item of out){
-    const size=String(item.text||'').length;
-    if(kept.length&&total+size>MAX_VERSION_CHARS)break;
-    kept.push(item);
-    total+=size;
-  }
-  return kept;
-}
-
-function saveVersionSnapshot(reason='Авто',silent=true){
-  const text=editor.value||'';
-  if(!text.trim())return false;
-  let versions=loadVersions();
-  if(versions[0]&&versions[0].text===text)return false;
-  const item={
-    id:String(Date.now())+'_'+Math.random().toString(36).slice(2,7),
-    ts:Date.now(),
-    reason:String(reason||'Версия'),
-    text
-  };
-  versions=trimVersions([item,...versions]);
-  const ok=storeVersions(versions);
-  if(ok&&!silent)toast('Версия сохранена');
-  return ok;
-}
-
 function saveVersionNow(){
   if(!editor.value.trim()){toast('Нет текста для сохранения');return}
-  if(!saveVersionSnapshot('Вручную',false))toast('Такая версия уже сохранена');
+  if(!saveVersionSnapshot('Вручную',false))toast('Такая версия уже сохранена или история заполнена');
   renderVersions();
 }
 
-function versionPreview(text){
-  const one=String(text||'').replace(/\s+/g,' ').trim();
-  return one.length>110?one.slice(0,110)+'…':one;
+function versionsPayload(){
+  if(nativeVersionsAvailable()){
+    try{return JSON.parse(AndroidDocuments.listVersions(activeArticleId)||'{}')}catch(e){return {versions:[]}}
+  }
+  const versions=legacyVersions().map(function(x){
+    return {id:x.id,ts:x.ts,reason:x.reason,size:String(x.text||'').length,preview:String(x.text||'').replace(/\s+/g,' ').trim().slice(0,150)};
+  });
+  return {versions:versions,articleBytes:0,totalBytes:0,limitBytes:0};
+}
+
+function renderVersionUsage(data){
+  const text=document.getElementById('versionUsageText');
+  const bar=document.getElementById('versionUsageBar');
+  if(!text||!bar)return;
+  const total=Math.max(0,Number(data.totalBytes)||0);
+  const article=Math.max(0,Number(data.articleBytes)||0);
+  const limit=Math.max(0,Number(data.limitBytes)||0);
+  if(limit){
+    text.textContent='Эта статья: '+bytesLabel(article)+' · всего: '+bytesLabel(total)+' из '+bytesLabel(limit);
+    bar.style.width=Math.min(100,(total/limit)*100)+'%';
+  }else{
+    text.textContent='История хранится локально';
+    bar.style.width='0%';
+  }
 }
 
 function renderVersions(){
   const root=document.getElementById('versionsList');
   if(!root)return;
-  const versions=loadVersions();
+  const data=versionsPayload();
+  const versions=Array.isArray(data.versions)?data.versions:[];
+  renderVersionUsage(data);
   if(!versions.length){
-    root.innerHTML='<div class="empty versionEmpty">Версий пока нет. Они появятся автоматически после редактирования, а текущую можно сохранить вручную.</div>';
+    root.innerHTML='<div class="empty versionEmpty">Версий этой статьи пока нет.</div>';
     return;
   }
-  root.innerHTML=versions.map(item=>{
+  root.innerHTML=versions.map(function(item){
     const date=new Date(Number(item.ts)||Date.now()).toLocaleString('ru-RU',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
     const reason=escapeHtml(item.reason||'Версия');
-    const preview=escapeHtml(versionPreview(item.text));
-    const chars=String(item.text||'').length.toLocaleString('ru-RU');
-    const id=String(item.id).replace(/'/g,'');
+    const preview=escapeHtml(item.preview||'');
+    const id=String(item.id||'').replace(/'/g,'');
     return '<div class="versionCard">'+
-      '<div class="versionMeta"><b>'+reason+'</b><span>'+date+' · '+chars+' знаков</span></div>'+
+      '<div class="versionMeta"><b>'+reason+'</b><span>'+date+' · '+bytesLabel(item.size)+'</span></div>'+
       '<div class="versionPreview">'+preview+'</div>'+
       '<div class="versionActions"><button type="button" onclick="restoreVersion(\''+id+'\')">Восстановить</button><button type="button" class="dangerText" onclick="deleteVersion(\''+id+'\')">Удалить</button></div>'+
       '</div>';
@@ -156,7 +195,8 @@ function renderVersions(){
 }
 
 function openVersions(){
-  if(typeof closeQuickMenu==='function')closeQuickMenu();
+  if(typeof closeSideDrawer==='function')closeSideDrawer();
+  if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
   renderVersions();
   document.getElementById('versionsBackdrop').classList.add('open');
 }
@@ -169,16 +209,28 @@ function versionsBackdropClick(event){
   if(event.target&&event.target.id==='versionsBackdrop')closeVersions();
 }
 
+function loadVersionText(id){
+  if(nativeVersionsAvailable()){
+    try{return String(AndroidDocuments.loadVersion(activeArticleId,id)||'')}catch(e){return ''}
+  }
+  const item=legacyVersions().find(function(x){return String(x.id)===String(id)});
+  return item?String(item.text||''):'';
+}
+
 async function restoreVersion(id){
-  const item=loadVersions().find(x=>x.id===id);
-  if(!item)return;
-  const ok=await appConfirm('Восстановить версию?','Текущий текст останется в истории и его можно будет вернуть.','Восстановить',false);
+  const text=loadVersionText(id);
+  if(!text)return;
+  const ok=await appConfirm('Восстановить версию?','Текущий текст сначала сохранится отдельной версией.','Восстановить',false);
   if(!ok)return;
   saveVersionSnapshot('Перед восстановлением',true);
   historyCheckpoint();
-  editor.value=item.text||'';
+  historyRestoring=true;
+  editor.value=text;
+  historyRestoring=false;
   clearOnlineSpelling();
-  render(true);
+  markAnalysisStale();
+  render(false);
+  if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
   closeVersions();
   showPane('edit');
   editor.focus();
@@ -189,21 +241,52 @@ async function restoreVersion(id){
 async function deleteVersion(id){
   const ok=await appConfirm('Удалить версию?','Эту сохранённую копию нельзя будет восстановить.','Удалить',true);
   if(!ok)return;
-  storeVersions(loadVersions().filter(x=>x.id!==id));
+  if(nativeVersionsAvailable()){
+    try{AndroidDocuments.deleteVersion(activeArticleId,id)}catch(e){}
+  }else{
+    localStorage.setItem(LEGACY_VERSIONS_KEY,JSON.stringify(legacyVersions().filter(function(x){return String(x.id)!==String(id)})));
+  }
   renderVersions();
+}
+
+async function doubleConfirmCleanup(title,text){
+  const first=await appConfirm(title,text,'Продолжить',true);
+  if(!first)return false;
+  return await appConfirm('Подтвердите ещё раз','Удаление версий необратимо. Текущая статья останется без изменений.','Удалить версии',true);
+}
+
+async function cleanupVersions(mode){
+  if(!nativeVersionsAvailable()){toast('Очистка истории доступна в установленном приложении');return}
+  let title='Удалить версии?';
+  let text='Будут удалены выбранные версии текущей статьи.';
+  if(mode==='week'){title='Удалить версии старше недели?';text='Останутся версии за последние 7 дней.'}
+  if(mode==='month'){title='Удалить версии старше месяца?';text='Останутся версии за последние 30 дней.'}
+  if(mode==='all'){title='Удалить все версии?';text='История версий текущей статьи будет полностью очищена.'}
+  if(!await doubleConfirmCleanup(title,text))return;
+
+  let count=0;
+  try{
+    if(mode==='all')count=AndroidDocuments.deleteAllVersions(activeArticleId);
+    else{
+      const days=mode==='week'?7:30;
+      count=AndroidDocuments.deleteVersionsOlderThan(activeArticleId,Date.now()-days*24*60*60*1000);
+    }
+  }catch(e){}
+  renderVersions();
+  toast('Удалено версий: '+count);
 }
 
 function scheduleAutoVersion(){
   clearTimeout(autoVersionTimer);
-  autoVersionTimer=setTimeout(()=>saveVersionSnapshot('Авто',true),45000);
+  autoVersionTimer=setTimeout(function(){saveVersionSnapshot('Авто',true)},60000);
 }
 
-editor.addEventListener('beforeinput',event=>{
+editor.addEventListener('beforeinput',function(){
   if(historyRestoring)return;
   beforeInputSnapshot=editorSnapshot();
 });
 
-editor.addEventListener('input',event=>{
+editor.addEventListener('input',function(event){
   if(historyRestoring)return;
   const now=Date.now();
   const type=String(event.inputType||'');
@@ -217,7 +300,7 @@ editor.addEventListener('input',event=>{
   scheduleAutoVersion();
 });
 
-document.addEventListener('visibilitychange',()=>{
+document.addEventListener('visibilitychange',function(){
   if(document.hidden)saveVersionSnapshot('Авто',true);
 });
 
