@@ -5,6 +5,7 @@ let beforeInputSnapshot=null;
 let lastTypingAt=0;
 let autoVersionTimer=null;
 let historyRestoring=false;
+let lastLargeSnapshotAt=0;
 
 function editorSnapshot(){
   return {text:editor.value,start:editor.selectionStart||0,end:editor.selectionEnd||0};
@@ -36,6 +37,7 @@ function resetUndoHistory(){
   redoStack=[];
   beforeInputSnapshot=null;
   lastTypingAt=0;
+  lastLargeSnapshotAt=0;
   updateHistoryButtons();
 }
 
@@ -283,6 +285,15 @@ function scheduleAutoVersion(){
 
 editor.addEventListener('beforeinput',function(){
   if(historyRestoring)return;
+  const size=editor.value.length;
+  const now=Date.now();
+  if(size>120000){
+    if(now-lastLargeSnapshotAt<4500){
+      beforeInputSnapshot=null;
+      return;
+    }
+    lastLargeSnapshotAt=now;
+  }
   beforeInputSnapshot=editorSnapshot();
 });
 
