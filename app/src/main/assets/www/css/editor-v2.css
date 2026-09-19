@@ -1008,3 +1008,47 @@ body.markdown-toolbar-visible .spellPanel{
   max-width:calc(100vw - 14px);
 }
 
+/* Drawer and version-storage finishing touches. */
+.sideDrawer{
+  overflow-y:auto!important;
+  overscroll-behavior:contain;
+}
+.versionUsage{
+  margin:0 0 12px;
+  padding:11px 12px;
+  border:1px solid var(--border);
+  border-radius:13px;
+  background:var(--surface2);
+}
+.versionUsageText{
+  color:var(--muted);
+  font-size:11.5px;
+  line-height:1.35;
+  margin-bottom:8px;
+}
+.versionUsageTrack{
+  height:6px;
+  overflow:hidden;
+  border-radius:999px;
+  background:color-mix(in srgb,var(--text) 8%,transparent);
+}
+.versionUsageTrack span{
+  display:block;
+  width:0;
+  height:100%;
+  border-radius:inherit;
+  background:var(--accent);
+  transition:width .18s ease;
+}
+.versionUsage .smallNote{margin-top:8px}
+.versionCleanup{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+  margin-bottom:12px;
+}
+.versionCleanup .dangerText{
+  grid-column:1/-1;
+  color:#b64b43!important;
+}
+
