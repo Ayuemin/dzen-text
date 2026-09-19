@@ -97,6 +97,8 @@ if "function scheduleArticleSave()" not in articles_js or "articleDirty=true" no
     errors.append("native article autosave dirty-state scheduler is missing")
 if "function resetArticleAutosaveState()" not in articles_js:
     errors.append("article switches must cancel stale autosave state")
+if "legacyNeedsRetry" not in articles_js or "if(migrated)" not in articles_js:
+    errors.append("legacy draft must remain until native article migration succeeds")
 if "if(!text.trim())return true;" in articles_js:
     errors.append("empty article edits must be persisted before switching articles")
 
