@@ -1,33 +1,50 @@
 let keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
-function updateKeyboardInset(){
-  const vv=window.visualViewport;
-  const current=Math.round((vv&&vv.height)||window.innerHeight||document.documentElement.clientHeight||0);
-  if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
+let nativeKeyboardKnown=false;
+window.__keyboardInset=0;
+window.__keyboardOpen=false;
 
-  let inset=Math.max(0,Math.round(keyboardBaselineHeight-current));
-  if(vv){
-    const layoutH=window.innerHeight||document.documentElement.clientHeight||0;
-    inset=Math.max(inset,Math.round(layoutH-vv.height-vv.offsetTop));
+function updateViewportGeometry(){
+  const vv=window.visualViewport;
+  const layoutH=window.innerHeight||document.documentElement.clientHeight||0;
+  const top=vv?Math.max(0,Math.round(vv.offsetTop||0)):0;
+  const bottom=vv?Math.max(0,Math.round(layoutH-(vv.offsetTop+vv.height))):0;
+
+  document.documentElement.style.setProperty('--viewportTopOffset',top+'px');
+  document.documentElement.style.setProperty('--viewportBottomInset',bottom+'px');
+
+  if(!nativeKeyboardKnown&&vv){
+    const current=Math.round(vv.height);
+    if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
+    const delta=Math.max(0,Math.round(keyboardBaselineHeight-current));
+    window.__keyboardOpen=delta>=100;
+    window.__keyboardInset=window.__keyboardOpen?delta:0;
   }
 
-  // A real Android keyboard changes the viewport by much more than browser chrome.
-  if(inset<100)inset=0;
-  window.__keyboardInset=inset;
-  window.__keyboardOpen=inset>=100;
-  // This APK uses adjustResize: the WebView itself already ends above the IME.
-  // Keep CSS bottom offsets at zero and use the measured inset only as an open/closed signal.
-  document.documentElement.style.setProperty('--keyboardInset','0px');
-  window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:inset}));
+  window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:window.__keyboardInset}));
 }
+
+window.onNativeKeyboardInset=function(inset,open){
+  nativeKeyboardKnown=true;
+  window.__keyboardInset=Math.max(0,Number(inset)||0);
+  window.__keyboardOpen=!!open;
+  updateViewportGeometry();
+};
+
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',updateKeyboardInset);
-  window.visualViewport.addEventListener('scroll',updateKeyboardInset);
+  window.visualViewport.addEventListener('resize',updateViewportGeometry);
+  window.visualViewport.addEventListener('scroll',updateViewportGeometry);
 }
-window.addEventListener('resize',updateKeyboardInset);
-window.addEventListener('orientationchange',()=>{keyboardBaselineHeight=0;setTimeout(updateKeyboardInset,350)});
-document.addEventListener('focusin',()=>setTimeout(updateKeyboardInset,60));
-document.addEventListener('focusout',()=>setTimeout(updateKeyboardInset,120));
-setTimeout(updateKeyboardInset,0);
+window.addEventListener('resize',updateViewportGeometry);
+window.addEventListener('orientationchange',function(){
+  keyboardBaselineHeight=0;
+  setTimeout(function(){
+    keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||0;
+    updateViewportGeometry();
+  },350);
+});
+document.addEventListener('focusin',function(){setTimeout(updateViewportGeometry,60)});
+document.addEventListener('focusout',function(){setTimeout(updateViewportGeometry,120)});
+setTimeout(updateViewportGeometry,0);
 const editor=document.getElementById('editor'), preview=document.getElementById('preview'), htmlCode=document.getElementById('htmlCode');
 const exampleRiskWords='VPN\nВПН\nобход\nобход блокировок\nразблокировка\nпрокси\nанонимайзер';
 const defaultSettings={font:'serif',size:19,line:1.7,theme:'system',paper:'gray',accent:'#D65C43',backgroundVeil:0.6,backgroundText:'dark',wpm:200,tts:1.0,autosave:true,showCode:false,headingCheck:true,headingMin:8,headingMax:80,sentenceCheck:true,sentenceMax:30,paragraphCheck:true,paragraphMax:650,frequentCheck:true,frequentMin:8,nearbyCheck:true,structureCheck:true,structureMax:1800,phraseCheck:true,openingCheck:true,headingStructureCheck:true,markdownCheck:true,aiStyleCheck:true,proofCheck:true,onlineSpelling:false,dzenCheck:true,dzenSmartRules:true,riskCheck:true,riskWords:exampleRiskWords};
