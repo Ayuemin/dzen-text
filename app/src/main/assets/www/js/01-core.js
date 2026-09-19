@@ -1,10 +1,29 @@
 let keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
+let layoutBaselineHeight=window.innerHeight||document.documentElement.clientHeight||keyboardBaselineHeight;
 let nativeKeyboardOpen=false;
 let fallbackKeyboardOpen=false;
+let nativeKeyboardInsetCss=0;
+let fallbackKeyboardInsetCss=0;
 window.__keyboardOpen=false;
+
+function syncKeyboardAvoidance(){
+  const currentLayout=Math.round(window.innerHeight||document.documentElement.clientHeight||layoutBaselineHeight||0);
+  if(!nativeKeyboardOpen&&!fallbackKeyboardOpen&&currentLayout>0){
+    layoutBaselineHeight=Math.max(layoutBaselineHeight,currentLayout);
+  }
+  const layoutShrink=Math.max(0,Math.round(layoutBaselineHeight-currentLayout));
+  const reported=nativeKeyboardOpen?nativeKeyboardInsetCss:fallbackKeyboardInsetCss;
+  // Android 15 may leave WebView full-height and place the IME over it. If
+  // adjustResize already consumed part/all of the IME, subtract that layout
+  // shrink so we never add the keyboard height twice.
+  const avoidance=Math.max(0,Math.round(reported-layoutShrink));
+  document.documentElement.style.setProperty('--keyboardInset',avoidance+'px');
+  if(document.body)document.body.classList.toggle('keyboard-open',nativeKeyboardOpen||fallbackKeyboardOpen);
+}
 
 function applyKeyboardState(){
   const next=nativeKeyboardOpen||fallbackKeyboardOpen;
+  syncKeyboardAvoidance();
   if(next===window.__keyboardOpen)return;
   window.__keyboardOpen=next;
   window.dispatchEvent(new CustomEvent('dzenKeyboardState',{detail:{open:next}}));
@@ -13,14 +32,17 @@ function applyKeyboardState(){
 function updateFallbackKeyboardState(){
   const vv=window.visualViewport;
   const current=Math.round((vv&&vv.height)||window.innerHeight||document.documentElement.clientHeight||0);
-  if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
+  if(!window.__keyboardOpen&&current>keyboardBaselineHeight)keyboardBaselineHeight=current;
   const delta=Math.max(0,Math.round(keyboardBaselineHeight-current));
+  fallbackKeyboardInsetCss=delta;
   fallbackKeyboardOpen=delta>=100;
   applyKeyboardState();
 }
 
-window.onNativeKeyboardInset=function(_inset,open){
+window.onNativeKeyboardInset=function(inset,open){
   nativeKeyboardOpen=!!open;
+  const scale=Math.max(1,Number(window.devicePixelRatio)||1);
+  nativeKeyboardInsetCss=nativeKeyboardOpen?Math.max(0,Math.round((Number(inset)||0)/scale)):0;
   if(!nativeKeyboardOpen)fallbackKeyboardOpen=false;
   applyKeyboardState();
   if(!nativeKeyboardOpen)setTimeout(updateFallbackKeyboardState,40);
@@ -28,12 +50,17 @@ window.onNativeKeyboardInset=function(_inset,open){
 
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',updateFallbackKeyboardState);
+  window.visualViewport.addEventListener('scroll',syncKeyboardAvoidance);
 }
 window.addEventListener('resize',updateFallbackKeyboardState);
 window.addEventListener('orientationchange',function(){
   setTimeout(function(){
     const current=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
-    if(!window.__keyboardOpen)keyboardBaselineHeight=current;
+    const currentLayout=window.innerHeight||document.documentElement.clientHeight||0;
+    if(!window.__keyboardOpen){
+      keyboardBaselineHeight=current;
+      if(currentLayout)layoutBaselineHeight=currentLayout;
+    }
     updateFallbackKeyboardState();
   },350);
 });
