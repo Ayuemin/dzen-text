@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Build;
 import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -20,6 +21,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Rect;
 import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 
 import org.json.JSONObject;
 import org.json.JSONArray;
@@ -530,34 +532,34 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
 
     private void installKeyboardObserver() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            web.setOnApplyWindowInsetsListener((view, insets) -> {
+                boolean open = insets.isVisible(WindowInsets.Type.ime());
+                int bottom = insets.getInsets(WindowInsets.Type.ime()).bottom;
+                runJs("window.onNativeKeyboardInset && window.onNativeKeyboardInset(" + bottom + "," + (open ? "true" : "false") + ")");
+                return insets;
+            });
+            web.post(web::requestApplyInsets);
+            return;
+        }
+
         final Rect visible = new Rect();
-        final float density = getResources().getDisplayMetrics().density;
-        final int threshold = Math.round(100f * density);
+        final int threshold = Math.round(100f * getResources().getDisplayMetrics().density);
         web.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-            private int lastInset = -1;
+            private int maxVisibleHeight = 0;
             private boolean lastOpen = false;
 
             @Override
             public void onGlobalLayout() {
                 if (web == null) return;
                 web.getWindowVisibleDisplayFrame(visible);
-
-                // With adjustResize the WebView itself may shrink, so comparing only
-                // rootView.height to the visible frame can report zero. Use the physical
-                // display height as a second signal and keep a generous threshold so
-                // status/navigation bars are not mistaken for the IME.
-                int screenHeight = getResources().getDisplayMetrics().heightPixels;
-                int rootHeight = web.getRootView().getHeight();
-                int byScreen = Math.max(0, screenHeight - visible.bottom);
-                int byRoot = Math.max(0, rootHeight - visible.bottom);
-                int inset = Math.max(byScreen, byRoot);
-
-                boolean open = inset > threshold;
-                int effective = open ? inset : 0;
-                if (effective == lastInset && open == lastOpen) return;
-                lastInset = effective;
+                int currentHeight = Math.max(0, visible.height());
+                if (currentHeight > maxVisibleHeight) maxVisibleHeight = currentHeight;
+                int hidden = Math.max(0, maxVisibleHeight - currentHeight);
+                boolean open = hidden > threshold;
+                if (open == lastOpen && hidden == 0) return;
                 lastOpen = open;
-                runJs("window.onNativeKeyboardInset && window.onNativeKeyboardInset(" + effective + "," + (open ? "true" : "false") + ")");
+                runJs("window.onNativeKeyboardInset && window.onNativeKeyboardInset(" + (open ? hidden : 0) + "," + (open ? "true" : "false") + ")");
             }
         });
     }
