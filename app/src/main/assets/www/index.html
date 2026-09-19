@@ -171,7 +171,14 @@
           <option value="system">Системный</option>
           <option value="sans">Нейтральный</option>
           <option value="mono">Моноширинный</option>
+          <option value="custom">Свой шрифт</option>
         </select>
+        <div class="settingActions fontActions">
+          <button class="nativeBtn" type="button" onclick="chooseEditorFont()">Добавить шрифт</button>
+          <button class="nativeBtn" type="button" onclick="clearEditorFont()">Удалить свой</button>
+        </div>
+        <div id="customFontStatus" class="fontStatus">Свой шрифт не подключён</div>
+        <div class="smallNote">Поддерживаются TTF, OTF, WOFF и WOFF2 до 6 МБ. Файл сохраняется внутри приложения.</div>
 
         <div class="subLabel"><span>Размер текста</span><span class="val" id="sizeVal"></span></div>
         <input id="sizeRange" type="range" min="14" max="26" step="1" oninput="applySettings()">
