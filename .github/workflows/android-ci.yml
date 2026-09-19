@@ -44,6 +44,7 @@ jobs:
               raise SystemExit("Bootstrap must be the final editor script")
           print(f"Checked {len(handlers)} static handlers and {len(scripts)} scripts")
           PY
+          python3 tools/check_editor_invariants.py
 
       - uses: gradle/actions/setup-gradle@v4
         with:
