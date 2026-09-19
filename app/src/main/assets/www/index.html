@@ -21,22 +21,9 @@
   </header>
 
   <div class="workspaceControls" aria-label="Управление рабочей областью">
-    <button class="roundFloat navFloat" type="button" onclick="openSideDrawer()" aria-label="Открыть панель" title="Панель">
+    <button class="navFloat" type="button" onclick="openSideDrawer()" aria-label="Открыть панель" title="Панель">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>
     </button>
-    <button class="roundFloat moreFloat" type="button" onclick="toggleQuickMenu(event)" aria-label="Быстрые действия" title="Быстрые действия">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
-    </button>
-  </div>
-  <div class="quickMenu" id="quickMenu" role="menu">
-    <button type="button" onclick="quickPreview()">Предпросмотр</button>
-    <button type="button" onclick="quickCopy()">Скопировать для Дзена</button>
-    <button type="button" id="quickSpeakBtn" onclick="quickSpeak()">Озвучить</button>
-    <button type="button" onclick="quickCheck()">Проверить текст</button>
-    <button type="button" onclick="quickImport()">Импортировать файл</button>
-    <button type="button" onclick="openVersions()">Версии текста</button>
-    <button type="button" onclick="quickSettings()">Настройки</button>
-    <button type="button" class="dangerText" onclick="quickClear()">Очистить текст</button>
   </div>
   <main class="main">
     <section class="pane active" id="editPane"><div class="editorWrap">
@@ -44,7 +31,7 @@
         <button class="iconBtn" type="button" onclick="chooseFile()" aria-label="Добавить текст из файла" title="Добавить из файла"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h6l2 2h10v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M12 12v6M9 15l3-3 3 3"/></svg></button>
         <button class="iconBtn danger" type="button" onclick="clearEditor()" aria-label="Очистить поле" title="Очистить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2M19 6l-1 14H6L5 6"/><path d="M10 10v6M14 10v6"/></svg></button>
       </div>
-      <textarea id="editor" class="editor" spellcheck="true" placeholder="Вставьте сюда текст из буфера обмена…\n\nМожно использовать ## заголовки, **жирный текст**, списки и цитаты."></textarea>
+      <textarea id="editor" class="editor" spellcheck="true" placeholder=""></textarea>
       <input id="fileInput" class="fileInput" type="file" accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html">
       <input id="synonymFileInput" class="fileInput" type="file" accept=".json,.txt,application/json,text/plain">
     </div></section>
@@ -98,12 +85,16 @@
       <span class="mdDivider" aria-hidden="true"></span>
       <button type="button" class="mdBtn mdStrong" onclick="applyMarkdown('bold')" aria-label="Жирный" title="Жирный">B</button>
       <button type="button" class="mdBtn mdItalic" onclick="applyMarkdown('italic')" aria-label="Курсив" title="Курсив">I</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h2')" aria-label="Подзаголовок" title="Подзаголовок">H2</button>
+      <button type="button" class="mdBtn" onclick="applyMarkdown('h1')" aria-label="Заголовок H1" title="Заголовок H1">H1</button>
+      <button type="button" class="mdBtn" onclick="applyMarkdown('h2')" aria-label="Заголовок H2" title="Заголовок H2">H2</button>
+      <button type="button" class="mdBtn" onclick="applyMarkdown('h3')" aria-label="Заголовок H3" title="Заголовок H3">H3</button>
       <button type="button" class="mdBtn" onclick="applyMarkdown('bullet')" aria-label="Маркированный список" title="Маркированный список">•</button>
       <button type="button" class="mdBtn" onclick="applyMarkdown('number')" aria-label="Нумерованный список" title="Нумерованный список">1.</button>
       <button type="button" class="mdBtn" onclick="applyMarkdown('quote')" aria-label="Цитата" title="Цитата">❝</button>
       <button type="button" class="mdBtn" onclick="applyMarkdown('link')" aria-label="Ссылка" title="Ссылка">↗</button>
+      <button type="button" class="mdBtn" onclick="applyMarkdown('strike')" aria-label="Зачёркнутый" title="Зачёркнутый">S̶</button>
       <button type="button" class="mdBtn mdCode" onclick="applyMarkdown('code')" aria-label="Код" title="Код">&lt;/&gt;</button>
+      <button type="button" class="mdBtn" onclick="applyMarkdown('hr')" aria-label="Разделитель" title="Разделитель">—</button>
     </div>
   </div>
   <footer class="bottom">
@@ -118,17 +109,32 @@
 <div class="sideBackdrop" id="sideBackdrop" onclick="sideBackdropClick(event)">
   <aside class="sideDrawer" id="sideDrawer" aria-label="Навигация">
     <div class="drawerHead">
-      <div><div class="drawerTitle">Дзен Текст</div><div class="drawerSub">Редактор и проверка публикации</div></div>
+      <div>
+        <div class="drawerTitle">Дзен Текст</div>
+        <div class="drawerSub" id="currentArticleLabel">Без названия</div>
+      </div>
       <button class="drawerClose" type="button" onclick="closeSideDrawer()" aria-label="Закрыть">×</button>
     </div>
-    <nav class="drawerNav">
-      <button type="button" onclick="drawerEditor()">Редактор</button>
-      <button type="button" onclick="drawerPreview()">Предпросмотр</button>
-      <button type="button" onclick="drawerImport()">Импорт текста</button>
-      <button type="button" onclick="openIdeas()">Идеи</button>
+
+    <div class="drawerSectionLabel">Текущая статья</div>
+    <nav class="drawerNav drawerActions">
+      <button type="button" class="drawerPrimary" onclick="createNewArticle()">＋ Новая статья</button>
+      <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
       <button type="button" onclick="drawerCheck()">Проверить текст</button>
+      <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
+      <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
+      <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
+      <button type="button" onclick="drawerImport()">Импортировать файл</button>
       <button type="button" onclick="drawerVersions()">Версии текста</button>
+      <button type="button" onclick="drawerIdeas()">Идеи</button>
+      <button type="button" class="drawerDanger" onclick="drawerClear()">Очистить текущую статью</button>
     </nav>
+
+    <details class="drawerArticles" id="savedArticlesDetails">
+      <summary>Сохранённые статьи <span id="savedArticlesCount">0</span></summary>
+      <div id="savedArticlesList" class="savedArticlesList"></div>
+    </details>
+
     <div class="drawerSpacer"></div>
     <button class="drawerSettings" type="button" onclick="drawerSettings()">Настройки</button>
   </aside>
@@ -338,7 +344,7 @@
 <script src="js/10-settings.js"></script>
 <script src="js/11-ui.js"></script>
 <script src="js/12-dialogs.js"></script>
-<script src="js/12-history.js"></script>
+<script src="js/12-articles.js"></script>\n<script src="js/12-history.js"></script>
 <script src="js/12-markdown-toolbar.js"></script>
 <script src="js/12-caret-focus.js"></script>
 <script src="js/12-bootstrap.js"></script>
