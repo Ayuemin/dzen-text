@@ -11,7 +11,7 @@ function bootstrapDzenText(){
   editor.addEventListener('input',()=>{
     if(replacementState)closeReplacement();
     if(nearbyState)closeNearbyRepeat();
-    if(repeatNavState)closeRepeatNavigator();
+    if(repeatNavState&&typeof scheduleRepeatNavigatorRefresh==='function')scheduleRepeatNavigatorRefresh();
     if(typeof issueNavState!=='undefined'&&issueNavState&&typeof scheduleIssueNavigatorRefresh==='function')scheduleIssueNavigatorRefresh();
     if(spellNavState)closeSpellPanel();
     const pasted=inputWasPaste;
