@@ -842,14 +842,20 @@ body.markdown-toolbar-visible .issueNavPanel{bottom:57px}
   flex:0 0 36px;
 }
 
-/* Correction/navigation panels stay above the resized WebView bottom. */
+/* Android 15 can overlay the IME instead of shrinking the WebView. The JS
+   bridge exposes only the unconsumed overlap through --keyboardInset. */
+body.keyboard-open .app{
+  padding-bottom:calc(env(safe-area-inset-bottom) + var(--keyboardInset))!important;
+}
+
+/* Correction/navigation panels follow the same IME avoidance as the editor. */
 .issueNavPanel,.repeatNavPanel,.replacePanel,.nearbyPanel,.spellPanel{
-  bottom:calc(8px + env(safe-area-inset-bottom))!important;
+  bottom:calc(8px + env(safe-area-inset-bottom) + var(--keyboardInset))!important;
   max-height:min(190px,38vh)!important;
   overflow:auto;
 }
 body.markdown-toolbar-visible .issueNavPanel,body.markdown-toolbar-visible .repeatNavPanel,body.markdown-toolbar-visible .replacePanel,body.markdown-toolbar-visible .nearbyPanel,body.markdown-toolbar-visible .spellPanel{
-  bottom:58px!important;
+  bottom:calc(58px + env(safe-area-inset-bottom) + var(--keyboardInset))!important;
 }
 .issueNavDetail{
   white-space:nowrap;
@@ -1195,3 +1201,10 @@ body.markdown-toolbar-visible .issueNavPanel,body.markdown-toolbar-visible .repe
 }
 
 
+
+
+/* Empty editor invitation: visible, but deliberately quieter than article text. */
+.editor::placeholder{
+  color:var(--paper-muted)!important;
+  opacity:.48!important;
+}
