@@ -61,6 +61,7 @@ function restoreEditorSnapshot(snapshot){
   const max=editor.value.length;
   const start=Math.max(0,Math.min(max,Number(snapshot.start)||0));
   const end=Math.max(start,Math.min(max,Number(snapshot.end)||start));
+  if(typeof closeAllCorrectionPanels==='function')closeAllCorrectionPanels();
   clearOnlineSpelling();
   historyRestoring=false;
   if(typeof afterProgrammaticEdit==='function')afterProgrammaticEdit(false);
@@ -256,6 +257,7 @@ async function restoreVersion(id){
   historyRestoring=true;
   editor.value=text;
   historyRestoring=false;
+  if(typeof closeAllCorrectionPanels==='function')closeAllCorrectionPanels();
   clearOnlineSpelling();
   if(typeof afterProgrammaticEdit==='function')afterProgrammaticEdit(false);
   else{
