@@ -314,3 +314,103 @@
   .sideDrawer{width:min(82vw,292px)!important}
 }
 
+/* Unified chrome + compact floating controls */
+.roundFloat{
+  width:39px!important;height:39px!important;
+  background:color-mix(in srgb,var(--paper-bg) 70%,transparent)!important;
+  border-color:color-mix(in srgb,var(--paper-text) 13%,transparent)!important;
+  color:var(--paper-text)!important;
+  box-shadow:0 4px 15px rgba(18,20,18,.08)!important;
+  backdrop-filter:blur(16px)!important;
+  -webkit-backdrop-filter:blur(16px)!important;
+}
+.roundFloat svg{width:20px!important;height:20px!important}
+.navFloat{left:11px!important}.moreFloat{right:11px!important}
+
+.quickMenu,.sideDrawer{
+  background:color-mix(in srgb,var(--paper-bg) 92%,transparent)!important;
+  color:var(--paper-text)!important;
+  border-color:color-mix(in srgb,var(--paper-text) 12%,transparent)!important;
+  backdrop-filter:blur(20px);
+  -webkit-backdrop-filter:blur(20px);
+}
+.quickMenu button,.drawerNav button,.drawerSettings{
+  color:var(--paper-text)!important;
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif!important;
+  font-weight:540!important;
+}
+.quickMenu button:active,.drawerNav button:active,.drawerSettings:active{
+  background:color-mix(in srgb,var(--paper-text) 7%,transparent)!important;
+}
+.drawerSub{color:var(--paper-muted)!important}
+.drawerHead,.drawerSettings{
+  border-color:color-mix(in srgb,var(--paper-text) 11%,transparent)!important;
+}
+.drawerNav button::after,.drawerSettings::after{color:var(--paper-muted)!important}
+.drawerClose{color:var(--paper-muted)!important}
+
+/* Markdown bar: appears while editing and sits above the keyboard. */
+.markdownToolbar{
+  position:fixed;
+  left:7px;right:7px;
+  bottom:calc(var(--keyboardInset) + 5px);
+  z-index:13;
+  display:none;
+  padding:5px;
+  border:1px solid color-mix(in srgb,var(--paper-text) 12%,transparent);
+  border-radius:14px;
+  background:color-mix(in srgb,var(--paper-bg) 84%,transparent);
+  box-shadow:0 7px 24px rgba(0,0,0,.13);
+  backdrop-filter:blur(18px);
+  -webkit-backdrop-filter:blur(18px);
+}
+.markdownToolbar.visible{display:block;animation:markdownBarIn .12s ease-out}
+@keyframes markdownBarIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+.markdownToolbarScroll{
+  display:flex;
+  gap:4px;
+  overflow-x:auto;
+  overscroll-behavior-x:contain;
+  scrollbar-width:none;
+  padding:0 1px;
+}
+.markdownToolbarScroll::-webkit-scrollbar{display:none}
+.mdBtn{
+  flex:0 0 auto;
+  min-width:36px;
+  height:36px;
+  padding:0 9px;
+  border:0;
+  border-radius:10px;
+  background:transparent;
+  color:var(--paper-text);
+  font:600 14px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.mdBtn:active{background:color-mix(in srgb,var(--paper-text) 10%,transparent)}
+.mdStrong{font-weight:800}.mdItalic{font-style:italic}.mdCode{font-family:ui-monospace,monospace;font-size:12px}
+body.markdown-toolbar-visible .bottom{opacity:0;pointer-events:none}
+body.markdown-toolbar-visible .replacePanel,
+body.markdown-toolbar-visible .nearbyPanel,
+body.markdown-toolbar-visible .repeatNavPanel{
+  bottom:calc(var(--keyboardInset) + 57px)!important;
+}
+
+/* Paper presets stay subtle enough for long reading sessions. */
+:root[data-paper="old"]{
+  --paper-bg:#f0e4cc;
+  --paper-text:#2c281f;
+  --paper-muted:#766b58;
+  --paper-image:
+    radial-gradient(circle at 17% 12%,rgba(112,82,42,.055),transparent 30%),
+    radial-gradient(circle at 78% 46%,rgba(112,82,42,.035),transparent 28%),
+    repeating-linear-gradient(0deg,rgba(82,63,35,.014) 0 1px,transparent 1px 7px);
+}
+:root[data-paper="news"]{
+  --paper-bg:#e9e9e5;
+  --paper-text:#262724;
+  --paper-muted:#6d6e69;
+  --paper-image:
+    repeating-linear-gradient(0deg,rgba(0,0,0,.010) 0 1px,transparent 1px 5px),
+    radial-gradient(circle at 70% 22%,rgba(0,0,0,.018),transparent 34%);
+}
+
