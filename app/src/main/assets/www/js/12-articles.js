@@ -102,6 +102,7 @@ function preserveCurrentArticleBeforeSwitch(reason){
 }
 
 function resetEditorPanels(){
+  try{if(typeof stopSpeak==='function'&&speaking)stopSpeak()}catch(e){}
   try{closeReplacement()}catch(e){}
   try{closeNearbyRepeat()}catch(e){}
   try{closeRepeatNavigator()}catch(e){}
