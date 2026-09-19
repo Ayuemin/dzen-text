@@ -77,12 +77,10 @@ function insertIdea(id){
   const prefix=start&&editor.value[start-1]!=='\n'?'\n':'';
   historyCheckpoint();
   editor.setRangeText(prefix+idea.text,start,end,'end');
-  render(false);
-  markAnalysisStale();
+  afterProgrammaticEdit(false);
   closeIdeas();
   showPane('edit');
   editor.focus();
-  if(typeof scheduleArticleSave==='function')scheduleArticleSave();
   toast('Идея вставлена в текст');
 }
 
