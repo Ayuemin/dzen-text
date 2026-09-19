@@ -1,30 +1,27 @@
 let keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
-let nativeKeyboardKnown=false;
+let nativeKeyboardOpen=false;
+let fallbackKeyboardOpen=false;
 window.__keyboardOpen=false;
 
-function emitKeyboardState(){
-  window.dispatchEvent(new CustomEvent('dzenKeyboardState',{detail:{open:window.__keyboardOpen}}));
+function applyKeyboardState(){
+  const next=nativeKeyboardOpen||fallbackKeyboardOpen;
+  if(next===window.__keyboardOpen)return;
+  window.__keyboardOpen=next;
+  window.dispatchEvent(new CustomEvent('dzenKeyboardState',{detail:{open:next}}));
 }
 
 function updateFallbackKeyboardState(){
-  if(nativeKeyboardKnown)return;
   const vv=window.visualViewport;
-  if(!vv)return;
-  const current=Math.round(vv.height);
+  const current=Math.round((vv&&vv.height)||window.innerHeight||document.documentElement.clientHeight||0);
   if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
   const delta=Math.max(0,Math.round(keyboardBaselineHeight-current));
-  const open=delta>=100;
-  if(open===window.__keyboardOpen)return;
-  window.__keyboardOpen=open;
-  emitKeyboardState();
+  fallbackKeyboardOpen=delta>=100;
+  applyKeyboardState();
 }
 
 window.onNativeKeyboardInset=function(_inset,open){
-  nativeKeyboardKnown=true;
-  const next=!!open;
-  if(next===window.__keyboardOpen)return;
-  window.__keyboardOpen=next;
-  emitKeyboardState();
+  nativeKeyboardOpen=!!open;
+  applyKeyboardState();
 };
 
 if(window.visualViewport){
@@ -32,9 +29,9 @@ if(window.visualViewport){
 }
 window.addEventListener('resize',updateFallbackKeyboardState);
 window.addEventListener('orientationchange',function(){
-  keyboardBaselineHeight=0;
   setTimeout(function(){
-    keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||0;
+    const current=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
+    if(!window.__keyboardOpen)keyboardBaselineHeight=current;
     updateFallbackKeyboardState();
   },350);
 });
