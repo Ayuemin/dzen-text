@@ -7,7 +7,7 @@ function updateKeyboardInset(){
     // Tiny viewport differences are browser chrome, not the keyboard.
     if(inset<80)inset=0;
   }
-  document.documentElement.style.setProperty('--keyboardInset',inset+'px');
+  window.__keyboardInset=inset;document.documentElement.style.setProperty('--keyboardInset',inset+'px');window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:inset}));
 }
 if(window.visualViewport){
   window.visualViewport.addEventListener('resize',updateKeyboardInset);
@@ -30,7 +30,7 @@ function spellKey(word){return String(word||'').trim().toLocaleLowerCase('ru-RU'
 function loadSpellIgnoreWords(){try{const a=JSON.parse(localStorage.getItem(SPELL_IGNORE_KEY)||'[]');return new Set(Array.isArray(a)?a.map(spellKey).filter(Boolean):[])}catch(e){return new Set()}}
 function saveSpellIgnoreWords(){localStorage.setItem(SPELL_IGNORE_KEY,JSON.stringify([...spellIgnoreWords].sort()))}
 function updateSpellIgnoreStatus(){const el=document.getElementById('spellIgnoreStatus');if(el)el.innerHTML=`Мои правильные слова: <b>${spellIgnoreWords.size}</b>`}
-function clearSpellIgnoreWords(){if(!spellIgnoreWords.size){toast('Список исключений уже пуст');return}if(!confirm('Удалить все слова, отмеченные как правильные?'))return;spellIgnoreWords.clear();saveSpellIgnoreWords();updateSpellIgnoreStatus();clearOnlineSpelling();analyzeText();toast('Исключения орфографии очищены')}
+async function clearSpellIgnoreWords(){if(!spellIgnoreWords.size){toast('Список исключений уже пуст');return}if(!await appConfirm('Очистить исключения?','Все слова, отмеченные как правильные, будут удалены из локального списка.','Очистить',true))return;spellIgnoreWords.clear();saveSpellIgnoreWords();updateSpellIgnoreStatus();clearOnlineSpelling();analyzeText();toast('Исключения орфографии очищены')}
 
 const DZEN_RULES_URL='https://raw.githubusercontent.com/Ayuemin/dzen-text/main/rules/dzen-rules.json';
 const DZEN_RULES_KEY='dzenRulesV2';
