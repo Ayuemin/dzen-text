@@ -170,7 +170,7 @@
       <summary><span>Оформление</span><small>Фон, шрифт, цвет и размер текста</small></summary>
       <div class="settingsGroupBody">
         <div class="subLabel"><span>Фон редактора</span></div>
-        <select id="paperSelect" onchange="applySettings()">
+        <select id="paperSelect" onchange="onPaperSelectChanged()">
           <option value="white">Белый лист</option>
           <option value="gray">Светло-серый</option>
           <option value="old">Старая бумага</option>
@@ -179,9 +179,10 @@
           <option value="custom">Свой фон</option>
         </select>
         <div class="settingActions backgroundActions">
-          <button class="nativeBtn" type="button" onclick="chooseBackground()">Выбрать изображение</button>
-          <button class="nativeBtn" type="button" onclick="clearCustomBackground()">Удалить свой фон</button>
+          <button class="nativeBtn primarySettingBtn" type="button" onclick="chooseBackground()">＋ Добавить свой фон</button>
         </div>
+        <div class="subLabel customBackgroundLabel"><span>Мои фоны</span></div>
+        <div id="customBackgroundList" class="customBackgroundList"><div class="backgroundEmpty">Своих фонов пока нет</div></div>
 
         <div class="subLabel"><span>Подложка своего фона</span><span class="val" id="backgroundVeilVal"></span></div>
         <input id="backgroundVeil" type="range" min="0" max="0.9" step="0.05" oninput="applySettings()">
@@ -228,6 +229,14 @@
     </details>
 
     <details class="settingsGroup">
+      <summary><span>Ввод текста</span><small>Клавиатура и форматирование</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Панель Markdown над клавиатурой</span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Быстрые кнопки H1–H6, жирного, курсива, списков, цитаты, ссылки и других элементов. Можно отключить полностью.</div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
       <summary><span>Чтение и озвучка</span><small>Скорость чтения и голос</small></summary>
       <div class="settingsGroupBody">
         <div class="subLabel"><span>Скорость чтения для расчёта</span><span class="val" id="wpmVal"></span></div>
@@ -243,8 +252,6 @@
         <input id="autosaveSwitch" type="checkbox" checked hidden>
         <div class="saveAlwaysRow"><b>Автосохранение статьи включено всегда</b><span>Текст сохраняется локально на устройстве примерно через секунду после изменений.</span></div>
         <div class="smallNote">Автоверсия создаётся после начала редактирования и затем не чаще одного раза в минуту.</div>
-        <div class="switchRow" style="margin-top:13px"><span>Панель Markdown над клавиатурой</span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Можно отключить, если форматирование удобнее вводить вручную.</div>
         <div class="switchRow" style="margin-top:13px"><span>Показывать HTML-код в превью</span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button></div>
       </div>
@@ -320,7 +327,17 @@
     <div class="handle"></div>
     <div class="sheetHeader"><h2>Версии текста</h2><button class="sheetClose" type="button" onclick="closeVersions()" aria-label="Закрыть версии">×</button></div>
     <div class="versionIntro">Автоматические снимки сохраняются локально во время работы. Перед импортом, очисткой и восстановлением создаётся дополнительная версия.</div>
-    <button class="nativeBtn versionSaveNow" type="button" onclick="saveVersionNow()">Сохранить текущую версию</button>
+    <div class="versionUsage">
+      <div id="versionUsageText" class="versionUsageText">История версий</div>
+      <div class="versionUsageTrack"><span id="versionUsageBar"></span></div>
+      <div class="smallNote">Общий лимит истории: 100 МБ. При заполнении сначала удаляются старые автоматические версии.</div>
+    </div>
+    <button class="nativeBtn versionSaveNow primarySettingBtn" type="button" onclick="saveVersionNow()">Сохранить текущую версию</button>
+    <div class="versionCleanup">
+      <button class="nativeBtn" type="button" onclick="cleanupVersions('week')">Удалить старше недели</button>
+      <button class="nativeBtn" type="button" onclick="cleanupVersions('month')">Удалить старше месяца</button>
+      <button class="nativeBtn dangerText" type="button" onclick="cleanupVersions('all')">Удалить все версии</button>
+    </div>
     <div id="versionsList" class="versionsList"></div>
   </div>
 </div>
@@ -356,7 +373,8 @@
 <script src="js/10-settings.js"></script>
 <script src="js/11-ui.js"></script>
 <script src="js/12-dialogs.js"></script>
-<script src="js/12-articles.js"></script>\n<script src="js/12-history.js"></script>
+<script src="js/12-articles.js"></script>
+<script src="js/12-history.js"></script>
 <script src="js/12-markdown-toolbar.js"></script>
 <script src="js/12-caret-focus.js"></script>
 <script src="js/12-bootstrap.js"></script>
