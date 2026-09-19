@@ -59,7 +59,9 @@ function updateStatsFast(){
 function scheduleStatsUpdate(immediate=false){
   clearTimeout(statsTimer);
   if(immediate){updateStatsFast();return}
-  statsTimer=setTimeout(updateStatsFast,260);
+  const size=editor.value.length;
+  const delay=size>250000?1200:size>120000?700:260;
+  statsTimer=setTimeout(updateStatsFast,delay);
 }
 
 function renderPreview(){
@@ -76,9 +78,13 @@ function render(runAnalysis=true,forcePreview=false){
   if(forcePreview||previewActive)renderPreview();
   scheduleStatsUpdate(runAnalysis||forcePreview);
   if(runAnalysis)analyzeText();
-  if(settings.autosave&&!(typeof documentsAvailable==='function'&&documentsAvailable())){
-    clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
+  if(settings.autosave){
+    if(typeof documentsAvailable==='function'&&documentsAvailable()){
+      if(typeof scheduleArticleSave==='function')scheduleArticleSave();
+    }else{
+      clearTimeout(saveTimer);
+      saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
+    }
   }
 }
 
