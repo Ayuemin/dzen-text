@@ -414,3 +414,226 @@ body.markdown-toolbar-visible .repeatNavPanel{
     radial-gradient(circle at 70% 22%,rgba(0,0,0,.018),transparent 34%);
 }
 
+/* UX pass: stable chrome, system-bar contrast, grouped settings, history. */
+html,body,.app{background:var(--paper-bg)!important}
+.app{position:relative!important}
+
+.systemBarScrim{
+  position:fixed;
+  z-index:7;
+  left:0;right:0;top:0;
+  height:max(34px,env(safe-area-inset-top));
+  min-height:34px;
+  pointer-events:none;
+  background:linear-gradient(to bottom,rgba(0,0,0,.30),rgba(0,0,0,.10) 62%,transparent);
+}
+
+.workspaceControls{
+  position:absolute!important;
+  top:calc(env(safe-area-inset-top) + 8px)!important;
+  left:0;right:0;
+  z-index:10!important;
+  transform:none!important;
+}
+.roundFloat{
+  width:38px!important;height:38px!important;
+  background:rgba(248,248,244,.44)!important;
+  border:1px solid rgba(30,32,29,.14)!important;
+  box-shadow:0 4px 14px rgba(16,18,16,.09)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+}
+:root[data-paper="old"] .roundFloat{background:rgba(242,229,205,.46)!important}
+:root[data-paper="news"] .roundFloat{background:rgba(238,238,233,.46)!important}
+:root[data-paper="dark"] .roundFloat{background:rgba(27,28,29,.48)!important;border-color:rgba(255,255,255,.14)!important}
+:root[data-paper="custom"] .roundFloat{background:rgba(245,245,240,.44)!important}
+.roundFloat svg{width:19px!important;height:19px!important}
+.navFloat{left:12px!important}.moreFloat{right:12px!important}
+
+.quickMenu,.sideDrawer{
+  background:color-mix(in srgb,var(--paper-bg) 88%,transparent)!important;
+  color:var(--paper-text)!important;
+  border-color:color-mix(in srgb,var(--paper-text) 13%,transparent)!important;
+  backdrop-filter:blur(18px)!important;
+  -webkit-backdrop-filter:blur(18px)!important;
+}
+.quickMenu{
+  border-radius:18px!important;
+  box-shadow:0 16px 42px rgba(0,0,0,.18)!important;
+}
+.quickMenu button,.drawerNav button,.drawerSettings{
+  color:var(--paper-text)!important;
+  min-height:45px!important;
+  border-radius:12px!important;
+  font-weight:540!important;
+}
+.quickMenu button:active,.drawerNav button:active,.drawerSettings:active{
+  background:color-mix(in srgb,var(--paper-text) 8%,transparent)!important;
+}
+.quickMenu .stopAction{color:var(--accent)!important;font-weight:700!important}
+.sideDrawer{
+  border-right:1px solid color-mix(in srgb,var(--paper-text) 11%,transparent)!important;
+  border-radius:0 22px 22px 0!important;
+}
+.drawerHead,.drawerSettings{border-color:color-mix(in srgb,var(--paper-text) 11%,transparent)!important}
+.drawerSub,.drawerClose,.drawerNav button::after,.drawerSettings::after{color:var(--paper-muted)!important}
+
+/* The editor owns the safe-area colour, so paper presets no longer reveal a white strip. */
+.editorWrap,.previewWrap,.main,.pane{background-color:var(--paper-bg)!important}
+.bottom{background:transparent!important}
+
+/* Markdown controls are shown only while the IME is really visible. */
+.markdownToolbar{
+  background:color-mix(in srgb,var(--paper-bg) 84%,transparent)!important;
+  border-color:color-mix(in srgb,var(--paper-text) 13%,transparent)!important;
+  box-shadow:0 7px 24px rgba(0,0,0,.12)!important;
+}
+.mdHistory{font-size:20px!important;font-weight:500!important}
+.mdBtn:disabled{opacity:.28;pointer-events:none}
+.mdDivider{
+  width:1px;
+  align-self:stretch;
+  margin:5px 2px;
+  background:color-mix(in srgb,var(--paper-text) 14%,transparent);
+  flex:0 0 1px;
+}
+
+/* Settings are an accordion instead of one endless wall. */
+.settingsSheet{max-height:90vh!important}
+.settingsGroupWrap{display:flex;flex-direction:column;gap:9px;padding-bottom:10px}
+.settingsGroup{
+  border:1px solid var(--border);
+  border-radius:16px;
+  background:color-mix(in srgb,var(--surface2) 54%,transparent);
+  overflow:hidden;
+}
+.settingsGroup>summary{
+  list-style:none;
+  cursor:pointer;
+  min-height:62px;
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  gap:3px;
+  position:relative;
+  color:var(--text);
+  font-size:15px;
+  font-weight:700;
+}
+.settingsGroup>summary::-webkit-details-marker{display:none}
+.settingsGroup>summary::after{
+  content:"⌄";
+  position:absolute;
+  right:14px;
+  top:50%;
+  transform:translateY(-50%);
+  color:var(--muted);
+  font-size:18px;
+  transition:transform .16s ease;
+}
+.settingsGroup[open]>summary::after{transform:translateY(-50%) rotate(180deg)}
+.settingsGroup>summary small{
+  color:var(--muted);
+  font-size:11.5px;
+  font-weight:500;
+  padding-right:26px;
+}
+.settingsGroupBody{
+  border-top:1px solid var(--border);
+  padding:13px 14px 16px;
+}
+.settingsGroupBody>.subLabel:first-child{margin-top:0}
+.settingsGroupBody select,.settingsGroupBody input[type=range]{width:100%}
+.settingsGroupBody .switchRow{min-height:40px}
+.nestedDetails{
+  border:1px solid var(--border);
+  border-radius:11px;
+  padding:8px 10px;
+  background:var(--surface);
+}
+.nestedDetails summary{font-weight:600;font-size:13px}
+
+/* Local document versions. */
+.versionIntro{
+  color:var(--muted);
+  font-size:12.5px;
+  line-height:1.5;
+  margin:-2px 0 12px;
+}
+.versionSaveNow{width:100%;margin-bottom:12px}
+.versionsList{display:flex;flex-direction:column;gap:9px;padding-bottom:12px}
+.versionCard{
+  border:1px solid var(--border);
+  border-radius:14px;
+  background:var(--surface2);
+  padding:11px 12px;
+}
+.versionMeta{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.versionMeta b{font-size:13px}.versionMeta span{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.versionPreview{
+  margin-top:7px;
+  color:var(--text);
+  font-size:12.5px;
+  line-height:1.45;
+  display:-webkit-box;
+  -webkit-line-clamp:3;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+}
+.versionActions{display:flex;gap:7px;margin-top:10px}
+.versionActions button{
+  border:1px solid var(--border);
+  border-radius:9px;
+  min-height:34px;
+  padding:0 10px;
+  background:var(--surface);
+  color:var(--text);
+  font-size:12px;
+}
+.versionActions .dangerText{color:#b8443c}
+.versionEmpty{padding:30px 10px!important}
+
+/* Consistent in-app confirmation instead of WebView file:// alerts. */
+.dialogBackdrop{
+  position:fixed;
+  inset:0;
+  z-index:40;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:22px;
+  background:rgba(0,0,0,.34);
+  backdrop-filter:blur(2px);
+  -webkit-backdrop-filter:blur(2px);
+}
+.dialogBackdrop.open{display:flex}
+.appDialog{
+  width:min(100%,390px);
+  border:1px solid var(--border);
+  border-radius:22px;
+  background:var(--surface);
+  color:var(--text);
+  box-shadow:0 20px 60px rgba(0,0,0,.26);
+  padding:20px 18px 14px;
+}
+.appDialog h3{margin:0;font-size:19px;line-height:1.25}
+.appDialog p{margin:10px 0 18px;color:var(--muted);font-size:14px;line-height:1.48}
+.dialogActions{display:flex;justify-content:flex-end;gap:8px}
+.dialogActions button{
+  min-height:40px;
+  border:0;
+  border-radius:11px;
+  padding:0 14px;
+  font-weight:650;
+  font-size:14px;
+}
+.dialogCancel{background:var(--surface2);color:var(--text)}
+.dialogOk{background:var(--accent);color:white}
+.dialogOk.danger{background:#b74c44}
+
+@media(max-width:430px){
+  .systemBarScrim{height:38px}
+  .settingsGroup>summary{min-height:58px}
+}
+
