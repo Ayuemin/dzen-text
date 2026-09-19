@@ -56,7 +56,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final int MAX_FONT_BYTES = 6 * 1024 * 1024;
     private static final String DICT_FILE = "user_synonyms.dat";
-    private static final String BACKGROUND_FILE = "editor_background.jpg"; // legacy single background\n    private static final String BACKGROUND_DIR = "editor_backgrounds";\n    private static final String BACKGROUND_ACTIVE_KEY = "background_active_id";
+    private static final String BACKGROUND_FILE = "editor_background.jpg"; // legacy single background
+    private static final String BACKGROUND_DIR = "editor_backgrounds";
+    private static final String BACKGROUND_ACTIVE_KEY = "background_active_id";
     private static final String FONT_FILE = "editor_font.dat";
 
     private WebView web;
