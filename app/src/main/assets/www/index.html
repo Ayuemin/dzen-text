@@ -6,6 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>Дзен Текст 1.8.1</title>
 <link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/editor-v2.css">
 </head>
 <body>
 <div class="app">
@@ -17,6 +18,24 @@
       <button class="tab iconTab" onclick="copyRichHtml()" aria-label="Копировать HTML" title="Копировать HTML"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg><span class="srOnly">Копировать</span></button>
     </div>
   </header>
+
+  <div class="workspaceControls" aria-label="Управление рабочей областью">
+    <button class="roundFloat navFloat" type="button" onclick="openSideDrawer()" aria-label="Открыть панель" title="Панель">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>
+    </button>
+    <button class="roundFloat moreFloat" type="button" onclick="toggleQuickMenu(event)" aria-label="Быстрые действия" title="Быстрые действия">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+    </button>
+  </div>
+  <div class="quickMenu" id="quickMenu" role="menu">
+    <button type="button" onclick="quickPreview()">Предпросмотр</button>
+    <button type="button" onclick="quickCopy()">Скопировать для Дзена</button>
+    <button type="button" id="quickSpeakBtn" onclick="quickSpeak()">Озвучить</button>
+    <button type="button" onclick="quickCheck()">Проверить текст</button>
+    <button type="button" onclick="quickImport()">Импортировать файл</button>
+    <button type="button" onclick="quickSettings()">Настройки</button>
+    <button type="button" class="dangerText" onclick="quickClear()">Очистить текст</button>
+  </div>
   <main class="main">
     <section class="pane active" id="editPane"><div class="editorWrap">
       <div class="editorTools">
@@ -56,12 +75,43 @@
   </main>
   <footer class="bottom">
     <button class="bottomBtn iconOnly" id="speakBtn" onclick="toggleSpeak()" aria-label="Озвучить" title="Озвучить"><span id="speakIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11"/></svg></span><span id="speakText" class="srOnly">Озвучить</span></button>
-    <div class="stats"><div><b id="chars">0</b> знаков · <b id="words">0</b> слов</div><div>≈ <b id="readTime">0 мин</b> чтения</div></div>
+    <div class="stats"><b id="words">0</b> слов · <b id="readTime">0 мин</b> · <b id="chars">0</b> знаков</div>
     <button class="gear checkAction" id="checkBtn" onclick="runFullCheck()" aria-label="Проверить текст" title="Проверить текст"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M4 12h5M4 18h7"/><path d="m14 15 2.5 2.5L21 12"/></svg></button>
     <button class="analysisDot" id="analysisDot" onclick="openAnalysis()" aria-label="Редакторский анализ"><span></span></button>
     <button class="gear" onclick="openSettings()" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
   </footer>
 </div>
+
+<div class="sideBackdrop" id="sideBackdrop" onclick="sideBackdropClick(event)">
+  <aside class="sideDrawer" id="sideDrawer" aria-label="Навигация">
+    <div class="drawerHead">
+      <div><div class="drawerTitle">Дзен Текст</div><div class="drawerSub">Редактор и проверка публикации</div></div>
+      <button class="drawerClose" type="button" onclick="closeSideDrawer()" aria-label="Закрыть">×</button>
+    </div>
+    <nav class="drawerNav">
+      <button type="button" onclick="drawerEditor()">Редактор</button>
+      <button type="button" onclick="drawerPreview()">Предпросмотр</button>
+      <button type="button" onclick="drawerImport()">Импорт текста</button>
+      <button type="button" onclick="openIdeas()">Идеи</button>
+      <button type="button" onclick="drawerCheck()">Проверить текст</button>
+    </nav>
+    <div class="drawerSpacer"></div>
+    <button class="drawerSettings" type="button" onclick="drawerSettings()">Настройки</button>
+  </aside>
+</div>
+
+<div class="sheetBackdrop" id="ideasBackdrop" onclick="ideasBackdropClick(event)">
+  <div class="sheet ideasSheet">
+    <div class="handle"></div>
+    <div class="sheetHeader"><h2>Идеи</h2><button class="sheetClose" type="button" onclick="closeIdeas()" aria-label="Закрыть идеи">×</button></div>
+    <div class="ideaComposer">
+      <textarea id="ideaInput" rows="3" placeholder="Быстрая мысль, тема, заголовок…"></textarea>
+      <button class="nativeBtn ideaSave" type="button" onclick="saveQuickIdea()">Сохранить идею</button>
+    </div>
+    <div id="ideasList" class="ideasList"></div>
+  </div>
+</div>
+
 <div class="sheetBackdrop" id="settingsBackdrop" onclick="backdropClick(event)"><div class="sheet">
   <div class="handle"></div><div class="sheetHeader"><h2>Настройки</h2><button class="sheetClose" type="button" onclick="closeSettings()" aria-label="Закрыть настройки">×</button></div>
   <div class="setting"><label>Шрифт <span class="val" id="fontVal"></span></label><select id="fontSelect" onchange="applySettings()"><option value="system">Системный</option><option value="serif">Книжный</option><option value="sans">Нейтральный</option><option value="mono">Моноширинный</option></select></div>
@@ -140,4 +190,5 @@
 <script src="js/08-navigation.js"></script>
 <script src="js/09-editor.js"></script>
 <script src="js/10-settings.js"></script>
+<script src="js/11-ui.js"></script>
 </body></html>
