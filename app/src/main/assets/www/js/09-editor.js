@@ -13,7 +13,7 @@ async function clearEditor(){
     return;
   }
   if(!await appConfirm('Очистить текущий текст?','Перед очисткой будет сохранена версия, поэтому текст можно будет восстановить.','Очистить',true))return;
-  saveVersionSnapshot('Перед очисткой',true);
+  if(!ensureProtectiveVersion('Перед очисткой'))return;
   historyCheckpoint();
   stopSpeak();
   closeReplacement();
@@ -42,7 +42,7 @@ async function loadFileText(text,name=''){
     const ok=await appConfirm('Импортировать файл?','Текущий текст будет заменён содержимым файла. Перед заменой сохранится версия, которую можно восстановить.','Импортировать',false);
     if(!ok)return;
   }
-  if(typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед импортом',true);
+  if(editor.value.trim()&&typeof ensureProtectiveVersion==='function'&&!ensureProtectiveVersion('Перед импортом'))return;
   historyCheckpoint();
   const ext=(name.split('.').pop()||'').toLowerCase();
   editor.value=(ext==='html'||ext==='htm')?htmlToEditableText(text):String(text||'').replace(/^\uFEFF/,'');
