@@ -49,9 +49,9 @@ const SPELL_IGNORE_KEY='dzenSpellIgnoreV1';
 let spellIgnoreWords=new Set();
 function spellKey(word){return String(word||'').trim().toLocaleLowerCase('ru-RU')}
 function loadSpellIgnoreWords(){try{const a=JSON.parse(localStorage.getItem(SPELL_IGNORE_KEY)||'[]');return new Set(Array.isArray(a)?a.map(spellKey).filter(Boolean):[])}catch(e){return new Set()}}
-function saveSpellIgnoreWords(){localStorage.setItem(SPELL_IGNORE_KEY,JSON.stringify([...spellIgnoreWords].sort()))}
+function saveSpellIgnoreWords(){try{localStorage.setItem(SPELL_IGNORE_KEY,JSON.stringify([...spellIgnoreWords].sort()));return true}catch(e){toast('Не удалось сохранить список исключений');return false}}
 function updateSpellIgnoreStatus(){const el=document.getElementById('spellIgnoreStatus');if(el)el.innerHTML=`Мои правильные слова: <b>${spellIgnoreWords.size}</b>`}
-async function clearSpellIgnoreWords(){if(!spellIgnoreWords.size){toast('Список исключений уже пуст');return}if(!await appConfirm('Очистить исключения?','Все слова, отмеченные как правильные, будут удалены из локального списка.','Очистить',true))return;spellIgnoreWords.clear();saveSpellIgnoreWords();updateSpellIgnoreStatus();clearOnlineSpelling();analyzeText();toast('Исключения орфографии очищены')}
+async function clearSpellIgnoreWords(){if(!spellIgnoreWords.size){toast('Список исключений уже пуст');return}if(!await appConfirm('Очистить исключения?','Все слова, отмеченные как правильные, будут удалены из локального списка.','Очистить',true))return;spellIgnoreWords.clear();if(!saveSpellIgnoreWords()){spellIgnoreWords=loadSpellIgnoreWords();updateSpellIgnoreStatus();return}updateSpellIgnoreStatus();clearOnlineSpelling();analyzeText();toast('Исключения орфографии очищены')}
 
 const DZEN_RULES_URL='https://raw.githubusercontent.com/Ayuemin/dzen-text/main/rules/dzen-rules.json';
 const DZEN_RULES_KEY='dzenRulesV2';
