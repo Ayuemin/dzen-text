@@ -13,8 +13,8 @@ android {
         applicationId 'ru.dzenprep.texteditor'
         minSdk 24
         targetSdk 35
-        versionCode 35
-        versionName '1.9.0-test7'
+        versionCode 36
+        versionName '1.9.0-test8'
     }
 
     signingConfigs {
