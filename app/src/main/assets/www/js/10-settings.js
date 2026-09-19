@@ -4,6 +4,15 @@ function backdropClick(e){if(e.target.id==='settingsBackdrop')closeSettings()}
 let cachedCustomBackground='';
 let cachedCustomBackgroundId='';
 function normalizeAccentHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:'#D65C43'}
+function persistSettings(showError=true){
+  try{
+    localStorage.setItem('dzenSettings',JSON.stringify(settings));
+    return true;
+  }catch(e){
+    if(showError)toast('Не удалось сохранить настройки');
+    return false;
+  }
+}
 
 function backgroundList(){
   try{
@@ -82,7 +91,7 @@ function selectCustomBackground(id){
   settings.paper='custom';
   cachedCustomBackground='';
   cachedCustomBackgroundId='';
-  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  persistSettings();
   syncSettingsUI();
   applyVisualSettings();
   renderCustomBackgrounds();
@@ -109,7 +118,7 @@ async function deleteCustomBackground(id){
   }
   cachedCustomBackground='';
   cachedCustomBackgroundId='';
-  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  persistSettings();
   syncSettingsUI();
   applyVisualSettings();
   renderCustomBackgrounds();
@@ -134,7 +143,7 @@ window.onNativeBackgroundAdded=(id,name)=>{
   cachedCustomBackgroundId='';
   settings.customBackgroundId=String(id||'');
   settings.paper='custom';
-  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  persistSettings();
   syncSettingsUI();
   applyVisualSettings();
   renderCustomBackgrounds();
@@ -145,7 +154,7 @@ window.onNativeBackgroundSelected=(id)=>{
   cachedCustomBackgroundId='';
   settings.customBackgroundId=String(id||'');
   if(!id&&settings.paper==='custom')settings.paper='gray';
-  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  persistSettings();
   syncSettingsUI();
   applyVisualSettings();
   renderCustomBackgrounds();
@@ -184,8 +193,8 @@ function onFontSelectChanged(){
   }
   applySettings();
 }
-function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
-window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';localStorage.setItem('dzenSettings',JSON.stringify(settings));}else if(settings.font==='custom'){settings.font='serif';localStorage.setItem('dzenSettings',JSON.stringify(settings));}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
+function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';persistSettings();syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
+window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';persistSettings();}else if(settings.font==='custom'){settings.font='serif';persistSettings();}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
 window.onNativeFontError=(msg)=>toast(msg||'Не удалось подключить шрифт');
 function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;markdownToolbarSwitch.checked=settings.markdownToolbar!==false;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus()}
 async function applySettings(){
@@ -244,7 +253,7 @@ async function applySettings(){
     riskWords:riskWords.value
   };
   if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);
-  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  persistSettings();
   applyVisualSettings();
   render(false,false);
   const code=document.getElementById('htmlCode');
