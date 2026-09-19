@@ -1,9 +1,13 @@
-function afterProgrammaticEdit(runAnalysis=false){
+function afterProgrammaticEdit(runAnalysis=false,options={}){
+  const keepOnlineSpelling=!!options.keepOnlineSpelling;
+  if(!keepOnlineSpelling&&typeof clearOnlineSpelling==='function')clearOnlineSpelling();
   markAnalysisStale();
   render(!!runAnalysis);
   if(typeof scheduleArticleSave==='function')scheduleArticleSave();
   if(typeof scheduleAutoVersion==='function')scheduleAutoVersion();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
+  if(typeof issueNavState!=='undefined'&&issueNavState&&typeof scheduleIssueNavigatorRefresh==='function')scheduleIssueNavigatorRefresh();
+  if(typeof repeatNavState!=='undefined'&&repeatNavState&&typeof scheduleRepeatNavigatorRefresh==='function')scheduleRepeatNavigatorRefresh();
 }
 
 async function clearEditor(){
