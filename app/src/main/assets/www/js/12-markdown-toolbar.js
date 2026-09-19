@@ -44,6 +44,7 @@ function markdownPrefix(kind){
 }
 
 function applyMarkdown(action){
+  if(typeof historyCheckpoint==='function')historyCheckpoint();
   editor.focus();
   if(action==='bold')markdownWrap('**','**','текст');
   else if(action==='italic')markdownWrap('*','*','текст');
@@ -69,7 +70,9 @@ function updateMarkdownToolbarVisibility(){
   const bar=document.getElementById('markdownToolbar');
   if(!bar)return;
   const edit=document.getElementById('editPane');
-  const visible=document.activeElement===editor&&edit&&edit.classList.contains('active');
+  const visible=document.activeElement===editor&&
+    edit&&edit.classList.contains('active')&&
+    window.__keyboardOpen===true;
   bar.classList.toggle('visible',visible);
   document.body.classList.toggle('markdown-toolbar-visible',visible);
 }
@@ -87,5 +90,6 @@ function updateMarkdownToolbarVisibility(){
     window.visualViewport.addEventListener('scroll',updateMarkdownToolbarVisibility);
   }
   window.addEventListener('resize',updateMarkdownToolbarVisibility);
+  window.addEventListener('dzenKeyboardInset',()=>setTimeout(updateMarkdownToolbarVisibility,20));
   document.addEventListener('visibilitychange',updateMarkdownToolbarVisibility);
 })();
