@@ -1,5 +1,7 @@
 let activeArticleId='';
 let articleSaveTimer=null;
+let articleSaveInterval=null;
+let articleDirty=false;
 
 function documentsAvailable(){
   return !!(window.AndroidDocuments&&typeof AndroidDocuments.ensureActiveArticle==='function');
@@ -56,22 +58,33 @@ function initArticleWorkspace(){
 
 function persistCurrentArticleNow(){
   clearTimeout(articleSaveTimer);
+  articleSaveTimer=null;
   if(!documentsAvailable()||!activeArticleId)return false;
   try{
-    return !!AndroidDocuments.saveArticle(activeArticleId,editor.value||'');
+    const ok=!!AndroidDocuments.saveArticle(activeArticleId,editor.value||'');
+    if(ok)articleDirty=false;
+    return ok;
   }catch(e){
     return false;
   }
 }
 
-function scheduleArticleSave(){
-  clearTimeout(articleSaveTimer);
-  articleSaveTimer=setTimeout(function(){
-    persistCurrentArticleNow();
+function flushArticleAutosave(){
+  if(!articleDirty)return;
+  if(persistCurrentArticleNow()){
     updateCurrentArticleUi();
     const side=document.getElementById('sideBackdrop');
     if(side&&side.classList.contains('open'))renderSavedArticles();
-  },900);
+  }
+}
+
+function scheduleArticleSave(){
+  articleDirty=true;
+  clearTimeout(articleSaveTimer);
+  articleSaveTimer=setTimeout(flushArticleAutosave,900);
+  if(!articleSaveInterval){
+    articleSaveInterval=setInterval(flushArticleAutosave,5000);
+  }
 }
 
 function preserveCurrentArticleBeforeSwitch(reason){
