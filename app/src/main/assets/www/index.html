@@ -165,7 +165,7 @@
         <div class="accentRow"><input id="accentHex" type="text" inputmode="text" maxlength="7" placeholder="#D65C43" onchange="applySettings()"><span id="accentPreview" class="accentPreview"></span></div>
 
         <div class="subLabel"><span>Шрифт</span><span class="val" id="fontVal"></span></div>
-        <select id="fontSelect" onchange="applySettings()">
+        <select id="fontSelect" onchange="onFontSelectChanged()">
           <option value="serif">Книжный</option>
           <option value="classic">Классический</option>
           <option value="system">Системный</option>
