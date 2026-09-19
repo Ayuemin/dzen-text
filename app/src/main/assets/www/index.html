@@ -125,7 +125,6 @@
         <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
         <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
         <button type="button" onclick="drawerImport()">Импортировать файл</button>
-        <button type="button" onclick="drawerVersions()">Версии текста</button>
         <button type="button" class="drawerDanger" onclick="drawerClear()">Очистить текущую статью</button>
       </nav>
     </section>
@@ -139,6 +138,7 @@
         <summary>Сохранённые статьи <span id="savedArticlesCount">0</span></summary>
         <div id="savedArticlesList" class="savedArticlesList"></div>
       </details>
+      <button class="drawerLibraryAction drawerVersionsAction" type="button" onclick="drawerVersions()">Версии текста</button>
     </section>
 
     <div class="drawerSpacer"></div>
