@@ -1,9 +1,32 @@
 function activeCorrectionPanel(){for(const id of ['replacePanel','nearbyPanel','repeatNavPanel','spellPanel','issueNavPanel']){const el=document.getElementById(id);if(el&&el.classList.contains('open'))return el}return null}
 function textareaCaretContentTop(pos){const cs=getComputedStyle(editor),mirror=document.createElement('div');mirror.style.position='fixed';mirror.style.left='-10000px';mirror.style.top='0';mirror.style.visibility='hidden';mirror.style.pointerEvents='none';mirror.style.whiteSpace='pre-wrap';mirror.style.overflowWrap='break-word';mirror.style.wordBreak=cs.wordBreak||'normal';mirror.style.boxSizing=cs.boxSizing;mirror.style.width=editor.offsetWidth+'px';mirror.style.padding=cs.padding;mirror.style.border=cs.border;mirror.style.fontFamily=cs.fontFamily;mirror.style.fontSize=cs.fontSize;mirror.style.fontWeight=cs.fontWeight;mirror.style.fontStyle=cs.fontStyle;mirror.style.letterSpacing=cs.letterSpacing;mirror.style.lineHeight=cs.lineHeight;mirror.style.tabSize=cs.tabSize||'8';mirror.textContent=editor.value.slice(0,Math.max(0,pos));const marker=document.createElement('span');marker.textContent='\u200b';mirror.appendChild(marker);document.body.appendChild(mirror);const top=marker.offsetTop;mirror.remove();return top}
-function ensureSelectionVisible(start,end){if(!editor||!editor.offsetWidth)return;const er=editor.getBoundingClientRect();if(!er.height)return;const vv=window.visualViewport;const viewportTop=vv?vv.offsetTop:0,viewportBottom=vv?vv.offsetTop+vv.height:window.innerHeight;let visibleTop=Math.max(er.top,viewportTop)+12,visibleBottom=Math.min(er.bottom,viewportBottom)-12;const panel=activeCorrectionPanel();if(panel){const pr=panel.getBoundingClientRect();if(pr.height&&pr.top>visibleTop)visibleBottom=Math.min(visibleBottom,pr.top-12)}if(visibleBottom-visibleTop<80)return;const contentTop=textareaCaretContentTop(start),targetY=visibleTop+(visibleBottom-visibleTop)*0.43,maxScroll=Math.max(0,editor.scrollHeight-editor.clientHeight),desired=contentTop-(targetY-er.top);editor.scrollTop=Math.max(0,Math.min(maxScroll,desired))}
+function ensureSelectionVisible(start,end){if(!editor||!editor.offsetWidth)return;if(editor.value.length>120000)return;const er=editor.getBoundingClientRect();if(!er.height)return;const vv=window.visualViewport;const viewportTop=vv?vv.offsetTop:0,viewportBottom=vv?vv.offsetTop+vv.height:window.innerHeight;let visibleTop=Math.max(er.top,viewportTop)+12,visibleBottom=Math.min(er.bottom,viewportBottom)-12;const panel=activeCorrectionPanel();if(panel){const pr=panel.getBoundingClientRect();if(pr.height&&pr.top>visibleTop)visibleBottom=Math.min(visibleBottom,pr.top-12)}if(visibleBottom-visibleTop<80)return;const contentTop=textareaCaretContentTop(start),targetY=visibleTop+(visibleBottom-visibleTop)*0.43,maxScroll=Math.max(0,editor.scrollHeight-editor.clientHeight),desired=contentTop-(targetY-er.top);editor.scrollTop=Math.max(0,Math.min(maxScroll,desired))}
 let selectionVisibilityTimer=null;function scheduleSelectionVisibility(delay=40){if(!activeCorrectionPanel())return;clearTimeout(selectionVisibilityTimer);selectionVisibilityTimer=setTimeout(()=>ensureSelectionVisible(editor.selectionStart,editor.selectionEnd),delay)}
 if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>scheduleSelectionVisibility(55));window.visualViewport.addEventListener('scroll',()=>scheduleSelectionVisibility(55))}window.addEventListener('resize',()=>scheduleSelectionVisibility(55));
-function jumpTo(start,end,quiet=false){document.getElementById('analysisBackdrop').classList.remove('open');showPane('edit');setTimeout(()=>{const s=Math.max(0,start),e=Math.max(s,end);editor.focus();editor.setSelectionRange(s,e);ensureSelectionVisible(s,e);setTimeout(()=>ensureSelectionVisible(s,e),140);setTimeout(()=>ensureSelectionVisible(s,e),320);if(!quiet){const h=document.getElementById('highlightHint');h.classList.add('show');setTimeout(()=>h.classList.remove('show'),1200)}},70)}
+function jumpTo(start,end,quiet=false){
+  document.getElementById('analysisBackdrop').classList.remove('open');
+  showPane('edit');
+  setTimeout(()=>{
+    const s=Math.max(0,start),e=Math.max(s,end);
+    editor.focus();
+    editor.setSelectionRange(s,e);
+
+    // For normal articles, compensate for the correction panel once after the
+    // browser has scrolled the textarea. For very large articles the hidden
+    // mirror would copy a huge prefix and cause visible pauses; WebView's native
+    // textarea selection scrolling is faster and sufficiently accurate.
+    if(editor.value.length<=120000){
+      requestAnimationFrame(()=>ensureSelectionVisible(s,e));
+      setTimeout(()=>ensureSelectionVisible(s,e),160);
+    }
+
+    if(!quiet){
+      const h=document.getElementById('highlightHint');
+      h.classList.add('show');
+      setTimeout(()=>h.classList.remove('show'),1200);
+    }
+  },55);
+}
 
 let issueNavState=null;
 let issueNavRefreshTimer=null;
