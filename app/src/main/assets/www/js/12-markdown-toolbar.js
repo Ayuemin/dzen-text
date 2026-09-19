@@ -94,9 +94,8 @@ function updateMarkdownToolbarVisibility(){
   editor.addEventListener('blur',()=>setTimeout(updateMarkdownToolbarVisibility,100));
   if(window.visualViewport){
     window.visualViewport.addEventListener('resize',updateMarkdownToolbarVisibility);
-    window.visualViewport.addEventListener('scroll',updateMarkdownToolbarVisibility);
   }
   window.addEventListener('resize',updateMarkdownToolbarVisibility);
-  window.addEventListener('dzenKeyboardInset',()=>setTimeout(updateMarkdownToolbarVisibility,20));
+  window.addEventListener('dzenKeyboardState',()=>setTimeout(updateMarkdownToolbarVisibility,20));
   document.addEventListener('visibilitychange',updateMarkdownToolbarVisibility);
 })();

@@ -1,50 +1,44 @@
 let keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||document.documentElement.clientHeight||0;
 let nativeKeyboardKnown=false;
-window.__keyboardInset=0;
 window.__keyboardOpen=false;
 
-function updateViewportGeometry(){
-  const vv=window.visualViewport;
-  const layoutH=window.innerHeight||document.documentElement.clientHeight||0;
-  const top=vv?Math.max(0,Math.round(vv.offsetTop||0)):0;
-  const bottom=vv?Math.max(0,Math.round(layoutH-(vv.offsetTop+vv.height))):0;
-
-  document.documentElement.style.setProperty('--viewportTopOffset',top+'px');
-  document.documentElement.style.setProperty('--viewportBottomInset',bottom+'px');
-
-  if(!nativeKeyboardKnown&&vv){
-    const current=Math.round(vv.height);
-    if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
-    const delta=Math.max(0,Math.round(keyboardBaselineHeight-current));
-    window.__keyboardOpen=delta>=100;
-    window.__keyboardInset=window.__keyboardOpen?delta:0;
-  }
-
-  window.dispatchEvent(new CustomEvent('dzenKeyboardInset',{detail:window.__keyboardInset}));
+function emitKeyboardState(){
+  window.dispatchEvent(new CustomEvent('dzenKeyboardState',{detail:{open:window.__keyboardOpen}}));
 }
 
-window.onNativeKeyboardInset=function(inset,open){
+function updateFallbackKeyboardState(){
+  if(nativeKeyboardKnown)return;
+  const vv=window.visualViewport;
+  if(!vv)return;
+  const current=Math.round(vv.height);
+  if(current>keyboardBaselineHeight)keyboardBaselineHeight=current;
+  const delta=Math.max(0,Math.round(keyboardBaselineHeight-current));
+  const open=delta>=100;
+  if(open===window.__keyboardOpen)return;
+  window.__keyboardOpen=open;
+  emitKeyboardState();
+}
+
+window.onNativeKeyboardInset=function(_inset,open){
   nativeKeyboardKnown=true;
-  window.__keyboardInset=Math.max(0,Number(inset)||0);
-  window.__keyboardOpen=!!open;
-  updateViewportGeometry();
+  const next=!!open;
+  if(next===window.__keyboardOpen)return;
+  window.__keyboardOpen=next;
+  emitKeyboardState();
 };
 
 if(window.visualViewport){
-  window.visualViewport.addEventListener('resize',updateViewportGeometry);
-  window.visualViewport.addEventListener('scroll',updateViewportGeometry);
+  window.visualViewport.addEventListener('resize',updateFallbackKeyboardState);
 }
-window.addEventListener('resize',updateViewportGeometry);
+window.addEventListener('resize',updateFallbackKeyboardState);
 window.addEventListener('orientationchange',function(){
   keyboardBaselineHeight=0;
   setTimeout(function(){
     keyboardBaselineHeight=(window.visualViewport&&window.visualViewport.height)||window.innerHeight||0;
-    updateViewportGeometry();
+    updateFallbackKeyboardState();
   },350);
 });
-document.addEventListener('focusin',function(){setTimeout(updateViewportGeometry,60)});
-document.addEventListener('focusout',function(){setTimeout(updateViewportGeometry,120)});
-setTimeout(updateViewportGeometry,0);
+setTimeout(updateFallbackKeyboardState,0);
 const editor=document.getElementById('editor'), preview=document.getElementById('preview'), htmlCode=document.getElementById('htmlCode');
 const exampleRiskWords='VPN\nВПН\nобход\nобход блокировок\nразблокировка\nпрокси\nанонимайзер';
 const defaultSettings={font:'serif',size:19,line:1.7,theme:'system',paper:'gray',accent:'#D65C43',backgroundVeil:0.6,backgroundText:'dark',customBackgroundId:'',wpm:200,tts:1.0,autosave:true,showCode:false,markdownToolbar:true,headingCheck:true,headingMin:8,headingMax:80,sentenceCheck:true,sentenceMax:30,paragraphCheck:true,paragraphMax:650,frequentCheck:true,frequentMin:8,nearbyCheck:true,structureCheck:true,structureMax:1800,phraseCheck:true,openingCheck:true,headingStructureCheck:true,markdownCheck:true,aiStyleCheck:true,proofCheck:true,onlineSpelling:false,dzenCheck:true,dzenSmartRules:true,riskCheck:true,riskWords:exampleRiskWords};
