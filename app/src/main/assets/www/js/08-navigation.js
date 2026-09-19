@@ -6,6 +6,34 @@ if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>sc
 function jumpTo(start,end,quiet=false){document.getElementById('analysisBackdrop').classList.remove('open');showPane('edit');setTimeout(()=>{const s=Math.max(0,start),e=Math.max(s,end);editor.focus();editor.setSelectionRange(s,e);ensureSelectionVisible(s,e);setTimeout(()=>ensureSelectionVisible(s,e),140);setTimeout(()=>ensureSelectionVisible(s,e),320);if(!quiet){const h=document.getElementById('highlightHint');h.classList.add('show');setTimeout(()=>h.classList.remove('show'),1200)}},70)}
 
 let issueNavState=null;
+let issueNavRefreshTimer=null;
+
+function scheduleIssueNavigatorRefresh(){
+  if(!issueNavState)return;
+  const type=issueNavState.type;
+  const current=issueNavState.issues[issueNavState.index]||null;
+  const anchor=current&&Number.isFinite(current.start)?current.start:editor.selectionStart||0;
+  clearTimeout(issueNavRefreshTimer);
+  const delay=editor.value.length>120000?1100:520;
+  issueNavRefreshTimer=setTimeout(function(){
+    if(!issueNavState||issueNavState.type!==type)return;
+    try{analyzeText()}catch(e){return}
+    const same=currentAnalysis.issues.filter(function(x){return x.type===type});
+    if(!same.length){
+      closeIssueNavigator();
+      toast('Замечания этого типа исправлены');
+      return;
+    }
+    let nextIndex=same.findIndex(function(x){return Number(x.start)>anchor+1});
+    if(nextIndex<0){
+      nextIndex=same.findIndex(function(x){return Number(x.start)>=Math.max(0,anchor-2)});
+    }
+    if(nextIndex<0)nextIndex=0;
+    issueNavState={type:type,issues:same,index:nextIndex};
+    renderIssueNavigator();
+  },delay);
+}
+
 function issueTypeLabel(type){
   const group=(typeof issueGroups==='function'?issueGroups():[]).find(x=>x.id===type);
   return group?group.name:'Замечания';
@@ -63,6 +91,7 @@ function jumpIssueNavigator(quiet=false){
   if(!quiet)toast((issueNavState.index+1)+' из '+issueNavState.issues.length);
 }
 function closeIssueNavigator(){
+  clearTimeout(issueNavRefreshTimer);
   issueNavState=null;
   const panel=document.getElementById('issueNavPanel');
   if(panel)panel.classList.remove('open');
