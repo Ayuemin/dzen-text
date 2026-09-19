@@ -235,13 +235,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (safe.isEmpty()) return false;
             File file = backgroundFile(safe);
             boolean ok = !file.exists() || file.delete();
+            if (!ok) return false;
             getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("background_name_" + safe).apply();
             if (safe.equals(MainActivity.this.activeBackgroundId())) {
                 String next = newestBackgroundId();
                 setActiveBackgroundId(next);
                 runJs("window.onNativeBackgroundSelected && window.onNativeBackgroundSelected(" + JSONObject.quote(next) + ")");
             }
-            return ok;
+            return true;
         }
 
         @JavascriptInterface
@@ -433,9 +434,23 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (resultCode != RESULT_OK || data == null) return;
+        if (resultCode != RESULT_OK || data == null) {
+            if (requestCode == REQUEST_SAVE_REPORT) pendingReportText = "";
+            if (requestCode == REQUEST_SAVE_ARTICLE) {
+                pendingArticleText = "";
+                pendingArticleFileName = "article.md";
+            }
+            return;
+        }
         Uri uri = data.getData();
-        if (uri == null) return;
+        if (uri == null) {
+            if (requestCode == REQUEST_SAVE_REPORT) pendingReportText = "";
+            if (requestCode == REQUEST_SAVE_ARTICLE) {
+                pendingArticleText = "";
+                pendingArticleFileName = "article.md";
+            }
+            return;
+        }
 
         if (requestCode == REQUEST_SAVE_REPORT) {
             try (OutputStream out = getContentResolver().openOutputStream(uri)) {
@@ -1042,6 +1057,14 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private void runJs(final String js) {
         if (web == null) return;
         runOnUiThread(() -> web.evaluateJavascript(js, null));
+    }
+
+    @Override
+    protected void onPause() {
+        if (web != null) {
+            runJs("try{window.persistCurrentArticleNow&&window.persistCurrentArticleNow()}catch(e){}");
+        }
+        super.onPause();
     }
 
     @Override
