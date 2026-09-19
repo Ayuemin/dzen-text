@@ -719,3 +719,173 @@ body.markdown-toolbar-visible .repeatNavPanel{
 }
 .issueNavContext:active{background:color-mix(in srgb,var(--paper-text) 10%,transparent)}
 body.markdown-toolbar-visible .issueNavPanel{bottom:57px}
+
+/* Drawer information architecture: active article and library are visually separate. */
+.sideDrawer{
+  overflow:hidden!important;
+}
+.drawerHead{
+  flex:0 0 auto;
+}
+.drawerCurrentBlock,.drawerLibraryBlock{
+  flex:0 0 auto;
+}
+.drawerCurrentBlock{
+  margin-top:10px;
+  padding:10px;
+  border:1px solid color-mix(in srgb,var(--paper-text) 11%,transparent);
+  border-radius:16px;
+  background:color-mix(in srgb,var(--paper-text) 4%,transparent);
+}
+.drawerLibraryBlock{
+  margin-top:13px;
+  padding-top:12px;
+  border-top:1px solid color-mix(in srgb,var(--paper-text) 13%,transparent);
+}
+.drawerSectionLabel{
+  padding:0 4px 7px;
+  color:var(--paper-muted);
+  font:700 10.5px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.drawerCurrentBlock .drawerNav{
+  padding:0!important;
+  gap:2px;
+}
+.drawerCurrentBlock .drawerNav button{
+  min-height:42px!important;
+  padding:0 10px!important;
+  font-size:14px!important;
+}
+.drawerCurrentBlock .drawerNav button::after{
+  font-size:18px!important;
+}
+.drawerCurrentBlock .drawerPrimary{
+  background:color-mix(in srgb,var(--accent) 11%,transparent)!important;
+  color:var(--accent)!important;
+  font-weight:700!important;
+}
+.drawerCurrentBlock .drawerDanger{
+  color:#b64b43!important;
+}
+.drawerLibraryAction{
+  width:100%;
+  min-height:44px;
+  padding:0 12px;
+  border:0;
+  border-radius:12px;
+  background:transparent;
+  color:var(--paper-text);
+  text-align:left;
+  font:560 14.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.drawerLibraryAction::after{
+  content:"›";
+  color:var(--paper-muted);
+  font-size:20px;
+  opacity:.55;
+}
+.drawerLibraryAction:active{
+  background:color-mix(in srgb,var(--paper-text) 7%,transparent);
+}
+.drawerArticles{
+  margin-top:4px;
+  border:1px solid color-mix(in srgb,var(--paper-text) 10%,transparent);
+  border-radius:13px;
+  overflow:hidden;
+  background:color-mix(in srgb,var(--paper-text) 3%,transparent);
+}
+.drawerArticles>summary{
+  list-style:none;
+  min-height:44px;
+  padding:0 12px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--paper-text);
+  font:600 14px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.drawerArticles>summary::-webkit-details-marker{display:none}
+.drawerArticles>summary::after{
+  content:"⌄";
+  margin-left:auto;
+  color:var(--paper-muted);
+  transition:transform .15s ease;
+}
+.drawerArticles[open]>summary::after{transform:rotate(180deg)}
+.drawerArticles>summary span{
+  min-width:22px;
+  height:22px;
+  padding:0 6px;
+  border-radius:999px;
+  display:grid;
+  place-items:center;
+  background:color-mix(in srgb,var(--paper-text) 7%,transparent);
+  color:var(--paper-muted);
+  font-size:11px;
+}
+.savedArticlesList{
+  max-height:34vh;
+  overflow:auto;
+  border-top:1px solid color-mix(in srgb,var(--paper-text) 9%,transparent);
+}
+.savedArticleRow{
+  display:flex;
+  align-items:stretch;
+  border-top:1px solid color-mix(in srgb,var(--paper-text) 7%,transparent);
+}
+.savedArticleRow:first-child{border-top:0}
+.savedArticleRow.active{
+  background:color-mix(in srgb,var(--accent) 8%,transparent);
+}
+.savedArticleOpen{
+  min-width:0;
+  flex:1;
+  border:0;
+  background:transparent;
+  color:var(--paper-text);
+  text-align:left;
+  padding:10px 8px 10px 11px;
+}
+.savedArticleTitle{
+  display:block;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  font-size:12.8px;
+  font-weight:650;
+}
+.savedArticleMeta{
+  display:block;
+  margin-top:3px;
+  color:var(--paper-muted);
+  font-size:10.5px;
+}
+.savedArticleDelete{
+  flex:0 0 38px;
+  border:0;
+  background:transparent;
+  color:#ad5048;
+  font-size:21px;
+}
+.savedArticleDelete:active{
+  background:color-mix(in srgb,#b64b43 9%,transparent);
+}
+.drawerEmpty{
+  padding:14px 12px;
+  color:var(--paper-muted);
+  font-size:12px;
+}
+.drawerSpacer{
+  min-height:10px;
+}
+.drawerSettings{
+  margin-top:10px;
+  flex:0 0 auto;
+}
+
