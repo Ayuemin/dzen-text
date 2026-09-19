@@ -51,7 +51,10 @@ function openIdeas(){
 }
 
 function closeIdeas(){
-  document.getElementById('ideasBackdrop').classList.remove('open');
+  const backdrop=document.getElementById('ideasBackdrop');
+  const active=document.activeElement;
+  if(active&&backdrop.contains(active)&&typeof active.blur==='function')active.blur();
+  backdrop.classList.remove('open');
 }
 
 function ideasBackdropClick(event){
