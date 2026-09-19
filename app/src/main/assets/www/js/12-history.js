@@ -4,6 +4,8 @@ let redoStack=[];
 let beforeInputSnapshot=null;
 let lastTypingAt=0;
 let autoVersionTimer=null;
+let autoVersionInterval=null;
+let autoVersionDirty=false;
 let historyRestoring=false;
 let lastLargeSnapshotAt=0;
 
@@ -38,6 +40,9 @@ function resetUndoHistory(){
   beforeInputSnapshot=null;
   lastTypingAt=0;
   lastLargeSnapshotAt=0;
+  clearTimeout(autoVersionTimer);
+  autoVersionTimer=null;
+  autoVersionDirty=false;
   updateHistoryButtons();
 }
 
@@ -278,9 +283,26 @@ async function cleanupVersions(mode){
   toast('Удалено версий: '+count);
 }
 
+function flushAutoVersion(){
+  if(!autoVersionDirty)return;
+  if(saveVersionSnapshot('Авто',true))autoVersionDirty=false;
+}
+
 function scheduleAutoVersion(){
-  clearTimeout(autoVersionTimer);
-  autoVersionTimer=setTimeout(function(){saveVersionSnapshot('Авто',true)},60000);
+  autoVersionDirty=true;
+
+  if(!autoVersionTimer){
+    autoVersionTimer=setTimeout(function(){
+      autoVersionTimer=null;
+      flushAutoVersion();
+    },12000);
+  }
+
+  if(!autoVersionInterval){
+    autoVersionInterval=setInterval(function(){
+      flushAutoVersion();
+    },60000);
+  }
 }
 
 editor.addEventListener('beforeinput',function(){
@@ -312,7 +334,10 @@ editor.addEventListener('input',function(event){
 });
 
 document.addEventListener('visibilitychange',function(){
-  if(document.hidden)saveVersionSnapshot('Авто',true);
+  if(document.hidden){
+    autoVersionDirty=true;
+    flushAutoVersion();
+  }
 });
 
 updateHistoryButtons();
