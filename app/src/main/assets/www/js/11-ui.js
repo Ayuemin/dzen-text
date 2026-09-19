@@ -1,7 +1,7 @@
 const IDEAS_KEY='dzenQuickIdeasV1';
 let sideTouch=null;
 
-function openSideDrawer(){closeQuickMenu();document.getElementById('sideBackdrop').classList.add('open')}
+function openSideDrawer(){closeQuickMenu();if(document.activeElement===editor)editor.blur();document.getElementById('sideBackdrop').classList.add('open')}
 function closeSideDrawer(){document.getElementById('sideBackdrop').classList.remove('open')}
 function sideBackdropClick(e){if(e.target.id==='sideBackdrop')closeSideDrawer()}
 
@@ -38,20 +38,20 @@ function saveQuickIdea(){
   const ideas=loadIdeas();ideas.unshift({id:String(Date.now())+'_'+Math.random().toString(36).slice(2),text,created:Date.now()});
   saveIdeas(ideas.slice(0,300));input.value='';renderIdeas();toast('Идея сохранена')
 }
-function deleteIdea(id){
-  if(!confirm('Удалить эту идею?'))return;
+async function deleteIdea(id){
+  if(!await appConfirm('Удалить идею?','Идея будет удалена без переноса в текст.','Удалить',true))return;
   saveIdeas(loadIdeas().filter(x=>x.id!==id));renderIdeas()
 }
 function insertIdea(id){
   const idea=loadIdeas().find(x=>x.id===id);if(!idea)return;
   const start=editor.selectionStart||editor.value.length,end=editor.selectionEnd||start;
   const prefix=start&&editor.value[start-1]!=='\n'?'\n':'';
-  editor.setRangeText(prefix+idea.text,start,end,'end');render();closeIdeas();showPane('edit');editor.focus();toast('Идея вставлена в текст')
+  historyCheckpoint();editor.setRangeText(prefix+idea.text,start,end,'end');render();closeIdeas();showPane('edit');editor.focus();toast('Идея вставлена в текст')
 }
-function ideaAsText(id){
+async function ideaAsText(id){
   const idea=loadIdeas().find(x=>x.id===id);if(!idea)return;
-  if(editor.value.trim()&&!confirm('Заменить текущий текст этой идеей?'))return;
-  editor.value=idea.text;clearOnlineSpelling();render(true);closeIdeas();showPane('edit');editor.focus();toast('Идея открыта в редакторе')
+  if(editor.value.trim()&&!await appConfirm('Сделать идею текущим текстом?','Текущий текст будет сохранён в версиях перед заменой.','Заменить',false))return;
+  saveVersionSnapshot('Перед заменой идеей',true);historyCheckpoint();editor.value=idea.text;clearOnlineSpelling();render(true);closeIdeas();showPane('edit');editor.focus();toast('Идея открыта в редакторе')
 }
 function renderIdeas(){
   const root=document.getElementById('ideasList'),ideas=loadIdeas();
@@ -79,13 +79,17 @@ document.addEventListener('touchend',e=>{
   if(!sideTouch||!e.changedTouches.length)return;
   const t=e.changedTouches[0],dx=t.clientX-sideTouch.x,dy=t.clientY-sideTouch.y;
   if(Math.abs(dx)>70&&Math.abs(dx)>Math.abs(dy)*1.4){
-    if(!sideTouch.drawer&&sideTouch.x<64&&dx>0)openSideDrawer();
+    if(!sideTouch.drawer&&sideTouch.x<Math.min(150,window.innerWidth*0.34)&&dx>0)openSideDrawer();
     else if(sideTouch.drawer&&dx<0)closeSideDrawer()
   }
   sideTouch=null
 },{passive:true});
 
 function handleNativeBack(){
+  const confirmBox=document.getElementById('confirmBackdrop');
+  if(confirmBox&&confirmBox.classList.contains('open')){resolveAppConfirm(false);return true}
+  const versions=document.getElementById('versionsBackdrop');
+  if(versions&&versions.classList.contains('open')){closeVersions();return true}
   const quick=document.getElementById('quickMenu');
   if(quick&&quick.classList.contains('open')){closeQuickMenu();return true}
   const side=document.getElementById('sideBackdrop');
