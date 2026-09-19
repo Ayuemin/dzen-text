@@ -496,7 +496,8 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private void installKeyboardObserver() {
         final Rect visible = new Rect();
-        final int threshold = Math.round(100f * getResources().getDisplayMetrics().density);
+        final float density = getResources().getDisplayMetrics().density;
+        final int threshold = Math.round(100f * density);
         web.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
             private int lastInset = -1;
             private boolean lastOpen = false;
@@ -505,8 +506,17 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             public void onGlobalLayout() {
                 if (web == null) return;
                 web.getWindowVisibleDisplayFrame(visible);
+
+                // With adjustResize the WebView itself may shrink, so comparing only
+                // rootView.height to the visible frame can report zero. Use the physical
+                // display height as a second signal and keep a generous threshold so
+                // status/navigation bars are not mistaken for the IME.
+                int screenHeight = getResources().getDisplayMetrics().heightPixels;
                 int rootHeight = web.getRootView().getHeight();
-                int inset = Math.max(0, rootHeight - visible.bottom);
+                int byScreen = Math.max(0, screenHeight - visible.bottom);
+                int byRoot = Math.max(0, rootHeight - visible.bottom);
+                int inset = Math.max(byScreen, byRoot);
+
                 boolean open = inset > threshold;
                 int effective = open ? inset : 0;
                 if (effective == lastInset && open == lastOpen) return;
