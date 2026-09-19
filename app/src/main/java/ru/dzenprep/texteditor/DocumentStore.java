@@ -34,6 +34,7 @@ public final class DocumentStore {
         versionsDir = new File(root, "versions");
         articlesDir.mkdirs();
         versionsDir.mkdirs();
+        recoverAtomicFiles(root);
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
@@ -62,6 +63,7 @@ public final class DocumentStore {
     public synchronized boolean setActiveArticle(String rawId) {
         String id = safeId(rawId);
         if (id.isEmpty() || !articleFile(id).exists()) return false;
+        cleanupTransientEmptyActiveArticle();
         prefs.edit().putString(ACTIVE_KEY, id).apply();
         return true;
     }
@@ -295,6 +297,33 @@ public final class DocumentStore {
                 try { reason = readUtf8(meta); } catch (Exception ignored) { }
                 if (reason.startsWith("Авто")) out.add(file);
             }
+        }
+    }
+
+    private void recoverAtomicFiles(File root) {
+        File[] children = root == null ? null : root.listFiles();
+        if (children == null) return;
+        for (File child : children) {
+            if (child.isDirectory()) {
+                recoverAtomicFiles(child);
+                continue;
+            }
+            String name = child.getName();
+            try {
+                if (name.endsWith(".bak")) {
+                    File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
+                    if (target.exists()) {
+                        child.delete();
+                    } else {
+                        child.renameTo(target);
+                    }
+                } else if (name.endsWith(".tmp")) {
+                    File target = new File(child.getParentFile(), name.substring(0, name.length() - 4));
+                    if (target.exists()) {
+                        child.delete();
+                    }
+                }
+            } catch (Exception ignored) { }
         }
     }
 
