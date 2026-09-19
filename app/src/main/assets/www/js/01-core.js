@@ -21,7 +21,9 @@ function updateFallbackKeyboardState(){
 
 window.onNativeKeyboardInset=function(_inset,open){
   nativeKeyboardOpen=!!open;
+  if(!nativeKeyboardOpen)fallbackKeyboardOpen=false;
   applyKeyboardState();
+  if(!nativeKeyboardOpen)setTimeout(updateFallbackKeyboardState,40);
 };
 
 if(window.visualViewport){
