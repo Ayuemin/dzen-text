@@ -103,8 +103,8 @@ async function ideaAsText(id){
       false
     );
     if(!ok)return;
-    if(typeof preserveCurrentArticleBeforeSwitch==='function'&&!preserveCurrentArticleBeforeSwitch('Перед статьёй из идеи'))return;
   }
+  if(typeof preserveCurrentArticleBeforeSwitch==='function'&&!preserveCurrentArticleBeforeSwitch('Перед статьёй из идеи'))return;
 
   if(documentsAvailable()){
     const previousId=activeArticleId;
