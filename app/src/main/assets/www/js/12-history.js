@@ -128,9 +128,17 @@ function saveVersionSnapshot(reason,silent){
   if(nativeVersionsAvailable()){
     try{
       const result=JSON.parse(AndroidDocuments.saveVersion(activeArticleId,String(reason),text)||'{}');
+      if(result.ok){
+        if(!silent)toast('Версия сохранена');
+        return true;
+      }
+      if(result.duplicate){
+        if(!silent)toast('Такая версия уже сохранена');
+        return true;
+      }
       if(result.limit&&!silent)toast('История версий достигла лимита 100 МБ');
-      if(result.ok&&!silent)toast('Версия сохранена');
-      return !!result.ok;
+      if(result.error&&!silent)toast('Не удалось сохранить версию');
+      return false;
     }catch(e){
       if(!silent)toast('Не удалось сохранить версию');
       return false;
@@ -139,7 +147,10 @@ function saveVersionSnapshot(reason,silent){
 
   try{
     const list=legacyVersions();
-    if(list[0]&&list[0].text===text)return false;
+    if(list[0]&&list[0].text===text){
+      if(!silent)toast('Такая версия уже сохранена');
+      return true;
+    }
     list.unshift({id:String(Date.now()),ts:Date.now(),reason:String(reason),text:text});
     while(list.length>12)list.pop();
     localStorage.setItem(LEGACY_VERSIONS_KEY,JSON.stringify(list));
@@ -152,8 +163,15 @@ function saveVersionSnapshot(reason,silent){
 
 function saveVersionNow(){
   if(!editor.value.trim()){toast('Нет текста для сохранения');return}
-  if(!saveVersionSnapshot('Вручную',false))toast('Такая версия уже сохранена или история заполнена');
+  saveVersionSnapshot('Вручную',false);
   renderVersions();
+}
+
+function ensureProtectiveVersion(reason){
+  if(!editor.value.trim())return true;
+  const safe=saveVersionSnapshot(reason||'Защитная версия',true);
+  if(!safe)toast('Не удалось сохранить защитную версию. Действие отменено');
+  return safe;
 }
 
 function versionsPayload(){
@@ -233,7 +251,7 @@ async function restoreVersion(id){
   if(!text)return;
   const ok=await appConfirm('Восстановить версию?','Текущий текст сначала сохранится отдельной версией.','Восстановить',false);
   if(!ok)return;
-  saveVersionSnapshot('Перед восстановлением',true);
+  if(!ensureProtectiveVersion('Перед восстановлением'))return;
   historyCheckpoint();
   historyRestoring=true;
   editor.value=text;
