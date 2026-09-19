@@ -1,4 +1,4 @@
-function openSettings(){syncSettingsUI();updateDictStatus();updateDzenRulesStatus();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
+function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateDzenRulesStatus();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
 function closeSettings(){document.getElementById('settingsBackdrop').classList.remove('open')}
 function backdropClick(e){if(e.target.id==='settingsBackdrop')closeSettings()}
 let cachedCustomBackground='';
@@ -101,7 +101,7 @@ async function applySettings(){
   if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);
   localStorage.setItem('dzenSettings',JSON.stringify(settings));
   applyVisualSettings();
-  render();
+  render(false,document.getElementById('previewPane').classList.contains('active'));
   updateSettingLabels();
 }
 function updateSettingLabels(){backgroundVeilVal.textContent=Math.round(Number(settings.backgroundVeil||0)*100)+'%';const sw=document.getElementById('accentPreview');if(sw)sw.style.background=normalizeAccentHex(settings.accent);const names={system:'Системный',serif:'Книжный',classic:'Классический',sans:'Нейтральный',mono:'Моно',custom:'Свой'};fontVal.textContent=names[settings.font];sizeVal.textContent=settings.size+' px';lineVal.textContent=Number(settings.line).toFixed(2);wpmVal.textContent=settings.wpm+' слов/мин';ttsVal.textContent=Number(settings.tts).toFixed(2)+'×';headingVal.textContent=`${settings.headingMin}–${settings.headingMax} знаков`;sentenceVal.textContent=`>${settings.sentenceMax} слов`;paragraphVal.textContent=`>${settings.paragraphMax} знаков`;frequentVal.textContent=`${settings.frequentMin}+`;structureVal.textContent=`>${settings.structureMax} знаков`}
