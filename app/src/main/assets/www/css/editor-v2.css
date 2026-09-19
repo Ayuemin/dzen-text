@@ -888,4 +888,20 @@ body.markdown-toolbar-visible .issueNavPanel{bottom:57px}
   margin-top:10px;
   flex:0 0 auto;
 }
+.drawerNewArticle{
+  flex:0 0 auto;
+  width:100%;
+  min-height:46px;
+  margin:12px 0 0;
+  padding:0 13px;
+  border:1px solid color-mix(in srgb,var(--accent) 24%,transparent);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--accent) 10%,transparent);
+  color:var(--accent);
+  text-align:left;
+  font:700 14.5px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+.drawerNewArticle:active{
+  background:color-mix(in srgb,var(--accent) 16%,transparent);
+}
 
