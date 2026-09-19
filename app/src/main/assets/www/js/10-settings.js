@@ -8,7 +8,65 @@ function chooseBackground(){if(window.AndroidFile&&typeof AndroidFile.pickBackgr
 function clearCustomBackground(){try{if(window.AndroidFile&&typeof AndroidFile.clearBackground==='function')AndroidFile.clearBackground()}catch(e){}cachedCustomBackground='';settings.paper='gray';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Свой фон удалён')}
 window.onNativeBackgroundChanged=()=>{cachedCustomBackground='';settings.paper='custom';localStorage.setItem('dzenSettings',JSON.stringify(settings));syncSettingsUI();applyVisualSettings();toast('Фон обновлён')};
 function syncSettingsUI(){paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus()}
-function applySettings(){let wantsOnline=onlineSpelling.checked;if(wantsOnline&&!settings.onlineSpelling){if(!confirm('Включить онлайн-проверку? При нажатии ✓ текст будет отправляться в Яндекс.Спеллер для проверки орфографии. Автоматически при наборе или вставке текст не отправляется.')){wantsOnline=false;onlineSpelling.checked=false}}settings={...settings,paper:paperSelect.value,accent:normalizeAccentHex(accentHex.value),backgroundVeil:+backgroundVeil.value,backgroundText:backgroundTextSelect.value,font:fontSelect.value,size:+sizeRange.value,line:+lineRange.value,theme:themeSelect.value,wpm:+wpmRange.value,tts:+ttsRange.value,autosave:autosaveSwitch.checked,showCode:codeSwitch.checked,proofCheck:proofCheck.checked,onlineSpelling:wantsOnline,headingCheck:headingCheck.checked,headingMin:+headingMin.value,headingMax:+headingMax.value,sentenceCheck:sentenceCheck.checked,sentenceMax:+sentenceMax.value,paragraphCheck:paragraphCheck.checked,paragraphMax:+paragraphMax.value,frequentCheck:frequentCheck.checked,frequentMin:+frequentMin.value,nearbyCheck:nearbyCheck.checked,structureCheck:structureCheck.checked,structureMax:+structureMax.value,phraseCheck:phraseCheck.checked,openingCheck:openingCheck.checked,headingStructureCheck:headingStructureCheck.checked,markdownCheck:markdownCheck.checked,aiStyleCheck:aiStyleCheck.checked,dzenCheck:dzenCheck.checked,dzenSmartRules:dzenSmartRules.checked,riskCheck:riskCheck.checked,riskWords:riskWords.value};if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);localStorage.setItem('dzenSettings',JSON.stringify(settings));applyVisualSettings();render();updateSettingLabels()}
+async function applySettings(){
+  let wantsOnline=onlineSpelling.checked;
+  if(wantsOnline&&!settings.onlineSpelling){
+    const ok=await appConfirm(
+      'Включить онлайн-проверку?',
+      'Текст будет отправляться в Яндекс.Спеллер только после нажатия кнопки проверки. При наборе и вставке ничего не отправляется.',
+      'Включить',
+      false
+    );
+    if(!ok){
+      wantsOnline=false;
+      onlineSpelling.checked=false;
+    }
+  }
+
+  settings={
+    ...settings,
+    paper:paperSelect.value,
+    accent:normalizeAccentHex(accentHex.value),
+    backgroundVeil:+backgroundVeil.value,
+    backgroundText:backgroundTextSelect.value,
+    font:fontSelect.value,
+    size:+sizeRange.value,
+    line:+lineRange.value,
+    theme:themeSelect.value,
+    wpm:+wpmRange.value,
+    tts:+ttsRange.value,
+    autosave:autosaveSwitch.checked,
+    showCode:codeSwitch.checked,
+    proofCheck:proofCheck.checked,
+    onlineSpelling:wantsOnline,
+    headingCheck:headingCheck.checked,
+    headingMin:+headingMin.value,
+    headingMax:+headingMax.value,
+    sentenceCheck:sentenceCheck.checked,
+    sentenceMax:+sentenceMax.value,
+    paragraphCheck:paragraphCheck.checked,
+    paragraphMax:+paragraphMax.value,
+    frequentCheck:frequentCheck.checked,
+    frequentMin:+frequentMin.value,
+    nearbyCheck:nearbyCheck.checked,
+    structureCheck:structureCheck.checked,
+    structureMax:+structureMax.value,
+    phraseCheck:phraseCheck.checked,
+    openingCheck:openingCheck.checked,
+    headingStructureCheck:headingStructureCheck.checked,
+    markdownCheck:markdownCheck.checked,
+    aiStyleCheck:aiStyleCheck.checked,
+    dzenCheck:dzenCheck.checked,
+    dzenSmartRules:dzenSmartRules.checked,
+    riskCheck:riskCheck.checked,
+    riskWords:riskWords.value
+  };
+  if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);
+  localStorage.setItem('dzenSettings',JSON.stringify(settings));
+  applyVisualSettings();
+  render();
+  updateSettingLabels();
+}
 function updateSettingLabels(){backgroundVeilVal.textContent=Math.round(Number(settings.backgroundVeil||0)*100)+'%';const sw=document.getElementById('accentPreview');if(sw)sw.style.background=normalizeAccentHex(settings.accent);const names={system:'Системный',serif:'Книжный',classic:'Классический',sans:'Нейтральный',mono:'Моно'};fontVal.textContent=names[settings.font];sizeVal.textContent=settings.size+' px';lineVal.textContent=Number(settings.line).toFixed(2);wpmVal.textContent=settings.wpm+' слов/мин';ttsVal.textContent=Number(settings.tts).toFixed(2)+'×';headingVal.textContent=`${settings.headingMin}–${settings.headingMax} знаков`;sentenceVal.textContent=`>${settings.sentenceMax} слов`;paragraphVal.textContent=`>${settings.paragraphMax} знаков`;frequentVal.textContent=`${settings.frequentMin}+`;structureVal.textContent=`>${settings.structureMax} знаков`}
 function resetRiskWords(){riskWords.value=exampleRiskWords;applySettings();toast('Пример списка восстановлен')}
 function clearRiskWords(){riskWords.value='';applySettings();toast('Список очищен')}
