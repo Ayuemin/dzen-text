@@ -100,9 +100,14 @@ function setEditorTextForArticle(text,focus){
 }
 
 function createNewArticle(){
+  const previousId=activeArticleId;
+  const hadText=!!editor.value.trim();
   persistCurrentArticleNow();
-  if(editor.value.trim()&&typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед новой статьёй',true);
+  if(hadText&&typeof saveVersionSnapshot==='function')saveVersionSnapshot('Перед новой статьёй',true);
   if(documentsAvailable()){
+    if(!hadText&&previousId){
+      try{AndroidDocuments.deleteArticle(previousId)}catch(e){}
+    }
     activeArticleId=String(AndroidDocuments.createArticle()||'');
   }else{
     activeArticleId='local_'+Date.now();
