@@ -65,6 +65,27 @@ window.addEventListener('orientationchange',function(){
   },350);
 });
 setTimeout(updateFallbackKeyboardState,0);
+
+let sheetFocusRevealTimer=null;
+function keepFocusedSheetFieldVisible(){
+  clearTimeout(sheetFocusRevealTimer);
+  sheetFocusRevealTimer=setTimeout(function(){
+    const active=document.activeElement;
+    if(!active||active===document.body||active===editor)return;
+    const sheet=active.closest&&active.closest('.sheet');
+    if(!sheet||!sheet.parentElement||!sheet.parentElement.classList.contains('open'))return;
+    try{active.scrollIntoView({block:'center',inline:'nearest',behavior:'smooth'})}catch(e){
+      try{active.scrollIntoView(false)}catch(_e){}
+    }
+  },90);
+}
+document.addEventListener('focusin',function(event){
+  if(event.target&&event.target.closest&&event.target.closest('.sheet'))keepFocusedSheetFieldVisible();
+});
+window.addEventListener('dzenKeyboardState',function(event){
+  if(event.detail&&event.detail.open)keepFocusedSheetFieldVisible();
+});
+
 const editor=document.getElementById('editor'), preview=document.getElementById('preview'), htmlCode=document.getElementById('htmlCode');
 const exampleRiskWords='VPN\nВПН\nобход\nобход блокировок\nразблокировка\nпрокси\nанонимайзер';
 const defaultSettings={font:'serif',size:19,line:1.7,theme:'system',paper:'gray',accent:'#D65C43',backgroundVeil:0.6,backgroundText:'dark',customBackgroundId:'',wpm:200,tts:1.0,autosave:true,showCode:false,markdownToolbar:true,headingCheck:true,headingMin:8,headingMax:80,sentenceCheck:true,sentenceMax:30,paragraphCheck:true,paragraphMax:650,frequentCheck:true,frequentMin:8,nearbyCheck:true,structureCheck:true,structureMax:1800,phraseCheck:true,openingCheck:true,headingStructureCheck:true,markdownCheck:true,aiStyleCheck:true,proofCheck:true,onlineSpelling:false,dzenCheck:true,dzenSmartRules:true,riskCheck:true,riskWords:exampleRiskWords};
