@@ -33,7 +33,13 @@ function loadIdeas(){
 }
 
 function saveIdeas(value){
-  localStorage.setItem(IDEAS_KEY,JSON.stringify(value));
+  try{
+    localStorage.setItem(IDEAS_KEY,JSON.stringify(value));
+    return true;
+  }catch(e){
+    toast('Не удалось сохранить идеи: локальное хранилище недоступно');
+    return false;
+  }
 }
 
 function openIdeas(){
@@ -57,7 +63,7 @@ function saveQuickIdea(){
   if(!text){toast('Сначала запишите идею');return}
   const ideas=loadIdeas();
   ideas.unshift({id:String(Date.now())+'_'+Math.random().toString(36).slice(2),text:text,created:Date.now()});
-  saveIdeas(ideas.slice(0,300));
+  if(!saveIdeas(ideas.slice(0,300)))return;
   input.value='';
   renderIdeas();
   toast('Идея сохранена');
@@ -65,7 +71,7 @@ function saveQuickIdea(){
 
 async function deleteIdea(id){
   if(!await appConfirm('Удалить идею?','Идея будет удалена без переноса в текст.','Удалить',true))return;
-  saveIdeas(loadIdeas().filter(function(x){return x.id!==id}));
+  if(!saveIdeas(loadIdeas().filter(function(x){return x.id!==id})))return;
   renderIdeas();
 }
 
