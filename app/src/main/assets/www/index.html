@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
 <body>
+<div class="systemBarScrim" aria-hidden="true"></div>
 <div class="app">
   <header class="top">
     <div class="brand"><span class="mark"></span><span>Дзен Текст</span></div>
@@ -33,6 +34,7 @@
     <button type="button" id="quickSpeakBtn" onclick="quickSpeak()">Озвучить</button>
     <button type="button" onclick="quickCheck()">Проверить текст</button>
     <button type="button" onclick="quickImport()">Импортировать файл</button>
+    <button type="button" onclick="openVersions()">Версии текста</button>
     <button type="button" onclick="quickSettings()">Настройки</button>
     <button type="button" class="dangerText" onclick="quickClear()">Очистить текст</button>
   </div>
@@ -75,6 +77,9 @@
   </main>
   <div class="markdownToolbar" id="markdownToolbar" aria-label="Панель Markdown">
     <div class="markdownToolbarScroll">
+      <button type="button" class="mdBtn mdHistory" id="undoBtn" onclick="undoEdit()" aria-label="Отменить" title="Отменить">↶</button>
+      <button type="button" class="mdBtn mdHistory" id="redoBtn" onclick="redoEdit()" aria-label="Повторить" title="Повторить">↷</button>
+      <span class="mdDivider" aria-hidden="true"></span>
       <button type="button" class="mdBtn mdStrong" onclick="applyMarkdown('bold')" aria-label="Жирный" title="Жирный">B</button>
       <button type="button" class="mdBtn mdItalic" onclick="applyMarkdown('italic')" aria-label="Курсив" title="Курсив">I</button>
       <button type="button" class="mdBtn" onclick="applyMarkdown('h2')" aria-label="Подзаголовок" title="Подзаголовок">H2</button>
@@ -124,95 +129,171 @@
   </div>
 </div>
 
-<div class="sheetBackdrop" id="settingsBackdrop" onclick="backdropClick(event)"><div class="sheet">
-  <div class="handle"></div><div class="sheetHeader"><h2>Настройки</h2><button class="sheetClose" type="button" onclick="closeSettings()" aria-label="Закрыть настройки">×</button></div>
+<div class="sheetBackdrop" id="settingsBackdrop" onclick="backdropClick(event)"><div class="sheet settingsSheet">
+  <div class="handle"></div>
+  <div class="sheetHeader"><h2>Настройки</h2><button class="sheetClose" type="button" onclick="closeSettings()" aria-label="Закрыть настройки">×</button></div>
 
-  <div class="setting appearanceSetting">
-    <details open>
-      <summary>Оформление редактора</summary>
-      <div class="subLabel"><span>Фон</span></div>
-      <select id="paperSelect" onchange="applySettings()">
-        <option value="white">Белый лист</option>
-        <option value="gray">Светло-серый</option>
-        <option value="old">Старая бумага</option>
-        <option value="news">Газетный лист</option>
-        <option value="dark">Тёмный</option>
-        <option value="custom">Свой фон</option>
-      </select>
-      <div class="settingActions backgroundActions">
-        <button class="nativeBtn" type="button" onclick="chooseBackground()">Выбрать изображение</button>
-        <button class="nativeBtn" type="button" onclick="clearCustomBackground()">Удалить свой фон</button>
+  <div class="settingsGroupWrap">
+    <details class="settingsGroup" open>
+      <summary><span>Оформление</span><small>Фон, шрифт, цвет и размер текста</small></summary>
+      <div class="settingsGroupBody">
+        <div class="subLabel"><span>Фон редактора</span></div>
+        <select id="paperSelect" onchange="applySettings()">
+          <option value="white">Белый лист</option>
+          <option value="gray">Светло-серый</option>
+          <option value="old">Старая бумага</option>
+          <option value="news">Газетный лист</option>
+          <option value="dark">Тёмный</option>
+          <option value="custom">Свой фон</option>
+        </select>
+        <div class="settingActions backgroundActions">
+          <button class="nativeBtn" type="button" onclick="chooseBackground()">Выбрать изображение</button>
+          <button class="nativeBtn" type="button" onclick="clearCustomBackground()">Удалить свой фон</button>
+        </div>
+
+        <div class="subLabel"><span>Подложка своего фона</span><span class="val" id="backgroundVeilVal"></span></div>
+        <input id="backgroundVeil" type="range" min="0" max="0.9" step="0.05" oninput="applySettings()">
+
+        <div class="subLabel"><span>Текст на своём фоне</span></div>
+        <select id="backgroundTextSelect" onchange="applySettings()">
+          <option value="dark">Тёмный</option>
+          <option value="light">Светлый</option>
+        </select>
+
+        <div class="subLabel"><span>Акцентный цвет</span></div>
+        <div class="accentRow"><input id="accentHex" type="text" inputmode="text" maxlength="7" placeholder="#D65C43" onchange="applySettings()"><span id="accentPreview" class="accentPreview"></span></div>
+
+        <div class="subLabel"><span>Шрифт</span><span class="val" id="fontVal"></span></div>
+        <select id="fontSelect" onchange="applySettings()">
+          <option value="serif">Книжный</option>
+          <option value="classic">Классический</option>
+          <option value="system">Системный</option>
+          <option value="sans">Нейтральный</option>
+          <option value="mono">Моноширинный</option>
+        </select>
+
+        <div class="subLabel"><span>Размер текста</span><span class="val" id="sizeVal"></span></div>
+        <input id="sizeRange" type="range" min="14" max="26" step="1" oninput="applySettings()">
+
+        <div class="subLabel"><span>Межстрочный интервал</span><span class="val" id="lineVal"></span></div>
+        <input id="lineRange" type="range" min="1.25" max="2.0" step="0.05" oninput="applySettings()">
+
+        <div class="subLabel"><span>Тема интерфейса</span></div>
+        <select id="themeSelect" onchange="applySettings()">
+          <option value="system">Как в телефоне</option>
+          <option value="light">Светлая</option>
+          <option value="dark">Тёмная</option>
+        </select>
+        <div class="smallNote">Акцент меняет только управляющие элементы. Цвет текста задаётся отдельно от него.</div>
       </div>
-      <div class="subLabel"><span>Подложка своего фона</span><span class="val" id="backgroundVeilVal"></span></div>
-      <input id="backgroundVeil" type="range" min="0" max="0.9" step="0.05" oninput="applySettings()">
-      <div class="subLabel"><span>Текст на своём фоне</span></div>
-      <select id="backgroundTextSelect" onchange="applySettings()">
-        <option value="dark">Тёмный</option>
-        <option value="light">Светлый</option>
-      </select>
-      <div class="subLabel"><span>Акцентный цвет</span></div>
-      <div class="accentRow"><input id="accentHex" type="text" inputmode="text" maxlength="7" placeholder="#D65C43" onchange="applySettings()"><span id="accentPreview" class="accentPreview"></span></div>
-      <div class="smallNote">Акцент влияет только на кнопки и выделения. Цвет основного текста задаётся фоном отдельно, поэтому читаемость не зависит от выбранного акцента.</div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Чтение и озвучка</span><small>Скорость чтения и голос</small></summary>
+      <div class="settingsGroupBody">
+        <div class="subLabel"><span>Скорость чтения для расчёта</span><span class="val" id="wpmVal"></span></div>
+        <input id="wpmRange" type="range" min="120" max="300" step="10" oninput="applySettings()">
+        <div class="subLabel"><span>Скорость озвучки</span><span class="val" id="ttsVal"></span></div>
+        <input id="ttsRange" type="range" min="0.7" max="1.3" step="0.05" oninput="applySettings()">
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Сохранение и предпросмотр</span><small>Черновик, версии и HTML</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Автосохранение черновика</span><input id="autosaveSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Текст хранится только на этом устройстве.</div>
+        <div class="switchRow" style="margin-top:13px"><span>Показывать HTML-код в превью</span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button></div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Редакторский анализ</span><small>Длина, повторы, структура и Markdown</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Проверять заголовки</span><input id="headingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="subLabel"><span>Длина заголовка</span><span class="val" id="headingVal"></span></div><input id="headingMin" class="rangeCompact" type="range" min="3" max="30" step="1" oninput="applySettings()"><input id="headingMax" class="rangeCompact" type="range" min="40" max="140" step="5" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span>Длинные предложения</span><input id="sentenceCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="sentenceVal"></span></div><input id="sentenceMax" type="range" min="18" max="55" step="1" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span>Длинные абзацы</span><input id="paragraphCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="paragraphVal"></span></div><input id="paragraphMax" type="range" min="250" max="1400" step="50" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span>Частые слова</span><input id="frequentCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>От скольких повторов</span><span class="val" id="frequentVal"></span></div><input id="frequentMin" type="range" min="4" max="20" step="1" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span>Повторы в соседних предложениях</span><input id="nearbyCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Большие участки без подзаголовков</span><input id="structureCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="structureVal"></span></div><input id="structureMax" type="range" min="800" max="3500" step="100" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span>Повторяющиеся фразы</span><input id="phraseCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Одинаковые начала предложений и абзацев</span><input id="openingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Структура H1–H3</span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Ошибки Markdown</span><input id="markdownCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Признаки ИИ-стиля</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Локальный фильтр отмечает типографические признаки, характерные для машинного текста. Смысловые шаблоны автоматически не оцениваются.</div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Проверка текста</span><small>Опечатки и Яндекс.Спеллер</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Онлайн-проверка орфографии</span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Онлайн-проверка выполняется только после нажатия кнопки проверки. При наборе текст наружу не отправляется.</div>
+        <div id="spellIgnoreStatus" class="dictStatus">Мои правильные слова: 0</div>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button></div>
+        <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Правила Дзена</span><small>Локальная проверка возможных рисков</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Проверять возможные риски</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span>Использовать обновляемую ИИ-базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Текст статьи в OpenRouter не отправляется. Приложение получает с GitHub только компактную базу правил.</div>
+        <div id="dzenRulesStatus" class="ruleStatus"></div>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить умную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Словарь синонимов</span><small>Встроенный и пользовательский словари</small></summary>
+      <div class="settingsGroupBody">
+        <div class="smallNote">Большой русский словарь встроен и работает без интернета. Свой JSON/TXT можно подключить поверх него.</div>
+        <div id="dictStatus" class="dictStatus">Встроенный словарь загружается…</div>
+        <div id="userSynonymStatus" class="dictStatus">Свои синонимы: пока нет</div>
+        <details class="nestedDetails" style="margin:8px 0"><summary>Мои накопленные синонимы</summary><div id="userSynonymList" class="smallNote" style="max-height:130px;overflow:auto;white-space:pre-line">Пока пусто.</div></details>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="chooseSynonymDictionary()">Импортировать свой</button><button class="nativeBtn" type="button" onclick="clearSynonymDictionary()">Удалить внешний</button><button class="nativeBtn" type="button" onclick="clearUserSynonyms()">Очистить накопленные</button></div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
+      <summary><span>Контроль слов</span><small>Свой список слов и фраз</small></summary>
+      <div class="settingsGroupBody">
+        <div class="switchRow"><span>Проверять риск-слова</span><input id="riskCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Это ваш редакторский список. По одному слову или фразе на строку.</div>
+        <textarea id="riskWords" class="riskArea" oninput="applySettings()" placeholder="VPN&#10;ВПН&#10;обход"></textarea>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="resetRiskWords()">Вернуть пример</button><button class="nativeBtn" type="button" onclick="clearRiskWords()">Очистить</button></div>
+      </div>
     </details>
   </div>
-  <div class="setting"><label>Шрифт <span class="val" id="fontVal"></span></label><select id="fontSelect" onchange="applySettings()"><option value="serif">Книжный</option><option value="classic">Классический</option><option value="system">Системный</option><option value="sans">Нейтральный</option><option value="mono">Моноширинный</option></select></div>
-  <div class="setting"><label>Размер текста <span class="val" id="sizeVal"></span></label><input id="sizeRange" type="range" min="14" max="26" step="1" oninput="applySettings()"></div>
-  <div class="setting"><label>Межстрочный интервал <span class="val" id="lineVal"></span></label><input id="lineRange" type="range" min="1.25" max="2.0" step="0.05" oninput="applySettings()"></div>
-  <div class="setting"><label>Тема</label><select id="themeSelect" onchange="applySettings()"><option value="system">Как в телефоне</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></div>
-  <div class="setting"><label>Скорость чтения для расчёта <span class="val" id="wpmVal"></span></label><input id="wpmRange" type="range" min="120" max="300" step="10" oninput="applySettings()"></div>
-  <div class="setting"><label>Скорость озвучки <span class="val" id="ttsVal"></span></label><input id="ttsRange" type="range" min="0.7" max="1.3" step="0.05" oninput="applySettings()"></div>
-  <div class="setting"><div class="switchRow"><span>Автосохранение черновика</span><input id="autosaveSwitch" class="switch" type="checkbox" onchange="applySettings()"></div><div class="smallNote">Текст хранится только на этом устройстве.</div></div>
-  <div class="setting"><div class="switchRow"><span>Показывать HTML-код в превью</span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div></div>
-  <div class="setting"><details open><summary>Редакторский анализ</summary>
-    <div class="switchRow"><span>Проверять заголовки</span><input id="headingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="subLabel"><span>Длина заголовка</span><span class="val" id="headingVal"></span></div><input id="headingMin" class="rangeCompact" type="range" min="3" max="30" step="1" oninput="applySettings()"><input id="headingMax" class="rangeCompact" type="range" min="40" max="140" step="5" oninput="applySettings()">
-    <div class="switchRow" style="margin-top:13px"><span>Длинные предложения</span><input id="sentenceCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="sentenceVal"></span></div><input id="sentenceMax" type="range" min="18" max="55" step="1" oninput="applySettings()">
-    <div class="switchRow" style="margin-top:13px"><span>Длинные абзацы</span><input id="paragraphCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="paragraphVal"></span></div><input id="paragraphMax" type="range" min="250" max="1400" step="50" oninput="applySettings()">
-    <div class="switchRow" style="margin-top:13px"><span>Частые слова</span><input id="frequentCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>От скольких повторов</span><span class="val" id="frequentVal"></span></div><input id="frequentMin" type="range" min="4" max="20" step="1" oninput="applySettings()">
-    <div class="switchRow" style="margin-top:13px"><span>Повторы в соседних предложениях</span><input id="nearbyCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Большие участки без подзаголовков</span><input id="structureCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="structureVal"></span></div><input id="structureMax" type="range" min="800" max="3500" step="100" oninput="applySettings()">
-    <div class="switchRow" style="margin-top:13px"><span>Повторяющиеся фразы</span><input id="phraseCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Одинаковые начала предложений и абзацев</span><input id="openingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Структура H1–H3</span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Ошибки Markdown</span><input id="markdownCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Признаки ИИ-стиля</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="smallNote">Локальный фильтр проверяет только типографические символы, характерные для машинного текста. Сейчас отмечается длинное тире «—». Словосочетания, клише и смысловые шаблоны здесь не анализируются.</div>
-  </details></div>
-  <div class="setting"><details><summary>Проверка текста</summary>
-    <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Онлайн-проверка орфографии</span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="smallNote">Онлайн-проверка по умолчанию выключена. Если включить её, текст отправляется в Яндекс.Спеллер только после нажатия кнопки ✓. Автоматический анализ после вставки и загрузки файла остаётся локальным.</div>
-    <div id="spellIgnoreStatus" class="dictStatus">Мои правильные слова: 0</div>
-    <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button></div>
-    <div class="smallNote">Если Спеллер ошибочно считает правильное слово ошибкой, откройте замечание и нажмите «Не ошибка · запомнить». Слово останется только на устройстве.</div>
-    <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
-  </details></div>
-  <div class="setting"><details><summary>Правила Дзена</summary>
-    <div class="switchRow"><span>Проверять возможные риски</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="switchRow" style="margin-top:13px"><span>Использовать обновляемую ИИ-базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="smallNote">Это предварительная локальная проверка. Обновляемая база строится на GitHub Actions из официальных правил Дзена с помощью OpenRouter. Текст вашей статьи в OpenRouter не отправляется.</div>
-    <div id="dzenRulesStatus" class="ruleStatus"></div>
-    <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить умную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
-    <div class="smallNote">Источник истины — официальная справка Дзена. Приложение получает с GitHub только уже обработанную компактную базу. Функцию можно отключить выше; встроенная база всегда остаётся офлайн.</div>
-  </details></div>
-  <div class="setting"><details><summary>Словарь синонимов</summary>
-    <div class="smallNote">Большой русский словарь уже встроен в приложение и работает без интернета. При желании можно подключить свой JSON/TXT-словарь поверх встроенного. Поддерживается обычная карта «слово → синонимы» и JSON словаря Н. Абрамова с полем <b>wordlist</b>.</div>
-    <div id="dictStatus" class="dictStatus">Встроенный словарь загружается…</div>
-    <div id="userSynonymStatus" class="dictStatus">Свои синонимы: пока нет</div>
-    <details style="margin:8px 0"><summary>Мои накопленные синонимы</summary><div id="userSynonymList" class="smallNote" style="max-height:130px;overflow:auto;white-space:pre-line">Пока пусто.</div></details>
-    <div class="settingActions"><button class="nativeBtn" type="button" onclick="chooseSynonymDictionary()">Импортировать свой</button><button class="nativeBtn" type="button" onclick="clearSynonymDictionary()">Удалить внешний</button><button class="nativeBtn" type="button" onclick="clearUserSynonyms()">Очистить накопленные</button></div>
-    <div class="smallNote">Замена, введённая вручную в поле «Своя замена», автоматически запоминается для этого слова и в следующий раз показывается первой. Эти пары не удаляются при очистке текста и сохраняются при обновлении приложения.</div>
-    <div class="smallNote">Если найдено слово в другой форме, приложение пытается подобрать начальную форму и сохранить падеж/число у предлагаемой замены. Для сложных словоформ результат лучше проверить глазами.</div>
-  </details></div>
-  <div class="setting"><details><summary>Контроль слов</summary>
-    <div class="switchRow"><span>Проверять риск-слова</span><input id="riskCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-    <div class="smallNote">Это ваш редакторский список, а не юридический перечень запрещённых слов. По одному слову или фразе на строку.</div>
-    <textarea id="riskWords" class="riskArea" oninput="applySettings()" placeholder="VPN
-ВПН
-обход"></textarea>
-    <div class="settingActions"><button class="nativeBtn" type="button" onclick="resetRiskWords()">Вернуть пример</button><button class="nativeBtn" type="button" onclick="clearRiskWords()">Очистить</button></div>
-  </details></div>
 </div></div>
+
+<div class="sheetBackdrop" id="versionsBackdrop" onclick="versionsBackdropClick(event)">
+  <div class="sheet versionsSheet">
+    <div class="handle"></div>
+    <div class="sheetHeader"><h2>Версии текста</h2><button class="sheetClose" type="button" onclick="closeVersions()" aria-label="Закрыть версии">×</button></div>
+    <div class="versionIntro">Автоматические снимки сохраняются локально во время работы. Перед импортом, очисткой и восстановлением создаётся дополнительная версия.</div>
+    <button class="nativeBtn versionSaveNow" type="button" onclick="saveVersionNow()">Сохранить текущую версию</button>
+    <div id="versionsList" class="versionsList"></div>
+  </div>
+</div>
+
+<div class="dialogBackdrop" id="confirmBackdrop" onclick="confirmBackdropClick(event)">
+  <div class="appDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h3 id="confirmTitle">Подтвердите действие</h3>
+    <p id="confirmText"></p>
+    <div class="dialogActions">
+      <button type="button" class="dialogCancel" onclick="resolveAppConfirm(false)">Отмена</button>
+      <button type="button" class="dialogOk" id="confirmOk" onclick="resolveAppConfirm(true)">Продолжить</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheetBackdrop" id="analysisBackdrop" onclick="analysisBackdropClick(event)"><div class="sheet analysisSheet">
   <div class="handle"></div><div class="sheetHeader"><h2>Редакторский анализ</h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
   <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
@@ -231,6 +312,9 @@
 <script src="js/08-navigation.js"></script>
 <script src="js/09-editor.js"></script>
 <script src="js/10-settings.js"></script>
-<script src="js/11-ui.js"></script>\n<script src="js/12-markdown-toolbar.js"></script>
+<script src="js/11-ui.js"></script>
+<script src="js/12-dialogs.js"></script>
+<script src="js/12-history.js"></script>
+<script src="js/12-markdown-toolbar.js"></script>
 <script src="js/12-bootstrap.js"></script>
 </body></html>
