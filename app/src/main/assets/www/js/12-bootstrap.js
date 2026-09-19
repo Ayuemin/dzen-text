@@ -12,7 +12,7 @@ function bootstrapDzenText(){
     if(replacementState)closeReplacement();
     if(nearbyState)closeNearbyRepeat();
     if(repeatNavState)closeRepeatNavigator();
-    if(typeof issueNavState!=='undefined'&&issueNavState)closeIssueNavigator();
+    if(typeof issueNavState!=='undefined'&&issueNavState&&typeof scheduleIssueNavigatorRefresh==='function')scheduleIssueNavigatorRefresh();
     if(spellNavState)closeSpellPanel();
     const pasted=inputWasPaste;
     inputWasPaste=false;
