@@ -48,7 +48,7 @@ if dupe_callbacks:
     errors.append("duplicate native callbacks: " + "; ".join(f"{k} -> {','.join(v)}" for k,v in sorted(dupe_callbacks.items())))
 
 html_ids = set(ids)
-dynamic_ids = {"customEditorFontStyle"}
+dynamic_ids = {"customEditorFontStyle", "analysisCollapsedSummary"}  # optional/created dynamically
 missing_refs = sorted(k for k in id_refs if k not in html_ids and k not in dynamic_ids)
 if missing_refs:
     errors.append("getElementById targets missing from HTML: " + ", ".join(missing_refs))
