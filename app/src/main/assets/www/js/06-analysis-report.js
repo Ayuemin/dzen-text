@@ -8,7 +8,38 @@ function analysisOverflowNote(type){
   return n.hidden?'<div class="analysisOverflowNote">Показано '+n.visible+' из '+n.total+' однотипных замечаний. Остальные скрыты, чтобы не перегружать редактор.</div>':'';
 }
 
-function buildAnalysisReport(){analyzeText();const src=editor.value||'',a=currentAnalysis,lines=[];lines.push('ОТЧЁТ «ДЗЕН ТЕКСТ» ПО РЕДАКТОРСКОЙ ПРОВЕРКЕ');lines.push(`Создан: ${new Date().toLocaleString('ru-RU')}`);lines.push(`Всего замечаний: ${a.warningCount||0}; редакторских: ${a.editorCount||0}; признаки ИИ-стиля: ${a.aiStyleCount||0}; правила Дзена: ${a.dzenCount||0}; орфография: ${a.spellCount||0}.`);lines.push(`База правил Дзена: ${String(activeDzenRules().version||'встроенная')}.`);if(a.overflowTotal){lines.push(`Важно: в интерфейсе сохранено ${a.issues.length} из ${a.warningCount} замечаний; ${a.overflowTotal} однотипных срабатываний скрыто для производительности.`)}lines.push('');lines.push('Инструкция для модели: исправляйте только отмеченные места, сверяясь с «Меткой поиска» и контекстом. Не меняйте смысл и структуру статьи без необходимости. Сигналы «Правила Дзена» означают повод проверить формулировку, а не установленное нарушение.');lines.push('');if(!a.issues.length){lines.push('Замечаний не найдено.');return lines.join('\n')}a.issues.forEach((i,n)=>{const start=Number.isFinite(i.start)?i.start:0,end=Number.isFinite(i.end)?i.end:start;let marker=cleanReportText(src.slice(start,end));if(!marker)marker=cleanReportText(i.word||i.title);let context=shortContext(src,start,end);lines.push(`${n+1}. [${reportTypeName(i.type)}] ${cleanReportText(i.title)}`);lines.push(`Метка поиска: «${marker}»`);if(context)lines.push(`Контекст: ${context}`);lines.push(`Позиция: символы ${start+1}–${Math.max(start+1,end)}`);if(Array.isArray(i.occurrences)&&i.occurrences.length>1)lines.push(`Совпадения: ${i.occurrences.slice(0,12).map(o=>(Number(o.start)||0)+1).join(', ')}${i.occurrences.length>12?' …':''}`);if(i.detail)lines.push(`Комментарий: ${cleanReportText(i.detail)}`);if(i.type==='dzen')lines.push(`Уровень: ${i.severity==='critical'?'высокий риск — проверить':'проверить вручную'}`);lines.push('')});return lines.join('\n')}
+function buildAnalysisReport(){
+  analyzeText();
+  const src=editor.value||'',a=currentAnalysis,lines=[];
+  const localIssues=a.issues.filter(x=>!x.ai);
+  const localDzen=localIssues.filter(x=>x.type==='dzen').length;
+  const localAiStyle=localIssues.filter(x=>x.type==='aiStyle').length;
+  const localSpell=localIssues.filter(x=>x.type==='spelling').length;
+  const localEditor=localIssues.length-localDzen-localAiStyle-localSpell;
+  lines.push('ОТЧЁТ «ДЗЕН ТЕКСТ» ПО ЛОКАЛЬНОЙ РЕДАКТОРСКОЙ ПРОВЕРКЕ');
+  lines.push(`Создан: ${new Date().toLocaleString('ru-RU')}`);
+  lines.push(`Всего локальных замечаний: ${localIssues.length}; редакторских: ${localEditor}; признаки ИИ-стиля: ${localAiStyle}; правила Дзена: ${localDzen}; орфография: ${localSpell}.`);
+  lines.push(`База правил Дзена: ${String(activeDzenRules().version||'встроенная')}.`);
+  lines.push('');
+  lines.push('Инструкция для модели: исправляйте только отмеченные места, сверяясь с «Меткой поиска» и контекстом. Не меняйте смысл и структуру статьи без необходимости. Сигналы «Правила Дзена» означают повод проверить формулировку, а не установленное нарушение.');
+  lines.push('');
+  if(!localIssues.length){lines.push('Локальных замечаний не найдено.');return lines.join('\n')}
+  localIssues.forEach((i,n)=>{
+    const start=Number.isFinite(i.start)?i.start:0,end=Number.isFinite(i.end)?i.end:start;
+    let marker=cleanReportText(src.slice(start,end));
+    if(!marker)marker=cleanReportText(i.word||i.title);
+    const context=shortContext(src,start,end);
+    lines.push(`${n+1}. [${reportTypeName(i.type)}] ${cleanReportText(i.title)}`);
+    lines.push(`Метка поиска: «${marker}»`);
+    if(context)lines.push(`Контекст: ${context}`);
+    lines.push(`Позиция: символы ${start+1}–${Math.max(start+1,end)}`);
+    if(Array.isArray(i.occurrences)&&i.occurrences.length>1)lines.push(`Совпадения: ${i.occurrences.slice(0,12).map(o=>(Number(o.start)||0)+1).join(', ')}${i.occurrences.length>12?' …':''}`);
+    if(i.detail)lines.push(`Комментарий: ${cleanReportText(i.detail)}`);
+    if(i.type==='dzen')lines.push(`Уровень: ${i.severity==='critical'?'высокий риск — проверить':'проверить вручную'}`);
+    lines.push('');
+  });
+  return lines.join('\n');
+}
 function copyPlainReport(text){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.left='-10000px';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();return ok}
 function copyAnalysisReport(){const text=buildAnalysisReport();if(copyPlainReport(text))toast('Отчёт с замечаниями скопирован');else toast('Не удалось скопировать отчёт')}
 function saveAnalysisReport(){const text=buildAnalysisReport(),name=`Dzen-Text-report-${new Date().toISOString().slice(0,10)}.txt`;if(window.AndroidFile&&typeof AndroidFile.saveReport==='function'){AndroidFile.saveReport(text,name);return}try{const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1200);toast('Отчёт сохранён')}catch(e){toast('Не удалось сохранить отчёт')}}
