@@ -504,6 +504,7 @@ async function startAiDzenArticleCheck(src){
   aiDzenIssues=[];
   aiDzenSource='';
   setAiDzenRunState('running',{model:String(settings.dzenAiModel||''),startedAt:Date.now()});
+  document.getElementById('analysisBackdrop')?.classList.add('open');
   let knowledge=null;
   try{
     setCheckRunning(true);
