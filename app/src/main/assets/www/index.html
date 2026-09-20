@@ -289,13 +289,48 @@
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Правила Дзена</span><small>Локальная проверка возможных рисков</small></summary>
+      <summary><span>AI-проверка соответствия Дзену</span><small>Встроенная проверка или ваш OpenAI-совместимый API</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Проверять возможные риски</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Использовать обновляемую ИИ-базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Текст статьи в OpenRouter не отправляется. Приложение получает с GitHub только компактную базу правил.</div>
-        <div id="dzenRulesStatus" class="ruleStatus"></div>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить умную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
+        <div class="switchRow"><span>Проверять соответствие Дзену</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+
+        <div class="subLabel" style="margin-top:13px"><span>Режим проверки</span></div>
+        <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
+          <option value="builtin">Встроенная локальная</option>
+          <option value="ai">AI + встроенная</option>
+        </select>
+        <div class="smallNote">Встроенная проверка работает без API и не отправляет статью наружу. В AI-режиме сохраняются локальные проверки и добавляется смысловая проверка выбранной моделью.</div>
+
+        <div id="dzenAiFields" class="aiSettingsBlock" hidden>
+          <div class="subLabel"><span>API URL</span></div>
+          <input id="dzenAiBaseUrl" class="settingTextInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1" onchange="applySettings()">
+
+          <div class="subLabel"><span>API-ключ</span></div>
+          <input id="dzenAiApiKey" class="settingTextInput" type="password" autocomplete="off" spellcheck="false" placeholder="Введите API-ключ">
+          <div class="settingActions compactActions"><button class="nativeBtn" type="button" onclick="saveDzenAiApiKey()">Сохранить ключ</button><button class="nativeBtn" type="button" onclick="clearDzenAiApiKey()">Удалить ключ</button></div>
+          <div class="smallNote">Ключ хранится в приватном хранилище приложения и не записывается в настройки страницы.</div>
+
+          <div class="subLabel"><span>Модель</span></div>
+          <input id="dzenAiModel" class="settingTextInput" type="text" autocomplete="off" spellcheck="false" placeholder="openrouter/free" onchange="applySettings()">
+
+          <div class="subLabel"><span>Источники знаний Дзена</span></div>
+          <textarea id="dzenAiSources" class="riskArea aiPromptArea" rows="4" spellcheck="false" onchange="applySettings()" placeholder="По одному URL на строку"></textarea>
+          <div class="smallNote">Приложение читает указанные страницы и ограниченно проходит по внутренним ссылкам того же раздела. Из материалов модель выделяет правила, рекомендации, требования к качеству и сведения, способные влиять на распространение статьи.</div>
+
+          <div class="subLabel"><span>Что искать в стиле и AI-признаках</span></div>
+          <textarea id="dzenAiStylePrompt" class="riskArea aiPromptArea" rows="6" onchange="applySettings()" placeholder="Инструкция для смысловой проверки"></textarea>
+          <div class="smallNote">Это не «детектор ИИ». Модель ищет конкретные шаблонные и неестественные места по вашей инструкции.</div>
+
+          <div id="dzenAiStatus" class="ruleStatus"></div>
+          <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="buildDzenAiKnowledge()">Собрать / обновить AI-базу</button><button class="nativeBtn" type="button" onclick="clearDzenAiKnowledge()">Очистить AI-базу</button></div>
+        </div>
+
+        <details class="nestedDetails" style="margin-top:14px">
+          <summary>Встроенная база правил</summary>
+          <div class="switchRow" style="margin-top:10px"><span>Использовать обновляемую локальную базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
+          <div class="smallNote">Это прежняя проверка: статья анализируется на устройстве. Обновляется только компактная база правил.</div>
+          <div id="dzenRulesStatus" class="ruleStatus"></div>
+          <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить локальную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
+        </details>
       </div>
     </details>
 
@@ -370,7 +405,7 @@
 <script src="js/07-spelling.js"></script>
 <script src="js/08-navigation.js"></script>
 <script src="js/09-editor.js"></script>
-<script src="js/10-settings.js"></script>
+<script src="js/10-settings.js"></script>\n<script src="js/10-ai-dzen.js"></script>
 <script src="js/11-ui.js"></script>
 <script src="js/12-dialogs.js"></script>
 <script src="js/12-articles.js"></script>
