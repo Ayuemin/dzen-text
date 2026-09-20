@@ -131,18 +131,19 @@ function renderAnalysis(){
   updateAnalysisExportUi();
   document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));
 
+  const aiState=typeof aiDzenRunText==='function'?aiDzenRunText():(aiCount+' замеч.');
   if(mode==='local'){
     sum.innerHTML=`Режим: <b>локальная проверка</b> · замечаний: <b>${total}</b>.`;
     if(collapsed)collapsed.textContent=`${total?'🔴':'🟢'} локальных: ${total}`;
   }else if(mode==='ai'){
-    sum.innerHTML=`Режим: <b>AI-проверка</b> · замечаний: <b>${aiCount}</b>.`;
-    if(collapsed)collapsed.textContent=`${aiCount?'🟣':'🟢'} AI: ${aiCount}`;
+    sum.innerHTML=`Режим: <b>AI-проверка</b> · AI: <b>${escapeHtml(aiState)}</b>.`;
+    if(collapsed)collapsed.textContent=`AI: ${aiState}`;
   }else{
-    sum.innerHTML=`Режим: <b>обе проверки</b> · локальных: <b>${localCount}</b> · AI: <b>${aiCount}</b>.`;
-    if(collapsed)collapsed.textContent=`${total?'🔴':'🟢'} всего: ${total} · AI: ${aiCount}`;
+    sum.innerHTML=`Режим: <b>обе проверки</b> · локальных: <b>${localCount}</b> · AI: <b>${escapeHtml(aiState)}</b>.`;
+    if(collapsed)collapsed.textContent=`${localCount?'🔴':'🟢'} локальных: ${localCount} · AI: ${aiState}`;
   }
 
-  let html='';
+  let html=(mode==='ai'||mode==='both')&&typeof aiDzenRunDiagnosticHtml==='function'?aiDzenRunDiagnosticHtml():'';
   if(analysisMode==='all'){
     html+=`<div class="analysisInfo"><div class="metric"><b>${a.metrics.headings?.length||0}</b><span>заголовков</span></div><div class="metric"><b>${a.metrics.avgSentence||0}</b><span>слов в среднем предложении</span></div><div class="metric"><b>${a.metrics.lists||0}</b><span>пунктов списков</span></div><div class="metric"><b>${a.metrics.links||0}</b><span>ссылок</span></div></div>`;
   }
@@ -182,8 +183,11 @@ function renderAnalysis(){
   }
 
   if(!total){
-    const empty=mode==='ai'?'AI-проверка не нашла замечаний.':mode==='both'?'Обе проверки завершены без замечаний.':'Локальные проверки не нашли замечаний.';
-    html+=`<div class="analysisEmpty">${empty} Переключите «Всё», чтобы посмотреть информационные показатели.</div>`;
+    let empty='';
+    if(mode==='local')empty='Локальные проверки не нашли замечаний.';
+    else if(mode==='ai'&&typeof aiDzenRun!=='undefined'&&aiDzenRun.state==='success')empty='AI-проверка завершена без замечаний.';
+    else if(mode==='both'&&typeof aiDzenRun!=='undefined'&&aiDzenRun.state==='success'&&!localCount)empty='Обе проверки завершены без замечаний.';
+    if(empty)html+=`<div class="analysisEmpty">${empty} Переключите «Всё», чтобы посмотреть информационные показатели.</div>`;
   }
   box.innerHTML=html;
 }
@@ -191,6 +195,7 @@ function issueHtml(i){
   let sev=i.severity==='critical'?'Контроль':'Обратите внимание';
   if(i.type==='dzen')sev=i.severity==='critical'?'Высокий риск — проверить':'Проверить вручную';
   if(i.type==='aiStyle')sev='Маркер машинного стиля — проверить';
+  if(i.type==='aiQuality')sev='AI · качество текста — проверить';
   const word=i.word?String(i.word):'';
   const idx=currentAnalysis.issues.indexOf(i);
   const sameType=currentCheckMode()==='both'
