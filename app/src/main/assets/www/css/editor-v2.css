@@ -1237,3 +1237,13 @@ body.keyboard-open .sheetBackdrop.open .sheet{
 body.keyboard-open .ideasSheet{
   max-height:calc(100vh - var(--keyboardInset) - max(12px,env(safe-area-inset-top)))!important;
 }
+
+
+/* AI-проверка Дзена */
+.aiSettingsBlock{margin-top:14px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--accent) 20%,transparent)}
+.settingTextInput{width:100%;box-sizing:border-box;border:1px solid rgba(90,90,90,.24);border-radius:12px;padding:11px 12px;background:var(--sheetInput,#fff);color:inherit;font:inherit;outline:none}
+.settingTextInput:focus,.aiPromptArea:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 14%,transparent)}
+.aiPromptArea{width:100%;box-sizing:border-box;min-height:92px;resize:vertical}
+.compactActions{margin-top:8px}
+.aiSettingsBlock .subLabel{margin-top:13px}
+.aiSettingsBlock .ruleStatus{margin-top:11px}
