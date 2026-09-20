@@ -37,23 +37,10 @@ function analyzeText(){
 }
 function updateAnalysisDot(){const dot=document.getElementById('analysisDot');dot.classList.remove('stale');dot.classList.toggle('bad',currentAnalysis.warningCount>0);dot.setAttribute('aria-label',currentAnalysis.warningCount?`Есть замечания: ${currentAnalysis.warningCount}`:'Замечаний нет');dot.title=currentAnalysis.warningCount?`Есть замечания: ${currentAnalysis.warningCount}`:'Всё в пределах настроенных норм'}
 function issueGroups(){return [{id:'spelling',name:'Орфография'},{id:'proof',name:'Опечатки и пунктуация'},{id:'aiStyle',name:'Признаки ИИ-стиля'},{id:'risk',name:'Контроль слов'},{id:'dzen',name:'Правила Дзена'},{id:'heading',name:'Заголовки'},{id:'headingStructure',name:'Структура H1–H3'},{id:'sentence',name:'Длинные предложения'},{id:'paragraph',name:'Длинные абзацы'},{id:'frequent',name:'Частые слова'},{id:'nearby',name:'Повторы рядом'},{id:'phrase',name:'Повторяющиеся фразы'},{id:'opening',name:'Одинаковые начала'},{id:'markdown',name:'Markdown'},{id:'structure',name:'Структура текста'}]}
-let analysisScope='local';
 let analysisMode='problems';
-function syncAnalysisModeUi(){
-  document.querySelectorAll('.analysisScopeTab').forEach(b=>b.classList.toggle('active',b.dataset.scope===analysisScope));
-  document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));
-  const filters=document.getElementById('analysisLocalFilters');
-  if(filters)filters.hidden=analysisScope!=='local';
-}
-function setAnalysisScope(scope){
-  analysisScope=scope==='ai'?'ai':'local';
-  syncAnalysisModeUi();
-  renderAnalysis();
-}
 function setAnalysisMode(mode){
-  analysisScope='local';
   analysisMode=['problems','all','dzen'].includes(mode)?mode:'problems';
-  syncAnalysisModeUi();
+  document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));
   renderAnalysis();
 }
 function renderDzenManual(){const items=(activeDzenRules().manual_checks||[]).map(x=>`<li>${escapeHtml(String(x))}</li>`).join('');return `<div class="analysisDzenNote"><b>Что приложение не может подтвердить автоматически</b><ul class="manualChecklist">${items}</ul></div>`}
