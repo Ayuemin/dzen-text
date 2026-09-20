@@ -405,9 +405,20 @@
 
 <div class="sheetBackdrop" id="analysisBackdrop" onclick="analysisBackdropClick(event)"><div class="sheet analysisSheet">
   <div class="handle"></div><div class="sheetHeader"><h2 class="labelWithHint">Редакторский анализ <button class="infoHintBtn" type="button" onclick="showAppHint('analysisOverview')" aria-label="Подсказка о редакторском анализе">i</button></h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
-  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
+  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button><button class="analysisFilter" data-mode="ai" onclick="setAnalysisMode('ai')">AI</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
-  <div class="analysisExport"><div class="analysisExportTitle labelWithHint">Выгрузить замечания <button class="infoHintBtn" type="button" onclick="showAppHint('exportIssues')" aria-label="Подсказка о выгрузке замечаний">i</button></div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — удобно передать его модели, которая будет править исходную статью.</div></div>
+  <div class="analysisExport">
+    <div class="analysisExportSection">
+      <div class="analysisExportTitle labelWithHint">Локальная проверка <button class="infoHintBtn" type="button" onclick="showAppHint('exportIssues')" aria-label="Подсказка о локальном отчёте">i</button></div>
+      <div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать локальные замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить локальные замечания в файл">⇩ В файл</button></div>
+      <div class="smallNote">Только встроенные и локальные проверки. AI-замечания сюда не входят.</div>
+    </div>
+    <div class="analysisExportSection aiExportSection">
+      <div class="analysisExportTitle labelWithHint">AI-проверка <button class="infoHintBtn" type="button" onclick="showAppHint('aiExportIssues')" aria-label="Подсказка об AI-отчёте">i</button></div>
+      <div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAiAnalysisReport()" aria-label="Скопировать AI-замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAiAnalysisReport()" aria-label="Сохранить AI-замечания в файл">⇩ В файл</button></div>
+      <div class="smallNote">Только замечания модели по текущей версии статьи.</div>
+    </div>
+  </div>
 </div></div>
 <div id="highlightHint" class="highlightHint">Фрагмент выделен</div>
 <div id="toast" class="toast"></div><div id="copyStage" class="copyStage" aria-hidden="true"></div>
