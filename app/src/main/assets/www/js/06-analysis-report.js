@@ -12,6 +12,59 @@ function buildAnalysisReport(){analyzeText();const src=editor.value||'',a=curren
 function copyPlainReport(text){const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.left='-10000px';document.body.appendChild(ta);ta.select();let ok=false;try{ok=document.execCommand('copy')}catch(e){}ta.remove();return ok}
 function copyAnalysisReport(){const text=buildAnalysisReport();if(copyPlainReport(text))toast('Отчёт с замечаниями скопирован');else toast('Не удалось скопировать отчёт')}
 function saveAnalysisReport(){const text=buildAnalysisReport(),name=`Dzen-Text-report-${new Date().toISOString().slice(0,10)}.txt`;if(window.AndroidFile&&typeof AndroidFile.saveReport==='function'){AndroidFile.saveReport(text,name);return}try{const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1200);toast('Отчёт сохранён')}catch(e){toast('Не удалось сохранить отчёт')}}
+function buildAiAnalysisReport(){
+  analyzeText();
+  const src=editor.value||'',a=currentAnalysis,lines=[];
+  const aiRows=a.issues.filter(x=>x&&x.ai===true);
+  const aiRun=typeof aiDzenSource!=='undefined'&&aiDzenSource===src;
+  const knowledge=typeof dzenAiKnowledge==='function'?dzenAiKnowledge():null;
+  lines.push('ОТЧЁТ «ДЗЕН ТЕКСТ» — ЗАМЕЧАНИЯ AI-ПРОВЕРКИ');
+  lines.push(`Создан: ${new Date().toLocaleString('ru-RU')}`);
+  lines.push(`AI-замечаний: ${aiRows.length}.`);
+  if(settings.dzenAiModel)lines.push(`Модель: ${cleanReportText(settings.dzenAiModel)}.`);
+  if(settings.dzenAiBaseUrl)lines.push(`API: ${cleanReportText(settings.dzenAiBaseUrl)}.`);
+  if(knowledge&&knowledge.builtAt)lines.push(`AI-база Дзена собрана: ${new Date(knowledge.builtAt).toLocaleString('ru-RU')}.`);
+  if(knowledge&&knowledge.crawl)lines.push(`Страниц базы: обработано ${Number(knowledge.crawl.processed||0)}, пропущено ${Number(knowledge.crawl.skipped||0)}.`);
+  lines.push('');
+  lines.push('Инструкция для модели: исправляйте только перечисленные места. Не меняйте смысл статьи без необходимости. Замечания по правилам Дзена являются редакторскими сигналами для проверки, а не автоматическим вердиктом о нарушении.');
+  lines.push('');
+  if(!aiRun){
+    lines.push('AI-проверка для текущей версии текста не запускалась или её результат устарел после редактирования.');
+    return lines.join('\n');
+  }
+  if(!aiRows.length){
+    lines.push('AI-проверка выполнена. Дополнительных AI-замечаний не найдено.');
+    return lines.join('\n');
+  }
+  aiRows.forEach((i,n)=>{
+    const start=Number.isFinite(i.start)?i.start:0,end=Number.isFinite(i.end)?i.end:start;
+    let marker=cleanReportText(src.slice(start,end));
+    if(!marker)marker=cleanReportText(i.word||i.title);
+    const context=shortContext(src,start,end);
+    const type=i.type==='aiStyle'?'AI · стиль':'AI · Дзен';
+    lines.push(`${n+1}. [${type}] ${cleanReportText(i.title)}`);
+    lines.push(`Метка поиска: «${marker}»`);
+    if(context)lines.push(`Контекст: ${context}`);
+    lines.push(`Позиция: символы ${start+1}–${Math.max(start+1,end)}`);
+    if(i.detail)lines.push(`Комментарий: ${cleanReportText(i.detail)}`);
+    if(i.type==='dzen')lines.push(`Уровень: ${i.severity==='critical'?'высокий риск — проверить':'проверить вручную'}`);
+    lines.push('');
+  });
+  return lines.join('\n');
+}
+function copyAiAnalysisReport(){
+  const text=buildAiAnalysisReport();
+  if(copyPlainReport(text))toast('AI-замечания скопированы');else toast('Не удалось скопировать AI-отчёт');
+}
+function saveAiAnalysisReport(){
+  const text=buildAiAnalysisReport(),name=`Dzen-Text-AI-report-${new Date().toISOString().slice(0,10)}.txt`;
+  if(window.AndroidFile&&typeof AndroidFile.saveReport==='function'){AndroidFile.saveReport(text,name);return}
+  try{
+    const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1200);toast('AI-отчёт сохранён');
+  }catch(e){toast('Не удалось сохранить AI-отчёт')}
+}
 window.onNativeReportSaved=(name)=>toast(`Отчёт сохранён${name?': '+name:''}`);window.onNativeReportError=(msg)=>toast(msg||'Не удалось сохранить отчёт');
 function renderAnalysis(){const box=document.getElementById('analysisContent'),sum=document.getElementById('analysisSummary'),collapsed=document.getElementById('analysisCollapsedSummary'),a=currentAnalysis,ec=a.editorCount||0,ac=a.aiStyleCount||0,dc=a.dzenCount||0,sc=a.spellCount||0;let spellPart=settings.onlineSpelling?(spellStatus==='checking'?' · орфография: <b>проверяю…</b>':` · орфография: <b>${sc}</b>`):' · онлайн-орфография: выкл.';sum.innerHTML=a.warningCount?`Редакторских замечаний: <b>${ec}</b> · ИИ-стиль: <b>${ac}</b> · по правилам Дзена: <b>${dc}</b>${spellPart}.`:`<b>По локальным проверкам замечаний нет.</b>${spellPart} Финальная вычитка всё равно нужна.`;if(collapsed)collapsed.textContent=`${ec?'🔴':'🟢'} редакторских: ${ec} · ${dc?'🟠':'🟢'} Дзен: ${dc}`;document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));let html='';if(analysisMode==='all')html+=`<div class="analysisInfo"><div class="metric"><b>${a.metrics.headings?.length||0}</b><span>заголовков</span></div><div class="metric"><b>${a.metrics.avgSentence||0}</b><span>слов в среднем предложении</span></div><div class="metric"><b>${a.metrics.lists||0}</b><span>пунктов списков</span></div><div class="metric"><b>${a.metrics.links||0}</b><span>ссылок</span></div></div>`;if(analysisMode==='dzen'){const rows=a.issues.filter(x=>x.type==='dzen');html+=`<div class="analysisDzenNote">База правил: <b>${escapeHtml(String(activeDzenRules().version||'встроенная'))}</b>. Совпадение означает только повод проверить фрагмент, а не установленное нарушение.</div>`;if(rows.length){const n=analysisVisibleAndHidden('dzen');html+=`<div class="analysisGroup"><div class="analysisTitle"><span>Возможные риски</span><span class="badge bad">${n.total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote('dzen')}</div>`;}else html+='<div class="analysisEmpty">Автоматические признаки риска по текущей базе не найдены.</div>';html+=renderDzenManual();box.innerHTML=html;return}for(const g of issueGroups()){const rows=a.issues.filter(x=>x.type===g.id);if(g.id==='heading'&&analysisMode==='all'){const hs=a.metrics.headings||[];html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge ${analysisVisibleAndHidden(g.id).total?'bad':''}">${analysisVisibleAndHidden(g.id).total||'✓'}</span></div>`;if(!hs.length)html+='<div class="analysisRow"><span class="meta">Заголовков Markdown не найдено.</span></div>';else for(const h of hs){const bad=rows.find(r=>r.start===h.start);html+=bad?issueHtml(bad):`<button class="analysisRow jump" onclick="jumpTo(${h.start},${h.end})"><span class="ok">H${h.level} · ${h.text.length} знаков</span> ${escapeHtml(h.text)}<span class="meta">Нажмите, чтобы перейти к заголовку</span></button>`}html+='</div>';continue}if(!rows.length)continue;const n=analysisVisibleAndHidden(g.id);html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge bad">${n.total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote(g.id)}${g.id==='spelling'?'<div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>':''}</div>`}if(!a.warningCount)html+='<div class="analysisEmpty">Красных замечаний нет. Переключите «Всё», чтобы посмотреть информационные показатели.</div>';box.innerHTML=html}
 function issueHtml(i){
