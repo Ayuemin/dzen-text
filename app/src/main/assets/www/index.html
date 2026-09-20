@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Дзен Текст 1.10.0</title>
+<title>Дзен Текст 1.10.2</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
@@ -326,6 +326,7 @@
 
           <div class="subLabel"><span class="labelWithHint">Модель <button class="infoHintBtn" type="button" onclick="showAiHint('model')" aria-label="Подсказка о модели">i</button></span></div>
           <input id="dzenAiModel" class="settingTextInput" type="text" autocomplete="off" spellcheck="false" placeholder="openrouter/free" onchange="applySettings()">
+          <div class="settingActions compactActions"><button class="nativeBtn" type="button" onclick="testDzenAiConnection()">Проверить API</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAiHint('test')" aria-label="Подсказка о проверке API">i</button></div>
 
           <div class="subLabel"><span class="labelWithHint">Источники знаний Дзена <button class="infoHintBtn" type="button" onclick="showAiHint('sources')" aria-label="Подсказка об источниках знаний">i</button></span></div>
           <textarea id="dzenAiSources" class="riskArea aiPromptArea" rows="4" spellcheck="false" onchange="applySettings()" placeholder="По одному URL на строку"></textarea>
