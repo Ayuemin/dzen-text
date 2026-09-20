@@ -1252,3 +1252,23 @@ body.keyboard-open .ideasSheet{
 .aiPageList{margin-top:8px;max-height:220px;overflow:auto;border:1px solid rgba(100,100,100,.16);border-radius:10px;padding:6px}
 .aiPageRow{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;padding:6px 4px;font-size:12px;line-height:1.35;word-break:break-word}
 .aiPageSkipped{opacity:.68}
+
+
+/* Contextual info hints */
+.labelWithHint{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.infoHintBtn{
+  width:19px;height:19px;min-width:19px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));
+  border-radius:50%;
+  background:transparent;
+  color:var(--accent);
+  font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:0;
+  vertical-align:middle;
+}
+.infoHintBtn:active{transform:scale(.94)}
+.actionHintBtn{align-self:center;margin:0 2px}
+.versionUsageHeader{display:flex;align-items:center;gap:7px;min-width:0}
+.versionUsageHeader .versionUsageText{min-width:0;flex:1}
+.aiHintDialog p{white-space:pre-line}
