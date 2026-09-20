@@ -368,7 +368,7 @@
     <div class="sheetHeader"><h2>Версии текста</h2><button class="sheetClose" type="button" onclick="closeVersions()" aria-label="Закрыть версии">×</button></div>
     <div class="versionIntro">Автоматические снимки сохраняются локально во время работы. Перед импортом, очисткой и восстановлением создаётся дополнительная версия.</div>
     <div class="versionUsage">
-      <div id="versionUsageText" class="versionUsageText labelWithHint">История версий <button class="infoHintBtn" type="button" onclick="showAppHint('historyLimit')" aria-label="Подсказка об истории версий">i</button></div>
+      <div class="versionUsageHeader"><div id="versionUsageText" class="versionUsageText">История версий</div><button class="infoHintBtn" type="button" onclick="showAppHint('historyLimit')" aria-label="Подсказка об истории версий">i</button></div>
       <div class="versionUsageTrack"><span id="versionUsageBar"></span></div>
       <div class="smallNote">Общий лимит истории: 100 МБ. При заполнении сначала удаляются старые автоматические версии.</div>
     </div>
