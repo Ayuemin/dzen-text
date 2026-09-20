@@ -484,7 +484,7 @@ async function startAiDzenArticleCheck(src){
     aiDzenSource=source;
     analyzeText();
     document.getElementById('analysisBackdrop').classList.add('open');
-    setAnalysisMode('problems');
+    setAnalysisMode('ai');
     updateDzenAiStatus();
     toast(aiDzenIssues.length?'AI-проверка: замечаний '+aiDzenIssues.length:'AI-проверка: дополнительных замечаний нет');
   }catch(e){
