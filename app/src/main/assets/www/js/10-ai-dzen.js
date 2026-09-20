@@ -124,6 +124,13 @@ function renderDzenAiPageReport(report=null){
   for(const url of failed)rows.push('<div class="aiPageRow aiPageSkipped"><span>×</span><span>'+escapeHtml(String(url))+'</span></div>');
   listEl.innerHTML=rows.length?rows.join(''):'<div class="smallNote">Пока нет обработанных страниц.</div>';
 }
+function aiDzenStatusLine(){
+  if(aiDzenRun.state==='success')return '<br>Последняя AI-проверка: <b>успешно</b> · модель: '+escapeHtml(aiDzenRun.model||String(settings.dzenAiModel||'—'))+' · запросов: '+aiDzenRun.calls+' · замечаний: '+aiDzenRun.accepted;
+  if(aiDzenRun.state==='error')return '<br>Последняя AI-проверка: <b>ошибка</b> · '+escapeHtml(aiDzenRun.message||'неизвестная ошибка');
+  if(aiDzenRun.state==='running')return '<br>AI-проверка: <b>выполняется…</b>';
+  if(aiDzenRun.state==='stale')return '<br>Последний AI-результат: <b>устарел после изменения текста</b>';
+  return '<br>AI-проверка статьи ещё не запускалась.';
+}
 function updateDzenAiStatus(message=''){
   const el=document.getElementById('dzenAiStatus');
   if(!el)return;
@@ -135,14 +142,14 @@ function updateDzenAiStatus(message=''){
   const k=dzenAiKnowledge();
   const key=dzenAiHasKey()?'ключ сохранён':'ключ не задан';
   if(!k){
-    el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база ещё не собрана.';
+    el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база ещё не собрана.'+aiDzenStatusLine();
     renderDzenAiPageReport();
     return;
   }
   const date=k.builtAt?new Date(k.builtAt).toLocaleString('ru-RU'):'—';
   const state=dzenAiKnowledgeCurrent(k)?'актуальна для этих настроек':'нужно обновить';
   const pages=Number(k.crawl?.processed||k.pages||0);
-  el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+pages+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date);
+  el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+pages+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date)+aiDzenStatusLine();
   renderDzenAiPageReport();
 }
 async function onDzenCheckModeChanged(){
