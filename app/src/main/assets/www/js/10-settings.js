@@ -255,7 +255,7 @@ async function applySettings(){
     aiStyleCheck:aiStyleCheck.checked,
     dzenCheck:dzenCheck.checked,
     dzenSmartRules:dzenSmartRules.checked,
-    dzenCheckMode:document.getElementById('dzenCheckMode')?.value||'builtin',
+    dzenCheckMode:normalizeDzenCheckMode(document.getElementById('dzenCheckMode')?.value),
     dzenAiBaseUrl:String(document.getElementById('dzenAiBaseUrl')?.value||settings.dzenAiBaseUrl||'').trim(),
     dzenAiModel:String(document.getElementById('dzenAiModel')?.value||settings.dzenAiModel||'').trim(),
     dzenAiSources:String(document.getElementById('dzenAiSources')?.value||settings.dzenAiSources||'').trim(),

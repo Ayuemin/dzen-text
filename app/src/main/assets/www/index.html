@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Дзен Текст 1.9.0</title>
+<title>Дзен Текст 1.10.0</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
@@ -258,6 +258,19 @@
     </details>
 
     <details class="settingsGroup">
+      <summary><span>Режим проверки</span><small>Локальная, AI или обе вместе</small></summary>
+      <div class="settingsGroupBody">
+        <div class="subLabel"><span class="labelWithHint">Как проверять текст <button class="infoHintBtn" type="button" onclick="showAiHint('mode')" aria-label="Подсказка о режиме проверки">i</button></span></div>
+        <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
+          <option value="local">Локальная проверка</option>
+          <option value="ai">AI-проверка</option>
+          <option value="both">Обе проверки</option>
+        </select>
+        <div class="smallNote">Локальная — только встроенные проверки. AI — только выбранная модель. «Обе» запускает оба механизма и объединяет замечания в одном результате.</div>
+      </div>
+    </details>
+
+    <details class="settingsGroup">
       <summary><span>Редакторский анализ</span><small>Длина, повторы, структура и Markdown</small></summary>
       <div class="settingsGroupBody">
         <div class="switchRow"><span class="labelWithHint">Проверять заголовки <button class="infoHintBtn" type="button" onclick="showAppHint('headingCheck')" aria-label="Подсказка о проверке заголовков">i</button></span><input id="headingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
@@ -289,32 +302,34 @@
     </details>
 
     <details class="settingsGroup">
-      <summary><span>AI-проверка соответствия Дзену</span><small>Встроенная проверка или ваш OpenAI-совместимый API</small></summary>
+      <summary><span>Локальная проверка Дзена</span><small>Правила и обновляемая локальная база</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span class="labelWithHint">Проверять соответствие Дзену <button class="infoHintBtn" type="button" onclick="showAppHint('dzenCheck')" aria-label="Подсказка о проверке Дзена">i</button></span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span class="labelWithHint">Проверять правила Дзена локально <button class="infoHintBtn" type="button" onclick="showAppHint('dzenCheck')" aria-label="Подсказка о локальной проверке Дзена">i</button></span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Использовать обновляемую локальную базу <button class="infoHintBtn" type="button" onclick="showAppHint('localDzenBase')" aria-label="Подсказка о локальной базе Дзена">i</button></span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Работает без внешней AI-модели. Статья остаётся на устройстве; обновляется только компактная база правил.</div>
+        <div id="dzenRulesStatus" class="ruleStatus"></div>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить локальную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
+      </div>
+    </details>
 
-        <div class="subLabel" style="margin-top:13px"><span class="labelWithHint">Режим проверки <button class="infoHintBtn" type="button" onclick="showAiHint('mode')" aria-label="Подсказка о режиме проверки">i</button></span></div>
-        <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
-          <option value="builtin">Встроенная локальная</option>
-          <option value="ai">AI + встроенная</option>
-        </select>
-        <div class="smallNote">Встроенная проверка работает без API и не отправляет статью наружу. В AI-режиме сохраняются локальные проверки и добавляется смысловая проверка выбранной моделью.</div>
-
-        <div id="dzenAiFields" class="aiSettingsBlock" hidden>
+    <details class="settingsGroup">
+      <summary><span>AI-проверка Дзена</span><small>API, модель, база знаний и стиль</small></summary>
+      <div class="settingsGroupBody">
+        <div id="dzenAiFields" class="aiSettingsBlock">
           <div class="subLabel"><span class="labelWithHint">API URL <button class="infoHintBtn" type="button" onclick="showAiHint('api')" aria-label="Подсказка об API URL">i</button></span></div>
           <input id="dzenAiBaseUrl" class="settingTextInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1" onchange="applySettings()">
 
           <div class="subLabel"><span class="labelWithHint">API-ключ <button class="infoHintBtn" type="button" onclick="showAiHint('key')" aria-label="Подсказка об API-ключе">i</button></span></div>
           <input id="dzenAiApiKey" class="settingTextInput" type="password" autocomplete="off" spellcheck="false" placeholder="Введите API-ключ">
           <div class="settingActions compactActions"><button class="nativeBtn" type="button" onclick="saveDzenAiApiKey()">Сохранить ключ</button><button class="nativeBtn" type="button" onclick="clearDzenAiApiKey()">Удалить ключ</button></div>
-          <div class="smallNote">Ключ хранится в приватном хранилище приложения и не записывается в настройки страницы.</div>
+          <div class="smallNote">Ключ хранится в приватном хранилище приложения и не записывается в обычные настройки редактора.</div>
 
           <div class="subLabel"><span class="labelWithHint">Модель <button class="infoHintBtn" type="button" onclick="showAiHint('model')" aria-label="Подсказка о модели">i</button></span></div>
           <input id="dzenAiModel" class="settingTextInput" type="text" autocomplete="off" spellcheck="false" placeholder="openrouter/free" onchange="applySettings()">
 
           <div class="subLabel"><span class="labelWithHint">Источники знаний Дзена <button class="infoHintBtn" type="button" onclick="showAiHint('sources')" aria-label="Подсказка об источниках знаний">i</button></span></div>
           <textarea id="dzenAiSources" class="riskArea aiPromptArea" rows="4" spellcheck="false" onchange="applySettings()" placeholder="По одному URL на строку"></textarea>
-          <div class="smallNote">Указанный URL служит точкой входа. Приложение рекурсивно проходит все найденные внутренние страницы того же раздела официальной справки, включая ссылки со следующих страниц. Внешние сайты игнорируются, повторы URL не загружаются.</div>
+          <div class="smallNote">URL служит точкой входа. Приложение рекурсивно проходит внутренние страницы официальной справки; внешние сайты игнорируются, повторы не загружаются.</div>
 
           <div class="subLabel"><span class="labelWithHint">Что искать в стиле и AI-признаках <button class="infoHintBtn" type="button" onclick="showAiHint('style')" aria-label="Подсказка о проверке стиля">i</button></span></div>
           <textarea id="dzenAiStylePrompt" class="riskArea aiPromptArea" rows="6" onchange="applySettings()" placeholder="Инструкция для смысловой проверки"></textarea>
@@ -328,14 +343,6 @@
           </details>
           <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="buildDzenAiKnowledge()">Собрать / обновить AI-базу</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAiHint('build')" aria-label="Подсказка о сборке AI-базы">i</button><button class="nativeBtn" type="button" onclick="clearDzenAiKnowledge()">Очистить AI-базу</button></div>
         </div>
-
-        <details class="nestedDetails" style="margin-top:14px">
-          <summary>Встроенная база правил</summary>
-          <div class="switchRow" style="margin-top:10px"><span class="labelWithHint">Использовать обновляемую локальную базу <button class="infoHintBtn" type="button" onclick="showAppHint('localDzenBase')" aria-label="Подсказка о локальной базе Дзена">i</button></span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
-          <div class="smallNote">Это прежняя проверка: статья анализируется на устройстве. Обновляется только компактная база правил.</div>
-          <div id="dzenRulesStatus" class="ruleStatus"></div>
-          <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить локальную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
-        </details>
       </div>
     </details>
 
@@ -405,9 +412,13 @@
 
 <div class="sheetBackdrop" id="analysisBackdrop" onclick="analysisBackdropClick(event)"><div class="sheet analysisSheet">
   <div class="handle"></div><div class="sheetHeader"><h2 class="labelWithHint">Редакторский анализ <button class="infoHintBtn" type="button" onclick="showAppHint('analysisOverview')" aria-label="Подсказка о редакторском анализе">i</button></h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
-  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
+  <div class="analysisFilters" id="analysisLocalFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
-  <div class="analysisExport"><div class="analysisExportTitle labelWithHint">Выгрузить замечания <button class="infoHintBtn" type="button" onclick="showAppHint('exportIssues')" aria-label="Подсказка о выгрузке замечаний">i</button></div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — удобно передать его модели, которая будет править исходную статью.</div></div>
+  <div class="analysisExport">
+    <div class="analysisExportTitle labelWithHint"><span id="analysisExportTitleText">Выгрузить замечания</span> <button class="infoHintBtn" type="button" onclick="showAppHint('currentExport')" aria-label="Подсказка об отчёте">i</button></div>
+    <div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyCurrentAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveCurrentAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div>
+    <div class="smallNote" id="analysisExportNote">Отчёт соответствует выбранному режиму проверки.</div>
+  </div>
 </div></div>
 <div id="highlightHint" class="highlightHint">Фрагмент выделен</div>
 <div id="toast" class="toast"></div><div id="copyStage" class="copyStage" aria-hidden="true"></div>

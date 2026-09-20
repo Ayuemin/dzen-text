@@ -1272,3 +1272,9 @@ body.keyboard-open .ideasSheet{
 .versionUsageHeader{display:flex;align-items:center;gap:7px;min-width:0}
 .versionUsageHeader .versionUsageText{min-width:0;flex:1}
 .aiHintDialog p{white-space:pre-line}
+
+
+/* Separate local and AI report exports */
+.analysisExportSection{padding:10px 0}
+.analysisExportSection+.analysisExportSection{margin-top:8px;padding-top:14px;border-top:1px solid var(--border)}
+.aiExportSection .analysisExportTitle::before{content:'AI';display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:18px;margin-right:7px;padding:0 5px;border-radius:6px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);font-size:10px;font-weight:800;letter-spacing:.04em}

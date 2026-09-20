@@ -5,6 +5,14 @@ function runFullCheck(){
  clearOnlineSpelling();
  if(typeof clearAiDzenIssues==='function')clearAiDzenIssues();
  setCheckRunning(true);
+
+ const mode=currentCheckMode();
+ if(mode==='ai'){
+   toast('Запускаю AI-проверку…');
+   startAiDzenArticleCheck(src);
+   return;
+ }
+
  toast(src.length>150000?'Проверяю большой текст…':'Проверяю текст…');
  setTimeout(()=>{
    try{
@@ -16,19 +24,20 @@ function runFullCheck(){
      if(!settings.onlineSpelling){
        spellStatus='off';
        renderAnalysis();
-       if(typeof shouldRunAiDzenCheck==='function'&&shouldRunAiDzenCheck()){
+       if(mode==='both'){
+         toast('Локальная проверка готова · запускаю AI');
          startAiDzenArticleCheck(src);
        }else{
          setCheckRunning(false);
-         toast('Полная локальная проверка выполнена');
+         toast('Локальная проверка выполнена');
        }
        return;
      }
      if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){
        spellStatus='error';
        renderAnalysis();
-       if(typeof shouldRunAiDzenCheck==='function'&&shouldRunAiDzenCheck()){
-         toast('Онлайн-орфография недоступна · продолжаю AI-проверку');
+       if(mode==='both'){
+         toast('Онлайн-орфография недоступна · запускаю AI');
          startAiDzenArticleCheck(src);
        }else{
          setCheckRunning(false);
@@ -63,8 +72,8 @@ window.onNativeSpellResult=(requestId,items)=>{
  document.getElementById('analysisBackdrop').classList.add('open');
  setAnalysisMode('problems');
  const spellMessage=onlineSpellIssues.length?`Орфография: найдено ${onlineSpellIssues.length}`:'Орфографических ошибок не найдено';
- if(typeof shouldRunAiDzenCheck==='function'&&shouldRunAiDzenCheck()){
-   toast(spellMessage+' · продолжаю AI-проверку');
+ if(currentCheckMode()==='both'){
+   toast(spellMessage+' · запускаю AI-проверку');
    startAiDzenArticleCheck(editor.value);
  }else{
    setCheckRunning(false);
@@ -76,9 +85,10 @@ window.onNativeSpellError=(requestId,msg)=>{
  spellStatus='error';
  onlineSpellIssues=[];
  onlineSpellSource='';
+ analyzeText();
  renderAnalysis();
- if(typeof shouldRunAiDzenCheck==='function'&&shouldRunAiDzenCheck()){
-   toast((msg||'Онлайн-орфография недоступна')+' · продолжаю AI-проверку');
+ if(currentCheckMode()==='both'){
+   toast((msg||'Онлайн-орфография недоступна')+' · запускаю AI-проверку');
    startAiDzenArticleCheck(editor.value);
  }else{
    setCheckRunning(false);

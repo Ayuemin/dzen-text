@@ -42,7 +42,7 @@ function clearDzenAiKnowledge(){
 }
 function syncDzenAiVisibility(){
   const box=document.getElementById('dzenAiFields');
-  if(box)box.hidden=(document.getElementById('dzenCheckMode')?.value||settings.dzenCheckMode)!=='ai';
+  if(box)box.hidden=false;
 }
 function syncDzenAiSettingsUI(){
   const mode=document.getElementById('dzenCheckMode');
@@ -51,7 +51,7 @@ function syncDzenAiSettingsUI(){
   const sources=document.getElementById('dzenAiSources');
   const prompt=document.getElementById('dzenAiStylePrompt');
   const key=document.getElementById('dzenAiApiKey');
-  if(mode)mode.value=settings.dzenCheckMode||'builtin';
+  if(mode)mode.value=normalizeDzenCheckMode(settings.dzenCheckMode);
   if(base)base.value=settings.dzenAiBaseUrl||'https://openrouter.ai/api/v1';
   if(model)model.value=settings.dzenAiModel||'openrouter/free';
   if(sources)sources.value=settings.dzenAiSources||'https://dzen.ru/help/ru/requirements/rules.html';
@@ -109,23 +109,22 @@ function updateDzenAiStatus(message=''){
 }
 async function onDzenCheckModeChanged(){
   const select=document.getElementById('dzenCheckMode');
-  const next=select?.value||'builtin';
-  const previous=settings.dzenCheckMode||'builtin';
-  if(next==='ai'&&previous!=='ai'){
+  const next=normalizeDzenCheckMode(select?.value);
+  const previous=normalizeDzenCheckMode(settings.dzenCheckMode);
+  const enablesAi=(next==='ai'||next==='both')&&!(previous==='ai'||previous==='both');
+  if(enablesAi){
     const ok=await appConfirm(
-      'Включить AI-проверку Дзена?',
+      'Включить AI-проверку?',
       'После нажатия «Проверить» текст статьи и подготовленная база знаний Дзена будут отправлены в указанный вами OpenAI-совместимый API. При обычном наборе текста ничего не отправляется.',
       'Включить',
       false
     );
     if(!ok){
       if(select)select.value=previous;
-      syncDzenAiVisibility();
       return;
     }
   }
   await applySettings();
-  syncDzenAiVisibility();
 }
 function saveDzenAiApiKey(){
   const input=document.getElementById('dzenAiApiKey');
@@ -401,7 +400,7 @@ async function buildDzenAiKnowledge(options={}){
   }finally{aiDzenBusy=false;dzenAiLiveCrawl=null;updateDzenAiStatus()}
 }
 function shouldRunAiDzenCheck(){
-  return settings.dzenCheck!==false&&(settings.dzenCheckMode||'builtin')==='ai';
+  return checkModeUsesAi();
 }
 async function ensureDzenAiKnowledge(){
   let k=dzenAiKnowledge();
