@@ -314,13 +314,18 @@
 
           <div class="subLabel"><span>Источники знаний Дзена</span></div>
           <textarea id="dzenAiSources" class="riskArea aiPromptArea" rows="4" spellcheck="false" onchange="applySettings()" placeholder="По одному URL на строку"></textarea>
-          <div class="smallNote">Приложение читает указанные страницы и ограниченно проходит по внутренним ссылкам того же раздела. Из материалов модель выделяет правила, рекомендации, требования к качеству и сведения, способные влиять на распространение статьи.</div>
+          <div class="smallNote">Указанный URL служит точкой входа. Приложение рекурсивно проходит все найденные внутренние страницы того же раздела официальной справки, включая ссылки со следующих страниц. Внешние сайты игнорируются, повторы URL не загружаются.</div>
 
           <div class="subLabel"><span>Что искать в стиле и AI-признаках</span></div>
           <textarea id="dzenAiStylePrompt" class="riskArea aiPromptArea" rows="6" onchange="applySettings()" placeholder="Инструкция для смысловой проверки"></textarea>
           <div class="smallNote">Это не «детектор ИИ». Модель ищет конкретные шаблонные и неестественные места по вашей инструкции.</div>
 
           <div id="dzenAiStatus" class="ruleStatus"></div>
+          <details class="nestedDetails aiPagesDetails">
+            <summary>Страницы базы <span id="dzenAiPageCount">0</span></summary>
+            <div id="dzenAiCrawlNote" class="smallNote">Список появится после сборки базы.</div>
+            <div id="dzenAiPageList" class="aiPageList"><div class="smallNote">Пока нет обработанных страниц.</div></div>
+          </details>
           <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="buildDzenAiKnowledge()">Собрать / обновить AI-базу</button><button class="nativeBtn" type="button" onclick="clearDzenAiKnowledge()">Очистить AI-базу</button></div>
         </div>
 
