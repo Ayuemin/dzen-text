@@ -405,7 +405,11 @@
 
 <div class="sheetBackdrop" id="analysisBackdrop" onclick="analysisBackdropClick(event)"><div class="sheet analysisSheet">
   <div class="handle"></div><div class="sheetHeader"><h2 class="labelWithHint">Редакторский анализ <button class="infoHintBtn" type="button" onclick="showAppHint('analysisOverview')" aria-label="Подсказка о редакторском анализе">i</button></h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
-  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button><button class="analysisFilter" data-mode="ai" onclick="setAnalysisMode('ai')">AI</button></div>
+  <div class="analysisScopeTabs">
+    <button class="analysisScopeTab active" data-scope="local" type="button" onclick="setAnalysisScope('local')">Локальная проверка</button>
+    <button class="analysisScopeTab" data-scope="ai" type="button" onclick="setAnalysisScope('ai')">AI-проверка</button>
+  </div>
+  <div class="analysisFilters" id="analysisLocalFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
   <div class="analysisExport">
     <div class="analysisExportSection">
