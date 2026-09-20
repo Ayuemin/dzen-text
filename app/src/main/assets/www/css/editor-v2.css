@@ -1247,3 +1247,8 @@ body.keyboard-open .ideasSheet{
 .compactActions{margin-top:8px}
 .aiSettingsBlock .subLabel{margin-top:13px}
 .aiSettingsBlock .ruleStatus{margin-top:11px}
+
+.aiPagesDetails{margin-top:10px}
+.aiPageList{margin-top:8px;max-height:220px;overflow:auto;border:1px solid rgba(100,100,100,.16);border-radius:10px;padding:6px}
+.aiPageRow{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;padding:6px 4px;font-size:12px;line-height:1.35;word-break:break-word}
+.aiPageSkipped{opacity:.68}
