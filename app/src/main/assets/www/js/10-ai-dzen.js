@@ -4,6 +4,7 @@ let aiDzenSource='';
 let aiDzenBusy=false;
 const aiNativeWaiters=new Map();
 let aiNativeSeq=0;
+let dzenAiLiveCrawl=null;
 
 function dzenAiBridgeAvailable(){
   return !!(window.AndroidDzenAI&&typeof AndroidDzenAI.chat==='function'&&typeof AndroidDzenAI.fetchPage==='function');
@@ -62,19 +63,49 @@ function syncDzenAiSettingsUI(){
   syncDzenAiVisibility();
   updateDzenAiStatus();
 }
+function renderDzenAiPageReport(report=null){
+  const countEl=document.getElementById('dzenAiPageCount');
+  const listEl=document.getElementById('dzenAiPageList');
+  const noteEl=document.getElementById('dzenAiCrawlNote');
+  if(!countEl||!listEl||!noteEl)return;
+  const k=dzenAiKnowledge();
+  const stored=k&&k.crawl?k.crawl:null;
+  const data=report||stored;
+  const urls=Array.isArray(data?.urls)?data.urls:[];
+  const failed=Array.isArray(data?.failedUrls)?data.failedUrls:[];
+  const found=Number(data?.discovered||urls.length||0);
+  const processed=Number(data?.processed||urls.length||0);
+  const skipped=Number(data?.skipped||failed.length||0);
+  const truncated=!!data?.truncated;
+  countEl.textContent=processed?String(processed):'0';
+  noteEl.textContent=data
+    ?'Найдено: '+found+' · обработано: '+processed+' · пропущено: '+skipped+(truncated?' · достигнут защитный предел':'')
+    :'Список появится после сборки базы.';
+  const rows=[];
+  for(const url of urls)rows.push('<div class="aiPageRow"><span>✓</span><span>'+escapeHtml(String(url))+'</span></div>');
+  for(const url of failed)rows.push('<div class="aiPageRow aiPageSkipped"><span>×</span><span>'+escapeHtml(String(url))+'</span></div>');
+  listEl.innerHTML=rows.length?rows.join(''):'<div class="smallNote">Пока нет обработанных страниц.</div>';
+}
 function updateDzenAiStatus(message=''){
   const el=document.getElementById('dzenAiStatus');
   if(!el)return;
-  if(message){el.textContent=message;return}
+  if(message){
+    el.textContent=message;
+    if(dzenAiLiveCrawl)renderDzenAiPageReport(dzenAiLiveCrawl);
+    return;
+  }
   const k=dzenAiKnowledge();
   const key=dzenAiHasKey()?'ключ сохранён':'ключ не задан';
   if(!k){
     el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база ещё не собрана.';
+    renderDzenAiPageReport();
     return;
   }
   const date=k.builtAt?new Date(k.builtAt).toLocaleString('ru-RU'):'—';
   const state=dzenAiKnowledgeCurrent(k)?'актуальна для этих настроек':'нужно обновить';
-  el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+Number(k.pages||0)+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date);
+  const pages=Number(k.crawl?.processed||k.pages||0);
+  el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+pages+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date);
+  renderDzenAiPageReport();
 }
 async function onDzenCheckModeChanged(){
   const select=document.getElementById('dzenCheckMode');
@@ -168,8 +199,18 @@ function htmlPageData(raw,url){
   doc.querySelectorAll('script,style,noscript,svg,canvas,header,footer,nav,form').forEach(x=>x.remove());
   const title=(doc.querySelector('title')?.textContent||doc.querySelector('h1')?.textContent||url).replace(/\s+/g,' ').trim();
   let text=(doc.body?.innerText||doc.body?.textContent||'').replace(/\u00a0/g,' ').replace(/[ \t]+/g,' ').replace(/\n\s*\n+/g,'\n').trim();
-  if(text.length>12000)text=text.slice(0,12000);
+  // Аварийный предел только для явно аномальной одиночной страницы.
+  if(text.length>120000)text=text.slice(0,120000);
   return {url,title,text,links};
+}
+function canonicalAiSourceUrl(raw){
+  try{
+    const u=new URL(String(raw||'').trim());
+    if(u.protocol!=='https:')return '';
+    u.hash='';
+    if(/(^|\.)dzen\.ru$/i.test(u.hostname)&&u.pathname.startsWith('/help/ru/'))u.search='';
+    return u.href;
+  }catch(e){return ''}
 }
 function sourceScope(seed){
   try{
@@ -180,47 +221,109 @@ function sourceScope(seed){
   }catch(e){return null}
 }
 function allowedAiSourceLink(url,seeds){
-  let u;try{u=new URL(url)}catch(e){return false}
-  if(u.protocol!=='https:')return false;
-  u.hash='';
-  const clean=u.href;
-  if(/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|apk)(?:\?|$)/i.test(clean))return false;
+  const canonical=canonicalAiSourceUrl(url);
+  if(!canonical)return false;
+  const u=new URL(canonical);
+  if(/\.(?:jpg|jpeg|png|gif|webp|svg|pdf|zip|apk|mp4|webm|mp3|wav)(?:\?|$)/i.test(canonical))return false;
   return seeds.some(seed=>{
-    const scope=sourceScope(seed);return scope&&u.origin===scope.origin&&u.pathname.startsWith(scope.prefix);
+    const scope=sourceScope(seed);
+    return scope&&u.origin===scope.origin&&u.pathname.startsWith(scope.prefix);
   });
 }
 async function crawlDzenAiSources(){
-  const seeds=parseDzenAiSources();
-  if(!seeds.length)throw new Error('Добавьте хотя бы один URL Дзена');
-  const queue=[...seeds],seen=new Set(),pages=[],maxPages=18;
-  let totalChars=0;
-  while(queue.length&&pages.length<maxPages&&totalChars<90000){
-    const next=queue.shift();
-    let canonical;try{const u=new URL(next);u.hash='';canonical=u.href}catch(e){continue}
-    if(seen.has(canonical)||!allowedAiSourceLink(canonical,seeds))continue;
+  const rawSeeds=parseDzenAiSources();
+  const seeds=[...new Set(rawSeeds.map(canonicalAiSourceUrl).filter(Boolean))];
+  if(!seeds.length)throw new Error('Добавьте хотя бы один HTTPS URL Дзена');
+
+  // Обходим все уникальные страницы, достижимые из стартовых URL внутри разрешённого раздела.
+  // Предел 500 — аварийная защита от циклического/бесконечного сайта, а не рабочий лимит базы.
+  const EMERGENCY_MAX_PAGES=500;
+  const queue=[],discovered=new Set(),seen=new Set(),pages=[],failedUrls=[];
+  let truncated=false;
+
+  const enqueue=(raw)=>{
+    const url=canonicalAiSourceUrl(raw);
+    if(!url||discovered.has(url)||!allowedAiSourceLink(url,seeds))return;
+    if(discovered.size>=EMERGENCY_MAX_PAGES){truncated=true;return}
+    discovered.add(url);
+    queue.push(url);
+  };
+  seeds.forEach(enqueue);
+
+  while(queue.length){
+    const canonical=queue.shift();
+    if(seen.has(canonical))continue;
     seen.add(canonical);
-    updateDzenAiStatus('Читаю базу Дзена: '+(pages.length+1)+'/'+maxPages+'…');
+
+    dzenAiLiveCrawl={
+      discovered:discovered.size,
+      processed:pages.length,
+      skipped:failedUrls.length,
+      truncated,
+      urls:pages.map(x=>x.url),
+      failedUrls:[...failedUrls]
+    };
+    updateDzenAiStatus('Читаю справку Дзена: '+seen.size+' · найдено '+discovered.size+'…');
+
     let fetched;
-    try{fetched=await aiFetchPage(canonical)}catch(e){continue}
+    try{
+      fetched=await aiFetchPage(canonical);
+    }catch(e){
+      failedUrls.push(canonical);
+      continue;
+    }
+
     const data=htmlPageData(fetched.content,canonical);
     if(data.text.length>180){
-      pages.push({url:data.url,title:data.title,text:data.text});
-      totalChars+=data.text.length;
+      pages.push({url:canonical,title:data.title,text:data.text});
+    }else{
+      failedUrls.push(canonical);
     }
-    for(const link of data.links){
-      if(queue.length+seen.size>90)break;
-      if(allowedAiSourceLink(link,seeds)&&!seen.has(link))queue.push(link);
+
+    for(const link of data.links)enqueue(link);
+  }
+
+  if(!pages.length)throw new Error('Не удалось получить текст из указанных страниц');
+
+  const crawl={
+    discovered:discovered.size,
+    processed:pages.length,
+    skipped:failedUrls.length,
+    truncated,
+    urls:pages.map(x=>x.url),
+    failedUrls:[...failedUrls]
+  };
+  dzenAiLiveCrawl=crawl;
+  renderDzenAiPageReport(crawl);
+  return {pages,crawl};
+}
+function packKnowledgeBatches(pages,maxChars=28000){
+  const pieces=[];
+  const pagePieceMax=22000;
+  for(const p of pages){
+    let offset=0,part=1;
+    while(offset<p.text.length){
+      let end=Math.min(p.text.length,offset+pagePieceMax);
+      if(end<p.text.length){
+        const cut=p.text.lastIndexOf('\n',end);
+        if(cut>offset+Math.floor(pagePieceMax*.6))end=cut;
+      }
+      const piece=p.text.slice(offset,end).trim();
+      if(piece){
+        pieces.push('=== SOURCE ===\nURL: '+p.url+'\nTITLE: '+p.title+'\nPART: '+part+'\nTEXT:\n'+piece);
+        part++;
+      }
+      offset=Math.max(end,offset+1);
     }
   }
-  if(!pages.length)throw new Error('Не удалось получить текст из указанных страниц');
-  return pages;
-}
-function packKnowledgeBatches(pages,maxChars=30000){
   const batches=[];let current='',count=0;
-  for(const p of pages){
-    const block='\n\n=== SOURCE ===\nURL: '+p.url+'\nTITLE: '+p.title+'\nTEXT:\n'+p.text;
-    if(current&&current.length+block.length>maxChars){batches.push({text:current,count});current='';count=0}
-    current+=block;count++;
+  for(const block of pieces){
+    if(current&&current.length+block.length+2>maxChars){
+      batches.push({text:current,count});
+      current='';count=0;
+    }
+    current+=(current?'\n\n':'')+block;
+    count++;
   }
   if(current)batches.push({text:current,count});
   return batches;
@@ -230,9 +333,29 @@ function normalizeKnowledgeItems(value){
   return items.map(x=>({
     kind:String(x?.kind||'recommendation').slice(0,32),
     title:String(x?.title||'').trim().slice(0,180),
-    guidance:String(x?.guidance||x?.rule||'').trim().slice(0,900),
+    guidance:String(x?.guidance||x?.rule||'').trim().slice(0,1200),
     source_url:String(x?.source_url||x?.source||'').trim().slice(0,800)
-  })).filter(x=>x.title&&x.guidance).slice(0,140);
+  })).filter(x=>x.title&&x.guidance);
+}
+function dedupeKnowledgeItems(items){
+  const seen=new Set(),out=[];
+  for(const item of items){
+    const key=(item.kind+'|'+item.title+'|'+item.guidance).toLocaleLowerCase('ru-RU').replace(/\s+/g,' ').trim();
+    if(seen.has(key))continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+function packKnowledgeItems(items,maxChars=22000){
+  const batches=[];let current=[],chars=0;
+  for(const item of items){
+    const size=JSON.stringify(item).length+2;
+    if(current.length&&chars+size>maxChars){batches.push(current);current=[];chars=0}
+    current.push(item);chars+=size;
+  }
+  if(current.length)batches.push(current);
+  return batches;
 }
 async function buildDzenAiKnowledge(options={}){
   if(aiDzenBusy)return false;
@@ -240,9 +363,11 @@ async function buildDzenAiKnowledge(options={}){
   if(!dzenAiHasKey()){toast('Сначала сохраните API-ключ');return false}
   if(!String(settings.dzenAiBaseUrl||'').trim()||!String(settings.dzenAiModel||'').trim()){toast('Заполните API URL и модель');return false}
   aiDzenBusy=true;
+  dzenAiLiveCrawl=null;
   try{
     updateDzenAiStatus('Получаю страницы Дзена…');
-    const pages=await crawlDzenAiSources();
+    const crawled=await crawlDzenAiSources();
+    const pages=crawled.pages;
     const batches=packKnowledgeBatches(pages);
     let items=[];
     const system='Ты создаёшь базу знаний для редактора статей. Используй только предоставленные официальные материалы. Выделяй обязательные правила, рекомендации, требования к качеству и оформлению, а также сведения, которые могут влиять на распространение и показатели публикации. Не придумывай норм и не делай выводов, которых нет в источнике. Верни только JSON: {"items":[{"kind":"rule|recommendation|quality|distribution|format","title":"кратко","guidance":"что учитывать автору","source_url":"точный URL из материала"}]}.';
@@ -251,16 +376,19 @@ async function buildDzenAiKnowledge(options={}){
       const raw=await aiChat(system,batches[i].text);
       items.push(...normalizeKnowledgeItems(parseAiJson(raw)));
     }
-    if(items.length>1){
-      const compact=JSON.stringify({items:items.slice(0,140)});
-      updateDzenAiStatus('Убираю повторы и собираю базу…');
-      const mergeSystem='Объедини пункты базы знаний без потери смысла. Удали только явные дубли. Не добавляй новых правил. Сохраняй source_url. Верни только JSON вида {"items":[{"kind":"rule|recommendation|quality|distribution|format","title":"...","guidance":"...","source_url":"..."}]}.';
-      try{
-        const merged=normalizeKnowledgeItems(parseAiJson(await aiChat(mergeSystem,compact.slice(0,55000))));
-        if(merged.length)items=merged;
-      }catch(e){}
-    }
-    const knowledge={schema:1,builtAt:Date.now(),signature:dzenAiSettingsSignature(),baseUrl:String(settings.dzenAiBaseUrl||''),model:String(settings.dzenAiModel||''),sources:parseDzenAiSources(),pages:pages.length,items:items.slice(0,120)};
+    updateDzenAiStatus('Собираю базу без потери правил…');
+    items=dedupeKnowledgeItems(items);
+    const knowledge={
+      schema:2,
+      builtAt:Date.now(),
+      signature:dzenAiSettingsSignature(),
+      baseUrl:String(settings.dzenAiBaseUrl||''),
+      model:String(settings.dzenAiModel||''),
+      sources:parseDzenAiSources(),
+      pages:pages.length,
+      crawl:crawled.crawl,
+      items
+    };
     if(!knowledge.items.length)throw new Error('Модель не выделила полезных правил');
     localStorage.setItem(DZEN_AI_KNOWLEDGE_KEY,JSON.stringify(knowledge));
     updateDzenAiStatus();
@@ -270,7 +398,7 @@ async function buildDzenAiKnowledge(options={}){
     updateDzenAiStatus();
     toast(e.message||'Не удалось собрать AI-базу Дзена');
     return false;
-  }finally{aiDzenBusy=false}
+  }finally{aiDzenBusy=false;dzenAiLiveCrawl=null;updateDzenAiStatus()}
 }
 function shouldRunAiDzenCheck(){
   return settings.dzenCheck!==false&&(settings.dzenCheckMode||'builtin')==='ai';
@@ -333,16 +461,23 @@ async function startAiDzenArticleCheck(src){
     if(aiDzenBusy)throw new Error('AI уже выполняет другую операцию');
     aiDzenBusy=true;
     toast('AI проверяет статью…');
-    const compactKnowledge=JSON.stringify({items:knowledge.items.slice(0,100)}).slice(0,30000);
+    const knowledgeBatches=packKnowledgeItems(knowledge.items);
     const stylePrompt=String(settings.dzenAiStylePrompt||'').trim();
     const chunks=splitArticleForAi(source);
     const result=[];
-    const system='Ты редактор Яндекс Дзена. Проверяй только по переданной базе знаний и отдельно ищи стилистические признаки машинного текста по пользовательской инструкции. Не утверждай, что текст создан ИИ: отмечай только конкретные признаки. Каждое замечание обязано содержать точную короткую цитату из ARTICLE_CHUNK. Не выдумывай цитаты. Верни только JSON: {"dzen_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning|critical","source_url":"..."}],"quality_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning","source_url":"..."}],"style_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning"}]}.';
+    const system='Ты редактор Яндекс Дзена. Проверяй только по переданной части базы знаний и отдельно ищи стилистические признаки машинного текста, только если STYLE_INSTRUCTION не пуст. Не утверждай, что текст создан ИИ: отмечай только конкретные признаки. Каждое замечание обязано содержать точную короткую цитату из ARTICLE_CHUNK. Не выдумывай цитаты. Верни только JSON: {"dzen_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning|critical","source_url":"..."}],"quality_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning","source_url":"..."}],"style_issues":[{"title":"...","reason":"...","quote":"точная цитата","severity":"warning"}]}.';
+    const totalCalls=Math.max(1,chunks.length*knowledgeBatches.length);
+    let callNo=0;
     for(let i=0;i<chunks.length;i++){
-      updateDzenAiStatus('Проверяю статью: '+(i+1)+'/'+chunks.length+'…');
-      const prompt='KNOWLEDGE:\n'+compactKnowledge+'\n\nSTYLE_INSTRUCTION:\n'+stylePrompt+'\n\nARTICLE_CHUNK '+(i+1)+'/'+chunks.length+'; absolute_offset='+chunks[i].start+':\n'+chunks[i].text;
-      const raw=await aiChat(system,prompt);
-      result.push(...normalizeAiArticleResult(parseAiJson(raw),chunks[i]));
+      for(let k=0;k<knowledgeBatches.length;k++){
+        callNo++;
+        updateDzenAiStatus('Проверяю статью: '+callNo+'/'+totalCalls+'…');
+        const knowledgeJson=JSON.stringify({items:knowledgeBatches[k]});
+        const styleInstruction=k===0?stylePrompt:'';
+        const prompt='KNOWLEDGE_PART '+(k+1)+'/'+knowledgeBatches.length+':\n'+knowledgeJson+'\n\nSTYLE_INSTRUCTION:\n'+styleInstruction+'\n\nARTICLE_CHUNK '+(i+1)+'/'+chunks.length+'; absolute_offset='+chunks[i].start+':\n'+chunks[i].text;
+        const raw=await aiChat(system,prompt);
+        result.push(...normalizeAiArticleResult(parseAiJson(raw),chunks[i]));
+      }
     }
     const seen=new Set();
     aiDzenIssues=result.filter(x=>{const k=x.type+'|'+x.title+'|'+x.start+'|'+x.end;if(seen.has(k))return false;seen.add(k);return true}).slice(0,180);
