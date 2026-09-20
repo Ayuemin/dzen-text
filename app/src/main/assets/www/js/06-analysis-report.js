@@ -97,14 +97,106 @@ function saveAiAnalysisReport(){
   }catch(e){toast('Не удалось сохранить AI-отчёт')}
 }
 window.onNativeReportSaved=(name)=>toast(`Отчёт сохранён${name?': '+name:''}`);window.onNativeReportError=(msg)=>toast(msg||'Не удалось сохранить отчёт');
-function renderAnalysis(){const box=document.getElementById('analysisContent'),sum=document.getElementById('analysisSummary'),collapsed=document.getElementById('analysisCollapsedSummary'),a=currentAnalysis,ec=a.editorCount||0,ac=a.aiStyleCount||0,dc=a.dzenCount||0,sc=a.spellCount||0;let spellPart=settings.onlineSpelling?(spellStatus==='checking'?' · орфография: <b>проверяю…</b>':` · орфография: <b>${sc}</b>`):' · онлайн-орфография: выкл.';sum.innerHTML=a.warningCount?`Редакторских замечаний: <b>${ec}</b> · ИИ-стиль: <b>${ac}</b> · по правилам Дзена: <b>${dc}</b>${spellPart}.`:`<b>По локальным проверкам замечаний нет.</b>${spellPart} Финальная вычитка всё равно нужна.`;if(collapsed)collapsed.textContent=`${ec?'🔴':'🟢'} редакторских: ${ec} · ${dc?'🟠':'🟢'} Дзен: ${dc}`;document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));let html='';if(analysisMode==='all')html+=`<div class="analysisInfo"><div class="metric"><b>${a.metrics.headings?.length||0}</b><span>заголовков</span></div><div class="metric"><b>${a.metrics.avgSentence||0}</b><span>слов в среднем предложении</span></div><div class="metric"><b>${a.metrics.lists||0}</b><span>пунктов списков</span></div><div class="metric"><b>${a.metrics.links||0}</b><span>ссылок</span></div></div>`;if(analysisMode==='dzen'){const rows=a.issues.filter(x=>x.type==='dzen');html+=`<div class="analysisDzenNote">База правил: <b>${escapeHtml(String(activeDzenRules().version||'встроенная'))}</b>. Совпадение означает только повод проверить фрагмент, а не установленное нарушение.</div>`;if(rows.length){const n=analysisVisibleAndHidden('dzen');html+=`<div class="analysisGroup"><div class="analysisTitle"><span>Возможные риски</span><span class="badge bad">${n.total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote('dzen')}</div>`;}else html+='<div class="analysisEmpty">Автоматические признаки риска по текущей базе не найдены.</div>';html+=renderDzenManual();box.innerHTML=html;return}for(const g of issueGroups()){const rows=a.issues.filter(x=>x.type===g.id);if(g.id==='heading'&&analysisMode==='all'){const hs=a.metrics.headings||[];html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge ${analysisVisibleAndHidden(g.id).total?'bad':''}">${analysisVisibleAndHidden(g.id).total||'✓'}</span></div>`;if(!hs.length)html+='<div class="analysisRow"><span class="meta">Заголовков Markdown не найдено.</span></div>';else for(const h of hs){const bad=rows.find(r=>r.start===h.start);html+=bad?issueHtml(bad):`<button class="analysisRow jump" onclick="jumpTo(${h.start},${h.end})"><span class="ok">H${h.level} · ${h.text.length} знаков</span> ${escapeHtml(h.text)}<span class="meta">Нажмите, чтобы перейти к заголовку</span></button>`}html+='</div>';continue}if(!rows.length)continue;const n=analysisVisibleAndHidden(g.id);html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge bad">${n.total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote(g.id)}${g.id==='spelling'?'<div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>':''}</div>`}if(!a.warningCount)html+='<div class="analysisEmpty">Красных замечаний нет. Переключите «Всё», чтобы посмотреть информационные показатели.</div>';box.innerHTML=html}
+function renderAnalysis(){
+  const box=document.getElementById('analysisContent'),
+        sum=document.getElementById('analysisSummary'),
+        collapsed=document.getElementById('analysisCollapsedSummary'),
+        a=currentAnalysis,
+        localIssues=a.issues.filter(x=>!x.ai),
+        aiIssues=a.issues.filter(x=>x.ai),
+        overflow=a.issueOverflow||{},
+        overflowTotal=Object.values(overflow).reduce((n,v)=>n+(Number(v)||0),0),
+        localTotal=localIssues.length+overflowTotal,
+        localDzen=localIssues.filter(x=>x.type==='dzen').length+(Number(overflow.dzen)||0),
+        localAiStyle=localIssues.filter(x=>x.type==='aiStyle').length+(Number(overflow.aiStyle)||0),
+        localSpell=localIssues.filter(x=>x.type==='spelling').length+(Number(overflow.spelling)||0),
+        localEditor=localTotal-localDzen-localAiStyle-localSpell,
+        aiCount=aiIssues.length;
+
+  let spellPart=settings.onlineSpelling
+    ?(spellStatus==='checking'?' · орфография: <b>проверяю…</b>':` · орфография: <b>${localSpell}</b>`)
+    :' · онлайн-орфография: выкл.';
+
+  sum.innerHTML=`Локальных замечаний: <b>${localTotal}</b> · AI: <b>${aiCount}</b>${spellPart}.`;
+  if(collapsed)collapsed.textContent=`${localTotal?'🔴':'🟢'} локальных: ${localTotal} · ${aiCount?'🟣':'🟢'} AI: ${aiCount}`;
+  document.querySelectorAll('.analysisFilter').forEach(b=>b.classList.toggle('active',b.dataset.mode===analysisMode));
+
+  let html='';
+
+  if(analysisMode==='ai'){
+    const aiCurrent=typeof aiDzenSource!=='undefined'&&aiDzenSource===(editor.value||'');
+    if(!aiCurrent){
+      html+='<div class="analysisEmpty">AI-проверка для текущей версии текста ещё не выполнена или результат устарел после редактирования.</div>';
+      box.innerHTML=html;
+      return;
+    }
+    if(!aiIssues.length){
+      html+='<div class="analysisEmpty">AI-проверка выполнена. Дополнительных замечаний не найдено.</div>';
+      box.innerHTML=html;
+      return;
+    }
+    const groups=[
+      {id:'dzen',name:'AI · соответствие Дзену'},
+      {id:'aiStyle',name:'AI · стиль текста'}
+    ];
+    for(const g of groups){
+      const rows=aiIssues.filter(x=>x.type===g.id);
+      if(!rows.length)continue;
+      html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge bad">${rows.length}</span></div>${rows.map(issueHtml).join('')}</div>`;
+    }
+    box.innerHTML=html;
+    return;
+  }
+
+  if(analysisMode==='all'){
+    html+=`<div class="analysisInfo"><div class="metric"><b>${a.metrics.headings?.length||0}</b><span>заголовков</span></div><div class="metric"><b>${a.metrics.avgSentence||0}</b><span>слов в среднем предложении</span></div><div class="metric"><b>${a.metrics.lists||0}</b><span>пунктов списков</span></div><div class="metric"><b>${a.metrics.links||0}</b><span>ссылок</span></div></div>`;
+  }
+
+  if(analysisMode==='dzen'){
+    const rows=localIssues.filter(x=>x.type==='dzen');
+    html+=`<div class="analysisDzenNote">База правил: <b>${escapeHtml(String(activeDzenRules().version||'встроенная'))}</b>. Это только встроенная/локальная проверка. AI-замечания находятся во вкладке «AI».</div>`;
+    if(rows.length){
+      const total=rows.length+(Number(overflow.dzen)||0);
+      html+=`<div class="analysisGroup"><div class="analysisTitle"><span>Возможные риски</span><span class="badge bad">${total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote('dzen')}</div>`;
+    }else{
+      html+='<div class="analysisEmpty">Автоматические признаки риска по локальной базе не найдены.</div>';
+    }
+    html+=renderDzenManual();
+    box.innerHTML=html;
+    return;
+  }
+
+  for(const g of issueGroups()){
+    const rows=localIssues.filter(x=>x.type===g.id);
+    if(g.id==='heading'&&analysisMode==='all'){
+      const hs=a.metrics.headings||[];
+      const total=rows.length+(Number(overflow[g.id])||0);
+      html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge ${total?'bad':''}">${total||'✓'}</span></div>`;
+      if(!hs.length){
+        html+='<div class="analysisRow"><span class="meta">Заголовков Markdown не найдено.</span></div>';
+      }else{
+        for(const h of hs){
+          const bad=rows.find(r=>r.start===h.start);
+          html+=bad?issueHtml(bad):`<button class="analysisRow jump" onclick="jumpTo(${h.start},${h.end})"><span class="ok">H${h.level} · ${h.text.length} знаков</span> ${escapeHtml(h.text)}<span class="meta">Нажмите, чтобы перейти к заголовку</span></button>`;
+        }
+      }
+      html+='</div>';
+      continue;
+    }
+    if(!rows.length)continue;
+    const total=rows.length+(Number(overflow[g.id])||0);
+    html+=`<div class="analysisGroup"><div class="analysisTitle"><span>${g.name}</span><span class="badge bad">${total}</span></div>${rows.map(issueHtml).join('')}${analysisOverflowNote(g.id)}${g.id==='spelling'?'<div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>':''}</div>`;
+  }
+  if(!localTotal)html+='<div class="analysisEmpty">Локальных замечаний нет. Переключите «Всё», чтобы посмотреть информационные показатели, или «AI» для результатов модели.</div>';
+  box.innerHTML=html;
+}
 function issueHtml(i){
   let sev=i.severity==='critical'?'Контроль':'Обратите внимание';
   if(i.type==='dzen')sev=i.severity==='critical'?'Высокий риск — проверить':'Проверить вручную';
   if(i.type==='aiStyle')sev='Маркер машинного стиля — проверить';
   const word=i.word?String(i.word):'';
   const idx=currentAnalysis.issues.indexOf(i);
-  const sameType=currentAnalysis.issues.filter(x=>x.type===i.type).length;
+  const sameType=currentAnalysis.issues.filter(x=>x.type===i.type&&!!x.ai===!!i.ai).length;
   let click,cls,hint;
   if(i.type==='nearby'&&Number.isFinite(i.pairStart)){
     click=`openNearbyRepeat(${i.pairStart},${i.pairEnd},${i.start},${i.end},${i.firstSentenceStart},${i.firstSentenceEnd},${i.secondSentenceStart},${i.secondSentenceEnd},${JSON.stringify(word)})`;
