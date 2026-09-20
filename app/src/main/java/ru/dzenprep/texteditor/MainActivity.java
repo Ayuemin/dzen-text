@@ -98,6 +98,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web.addJavascriptInterface(new FileBridge(), "AndroidFile");
         web.addJavascriptInterface(new DictionaryBridge(), "AndroidDictionary");
         web.addJavascriptInterface(new SpellBridge(), "AndroidSpell");
+        web.addJavascriptInterface(new DzenAiBridge(), "AndroidDzenAI");
         web.addJavascriptInterface(new DocumentsBridge(), "AndroidDocuments");
         installKeyboardObserver();
         loadBundledDictionary();
@@ -369,6 +370,70 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     runJs("window.onNativeSpellError && window.onNativeSpellError(" + JSONObject.quote(id) + ",'Не удалось обратиться к Яндекс.Спеллеру. Проверьте интернет.')");
                 }
             }, "dzen-speller").start();
+        }
+    }
+
+    public class DzenAiBridge {
+        private static final String PREFS = "dzen_text_private";
+        private static final String KEY_API = "dzen_ai_api_key";
+
+        @JavascriptInterface
+        public boolean saveKey(String key) {
+            String value = key == null ? "" : key.trim();
+            if (value.length() < 6 || value.length() > 4096) return false;
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_API, value).apply();
+            return true;
+        }
+
+        @JavascriptInterface
+        public boolean hasKey() {
+            String value = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_API, "");
+            return value != null && !value.trim().isEmpty();
+        }
+
+        @JavascriptInterface
+        public void clearKey() {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_API).apply();
+        }
+
+        @JavascriptInterface
+        public void fetchPage(final String rawUrl, final String requestId) {
+            final String id = requestId == null ? "" : requestId;
+            final String target = rawUrl == null ? "" : rawUrl.trim();
+            new Thread(() -> {
+                try {
+                    String html = fetchAiSourcePage(target);
+                    runJs("window.onNativeAiPageResult && window.onNativeAiPageResult(" +
+                            JSONObject.quote(id) + "," + JSONObject.quote(target) + "," + JSONObject.quote(html) + ")");
+                } catch (Exception e) {
+                    runJs("window.onNativeAiError && window.onNativeAiError(" +
+                            JSONObject.quote(id) + "," + JSONObject.quote(aiErrorMessage(e, "Не удалось загрузить страницу Дзена")) + ")");
+                }
+            }, "dzen-ai-page").start();
+        }
+
+        @JavascriptInterface
+        public void chat(final String baseUrl, final String model, final String systemPrompt,
+                         final String userPrompt, final String requestId) {
+            final String id = requestId == null ? "" : requestId;
+            new Thread(() -> {
+                try {
+                    String key = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_API, "");
+                    if (key == null || key.trim().isEmpty()) throw new Exception("API-ключ не сохранён");
+                    String content = callOpenAiCompatible(
+                            baseUrl == null ? "" : baseUrl.trim(),
+                            key.trim(),
+                            model == null ? "" : model.trim(),
+                            systemPrompt == null ? "" : systemPrompt,
+                            userPrompt == null ? "" : userPrompt
+                    );
+                    runJs("window.onNativeAiChatResult && window.onNativeAiChatResult(" +
+                            JSONObject.quote(id) + "," + JSONObject.quote(content) + ")");
+                } catch (Exception e) {
+                    runJs("window.onNativeAiError && window.onNativeAiError(" +
+                            JSONObject.quote(id) + "," + JSONObject.quote(aiErrorMessage(e, "Ошибка AI API")) + ")");
+                }
+            }, "dzen-ai-chat").start();
         }
     }
 
@@ -984,6 +1049,154 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             }
         }
         return result;
+    }
+
+    private String aiErrorMessage(Exception e, String fallback) {
+        String message = e == null ? "" : e.getMessage();
+        if (message == null || message.trim().isEmpty()) return fallback;
+        message = message.replace('\n', ' ').replace('\r', ' ').trim();
+        if (message.length() > 220) message = message.substring(0, 220) + "…";
+        return message;
+    }
+
+    private URL requireHttpsUrl(String raw) throws Exception {
+        if (raw == null || raw.trim().isEmpty()) throw new Exception("URL не указан");
+        URL url = new URL(raw.trim());
+        if (!"https".equalsIgnoreCase(url.getProtocol())) {
+            throw new Exception("Разрешены только HTTPS-адреса");
+        }
+        return url;
+    }
+
+    private String aiChatEndpoint(String baseUrl) throws Exception {
+        String value = baseUrl == null ? "" : baseUrl.trim();
+        if (value.isEmpty()) throw new Exception("API URL не указан");
+        while (value.endsWith("/")) value = value.substring(0, value.length() - 1);
+        if (!value.endsWith("/chat/completions")) value += "/chat/completions";
+        requireHttpsUrl(value);
+        return value;
+    }
+
+    private byte[] readHttpBodyLimited(InputStream response, int maxBytes) throws Exception {
+        if (response == null) throw new Exception("Пустой ответ сервера");
+        try (InputStream in = response; ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buf = new byte[8192];
+            int n, total = 0;
+            while ((n = in.read(buf)) != -1) {
+                total += n;
+                if (total > maxBytes) throw new Exception("Ответ сервера слишком большой");
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        }
+    }
+
+    private String fetchAiSourcePage(String rawUrl) throws Exception {
+        URL url = requireHttpsUrl(rawUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(12000);
+        conn.setReadTimeout(22000);
+        conn.setInstanceFollowRedirects(true);
+        conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.2");
+        conn.setRequestProperty("User-Agent", "Dzen-Text/1.10.0 Android");
+        int code = conn.getResponseCode();
+        InputStream response = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+        byte[] bytes;
+        try {
+            bytes = readHttpBodyLimited(response, 2 * 1024 * 1024);
+        } finally {
+            conn.disconnect();
+        }
+        if (code < 200 || code >= 300) throw new Exception("Источник вернул HTTP " + code);
+        return new String(bytes, StandardCharsets.UTF_8);
+    }
+
+    private String openAiContent(JSONObject response) throws Exception {
+        JSONArray choices = response.optJSONArray("choices");
+        if (choices == null || choices.length() == 0) throw new Exception("AI API вернул ответ без choices");
+        JSONObject choice = choices.optJSONObject(0);
+        JSONObject message = choice == null ? null : choice.optJSONObject("message");
+        if (message == null) throw new Exception("AI API вернул ответ без message");
+        Object content = message.opt("content");
+        if (content instanceof String) {
+            String text = ((String) content).trim();
+            if (!text.isEmpty()) return text;
+        }
+        if (content instanceof JSONArray) {
+            JSONArray parts = (JSONArray) content;
+            StringBuilder out = new StringBuilder();
+            for (int i = 0; i < parts.length(); i++) {
+                Object part = parts.opt(i);
+                if (part instanceof JSONObject) {
+                    String text = ((JSONObject) part).optString("text", "");
+                    if (!text.isEmpty()) {
+                        if (out.length() > 0) out.append('\n');
+                        out.append(text);
+                    }
+                } else if (part instanceof String) {
+                    if (out.length() > 0) out.append('\n');
+                    out.append((String) part);
+                }
+            }
+            if (out.length() > 0) return out.toString().trim();
+        }
+        throw new Exception("AI API вернул пустой content");
+    }
+
+    private String callOpenAiCompatible(String baseUrl, String apiKey, String model,
+                                        String systemPrompt, String userPrompt) throws Exception {
+        if (model == null || model.trim().isEmpty()) throw new Exception("Модель не указана");
+        URL endpoint = requireHttpsUrl(aiChatEndpoint(baseUrl));
+
+        JSONObject payload = new JSONObject();
+        payload.put("model", model.trim());
+        JSONArray messages = new JSONArray();
+        JSONObject system = new JSONObject();
+        system.put("role", "system");
+        system.put("content", systemPrompt == null ? "" : systemPrompt);
+        messages.put(system);
+        JSONObject user = new JSONObject();
+        user.put("role", "user");
+        user.put("content", userPrompt == null ? "" : userPrompt);
+        messages.put(user);
+        payload.put("messages", messages);
+        payload.put("temperature", 0.1);
+
+        byte[] body = payload.toString().getBytes(StandardCharsets.UTF_8);
+        HttpURLConnection conn = (HttpURLConnection) endpoint.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setConnectTimeout(15000);
+        conn.setReadTimeout(100000);
+        conn.setDoOutput(true);
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8");
+        conn.setRequestProperty("Accept", "application/json");
+        conn.setRequestProperty("User-Agent", "Dzen-Text/1.10.0 Android");
+        conn.setFixedLengthStreamingMode(body.length);
+        try (OutputStream out = conn.getOutputStream()) {
+            out.write(body);
+        }
+
+        int code = conn.getResponseCode();
+        InputStream response = code >= 200 && code < 300 ? conn.getInputStream() : conn.getErrorStream();
+        byte[] bytes;
+        try {
+            bytes = readHttpBodyLimited(response, 4 * 1024 * 1024);
+        } finally {
+            conn.disconnect();
+        }
+        String raw = new String(bytes, StandardCharsets.UTF_8);
+        if (code < 200 || code >= 300) {
+            String detail = "";
+            try {
+                JSONObject err = new JSONObject(raw);
+                JSONObject eo = err.optJSONObject("error");
+                detail = eo == null ? err.optString("message", "") : eo.optString("message", "");
+            } catch (Exception ignored) { }
+            throw new Exception("AI API: HTTP " + code + (detail.isEmpty() ? "" : " · " + detail));
+        }
+        return openAiContent(new JSONObject(raw));
     }
 
     private String readDisplayName(Uri uri) {

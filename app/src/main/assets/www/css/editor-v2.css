@@ -1237,3 +1237,38 @@ body.keyboard-open .sheetBackdrop.open .sheet{
 body.keyboard-open .ideasSheet{
   max-height:calc(100vh - var(--keyboardInset) - max(12px,env(safe-area-inset-top)))!important;
 }
+
+
+/* AI-проверка Дзена */
+.aiSettingsBlock{margin-top:14px;padding-top:12px;border-top:1px solid color-mix(in srgb,var(--accent) 20%,transparent)}
+.settingTextInput{width:100%;box-sizing:border-box;border:1px solid rgba(90,90,90,.24);border-radius:12px;padding:11px 12px;background:var(--sheetInput,#fff);color:inherit;font:inherit;outline:none}
+.settingTextInput:focus,.aiPromptArea:focus{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 14%,transparent)}
+.aiPromptArea{width:100%;box-sizing:border-box;min-height:92px;resize:vertical}
+.compactActions{margin-top:8px}
+.aiSettingsBlock .subLabel{margin-top:13px}
+.aiSettingsBlock .ruleStatus{margin-top:11px}
+
+.aiPagesDetails{margin-top:10px}
+.aiPageList{margin-top:8px;max-height:220px;overflow:auto;border:1px solid rgba(100,100,100,.16);border-radius:10px;padding:6px}
+.aiPageRow{display:grid;grid-template-columns:18px minmax(0,1fr);gap:6px;padding:6px 4px;font-size:12px;line-height:1.35;word-break:break-word}
+.aiPageSkipped{opacity:.68}
+
+
+/* Contextual info hints */
+.labelWithHint{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.infoHintBtn{
+  width:19px;height:19px;min-width:19px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid color-mix(in srgb,var(--accent) 42%,var(--border));
+  border-radius:50%;
+  background:transparent;
+  color:var(--accent);
+  font:700 12px/1 system-ui,-apple-system,"Segoe UI",sans-serif;
+  padding:0;
+  vertical-align:middle;
+}
+.infoHintBtn:active{transform:scale(.94)}
+.actionHintBtn{align-self:center;margin:0 2px}
+.versionUsageHeader{display:flex;align-items:center;gap:7px;min-width:0}
+.versionUsageHeader .versionUsageText{min-width:0;flex:1}
+.aiHintDialog p{white-space:pre-line}

@@ -181,6 +181,8 @@ document.addEventListener('touchend',function(event){
 },{passive:true});
 
 function handleNativeBack(){
+  const hintBox=document.getElementById('aiHintBackdrop');
+  if(hintBox&&hintBox.classList.contains('open')){if(typeof closeAiHint==='function')closeAiHint();return true}
   const confirmBox=document.getElementById('confirmBackdrop');
   if(confirmBox&&confirmBox.classList.contains('open')){resolveAppConfirm(false);return true}
   const versions=document.getElementById('versionsBackdrop');
