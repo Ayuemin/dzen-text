@@ -76,8 +76,24 @@ function updateDzenAiStatus(message=''){
   const state=dzenAiKnowledgeCurrent(k)?'актуальна для этих настроек':'нужно обновить';
   el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+Number(k.pages||0)+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date);
 }
-function onDzenCheckModeChanged(){
-  applySettings();
+async function onDzenCheckModeChanged(){
+  const select=document.getElementById('dzenCheckMode');
+  const next=select?.value||'builtin';
+  const previous=settings.dzenCheckMode||'builtin';
+  if(next==='ai'&&previous!=='ai'){
+    const ok=await appConfirm(
+      'Включить AI-проверку Дзена?',
+      'После нажатия «Проверить» текст статьи и подготовленная база знаний Дзена будут отправлены в указанный вами OpenAI-совместимый API. При обычном наборе текста ничего не отправляется.',
+      'Включить',
+      false
+    );
+    if(!ok){
+      if(select)select.value=previous;
+      syncDzenAiVisibility();
+      return;
+    }
+  }
+  await applySettings();
   syncDzenAiVisibility();
 }
 function saveDzenAiApiKey(){
