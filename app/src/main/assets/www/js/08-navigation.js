@@ -71,7 +71,7 @@ function issueTypeLabel(type){
 function openIssueNavigator(issueIndex){
   const issue=currentAnalysis.issues[issueIndex];
   if(!issue)return;
-  const same=currentAnalysis.issues.filter(x=>x.type===issue.type);
+  const same=currentAnalysis.issues.filter(x=>x.type===issue.type&&!!x.ai===!!issue.ai);
   if(same.length<2){jumpTo(issue.start,issue.end);return}
   closeAnalysis();
   if(replacementState)closeReplacement();
