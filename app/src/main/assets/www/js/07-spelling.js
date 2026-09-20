@@ -3,7 +3,7 @@ function runFullCheck(){
  if(!src.trim()){toast('Нет текста для проверки');return}
  editor.blur();
  clearOnlineSpelling();
- if(typeof clearAiDzenIssues==='function')clearAiDzenIssues();
+ if(typeof clearAiDzenIssues==='function')clearAiDzenIssues('idle');
  setCheckRunning(true);
 
  const mode=currentCheckMode();
