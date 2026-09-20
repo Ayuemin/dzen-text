@@ -293,7 +293,7 @@
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Проверять соответствие Дзену</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
 
-        <div class="subLabel" style="margin-top:13px"><span>Режим проверки</span></div>
+        <div class="subLabel" style="margin-top:13px"><span class="labelWithHint">Режим проверки <button class="infoHintBtn" type="button" onclick="showAiHint('mode')" aria-label="Подсказка о режиме проверки">i</button></span></div>
         <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
           <option value="builtin">Встроенная локальная</option>
           <option value="ai">AI + встроенная</option>
@@ -301,22 +301,22 @@
         <div class="smallNote">Встроенная проверка работает без API и не отправляет статью наружу. В AI-режиме сохраняются локальные проверки и добавляется смысловая проверка выбранной моделью.</div>
 
         <div id="dzenAiFields" class="aiSettingsBlock" hidden>
-          <div class="subLabel"><span>API URL</span></div>
+          <div class="subLabel"><span class="labelWithHint">API URL <button class="infoHintBtn" type="button" onclick="showAiHint('api')" aria-label="Подсказка об API URL">i</button></span></div>
           <input id="dzenAiBaseUrl" class="settingTextInput" type="url" autocomplete="off" spellcheck="false" placeholder="https://openrouter.ai/api/v1" onchange="applySettings()">
 
-          <div class="subLabel"><span>API-ключ</span></div>
+          <div class="subLabel"><span class="labelWithHint">API-ключ <button class="infoHintBtn" type="button" onclick="showAiHint('key')" aria-label="Подсказка об API-ключе">i</button></span></div>
           <input id="dzenAiApiKey" class="settingTextInput" type="password" autocomplete="off" spellcheck="false" placeholder="Введите API-ключ">
           <div class="settingActions compactActions"><button class="nativeBtn" type="button" onclick="saveDzenAiApiKey()">Сохранить ключ</button><button class="nativeBtn" type="button" onclick="clearDzenAiApiKey()">Удалить ключ</button></div>
           <div class="smallNote">Ключ хранится в приватном хранилище приложения и не записывается в настройки страницы.</div>
 
-          <div class="subLabel"><span>Модель</span></div>
+          <div class="subLabel"><span class="labelWithHint">Модель <button class="infoHintBtn" type="button" onclick="showAiHint('model')" aria-label="Подсказка о модели">i</button></span></div>
           <input id="dzenAiModel" class="settingTextInput" type="text" autocomplete="off" spellcheck="false" placeholder="openrouter/free" onchange="applySettings()">
 
-          <div class="subLabel"><span>Источники знаний Дзена</span></div>
+          <div class="subLabel"><span class="labelWithHint">Источники знаний Дзена <button class="infoHintBtn" type="button" onclick="showAiHint('sources')" aria-label="Подсказка об источниках знаний">i</button></span></div>
           <textarea id="dzenAiSources" class="riskArea aiPromptArea" rows="4" spellcheck="false" onchange="applySettings()" placeholder="По одному URL на строку"></textarea>
           <div class="smallNote">Указанный URL служит точкой входа. Приложение рекурсивно проходит все найденные внутренние страницы того же раздела официальной справки, включая ссылки со следующих страниц. Внешние сайты игнорируются, повторы URL не загружаются.</div>
 
-          <div class="subLabel"><span>Что искать в стиле и AI-признаках</span></div>
+          <div class="subLabel"><span class="labelWithHint">Что искать в стиле и AI-признаках <button class="infoHintBtn" type="button" onclick="showAiHint('style')" aria-label="Подсказка о проверке стиля">i</button></span></div>
           <textarea id="dzenAiStylePrompt" class="riskArea aiPromptArea" rows="6" onchange="applySettings()" placeholder="Инструкция для смысловой проверки"></textarea>
           <div class="smallNote">Это не «детектор ИИ». Модель ищет конкретные шаблонные и неестественные места по вашей инструкции.</div>
 
@@ -326,7 +326,7 @@
             <div id="dzenAiCrawlNote" class="smallNote">Список появится после сборки базы.</div>
             <div id="dzenAiPageList" class="aiPageList"><div class="smallNote">Пока нет обработанных страниц.</div></div>
           </details>
-          <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="buildDzenAiKnowledge()">Собрать / обновить AI-базу</button><button class="nativeBtn" type="button" onclick="clearDzenAiKnowledge()">Очистить AI-базу</button></div>
+          <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="buildDzenAiKnowledge()">Собрать / обновить AI-базу</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAiHint('build')" aria-label="Подсказка о сборке AI-базы">i</button><button class="nativeBtn" type="button" onclick="clearDzenAiKnowledge()">Очистить AI-базу</button></div>
         </div>
 
         <details class="nestedDetails" style="margin-top:14px">
@@ -382,6 +382,16 @@
   </div>
 </div>
 
+<div class="dialogBackdrop" id="aiHintBackdrop" onclick="aiHintBackdropClick(event)">
+  <div class="appDialog aiHintDialog" role="dialog" aria-modal="true" aria-labelledby="aiHintTitle">
+    <h3 id="aiHintTitle">Подсказка</h3>
+    <p id="aiHintText"></p>
+    <div class="dialogActions">
+      <button type="button" class="dialogOk" onclick="closeAiHint()">Понятно</button>
+    </div>
+  </div>
+</div>
+
 <div class="dialogBackdrop" id="confirmBackdrop" onclick="confirmBackdropClick(event)">
   <div class="appDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h3 id="confirmTitle">Подтвердите действие</h3>
@@ -410,7 +420,8 @@
 <script src="js/07-spelling.js"></script>
 <script src="js/08-navigation.js"></script>
 <script src="js/09-editor.js"></script>
-<script src="js/10-settings.js"></script>\n<script src="js/10-ai-dzen.js"></script>
+<script src="js/10-settings.js"></script>
+<script src="js/10-ai-dzen.js"></script>
 <script src="js/11-ui.js"></script>
 <script src="js/12-dialogs.js"></script>
 <script src="js/12-articles.js"></script>
