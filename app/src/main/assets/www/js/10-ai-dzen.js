@@ -307,14 +307,16 @@ function normalizeAiArticleResult(value,chunk){
 async function startAiDzenArticleCheck(src){
   const source=String(src||editor.value||'');
   if(!source.trim()){setCheckRunning(false);return}
-  if(aiDzenBusy){toast('AI уже занят обновлением базы');setCheckRunning(false);return}
-  aiDzenBusy=true;
+  if(aiDzenBusy){toast('AI уже выполняет другую операцию');setCheckRunning(false);return}
   clearAiDzenIssues();
+  let knowledge=null;
   try{
     setCheckRunning(true);
-    toast('AI проверяет статью…');
-    const knowledge=await ensureDzenAiKnowledge();
+    knowledge=await ensureDzenAiKnowledge();
     if(!knowledge)throw new Error('Нет актуальной AI-базы Дзена');
+    if(aiDzenBusy)throw new Error('AI уже выполняет другую операцию');
+    aiDzenBusy=true;
+    toast('AI проверяет статью…');
     const compactKnowledge=JSON.stringify({items:knowledge.items.slice(0,100)}).slice(0,30000);
     const stylePrompt=String(settings.dzenAiStylePrompt||'').trim();
     const chunks=splitArticleForAi(source);
