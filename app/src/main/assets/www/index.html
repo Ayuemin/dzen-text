@@ -184,7 +184,7 @@
         <div class="subLabel customBackgroundLabel"><span>Мои фоны</span></div>
         <div id="customBackgroundList" class="customBackgroundList"><div class="backgroundEmpty">Своих фонов пока нет</div></div>
 
-        <div class="subLabel"><span>Подложка своего фона</span><span class="val" id="backgroundVeilVal"></span></div>
+        <div class="subLabel"><span class="labelWithHint">Подложка своего фона <button class="infoHintBtn" type="button" onclick="showAppHint('backgroundVeil')" aria-label="Подсказка о подложке фона">i</button></span><span class="val" id="backgroundVeilVal"></span></div>
         <input id="backgroundVeil" type="range" min="0" max="0.9" step="0.05" oninput="applySettings()">
 
         <div class="subLabel"><span>Текст на своём фоне</span></div>
@@ -231,7 +231,7 @@
     <details class="settingsGroup">
       <summary><span>Ввод текста</span><small>Клавиатура и форматирование</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Панель Markdown над клавиатурой</span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span class="labelWithHint">Панель Markdown над клавиатурой <button class="infoHintBtn" type="button" onclick="showAppHint('markdownToolbar')" aria-label="Подсказка о панели Markdown">i</button></span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Быстрые кнопки H1–H6, жирного, курсива, списков, цитаты, ссылки и других элементов. Можно отключить полностью.</div>
       </div>
     </details>
@@ -239,7 +239,7 @@
     <details class="settingsGroup">
       <summary><span>Чтение и озвучка</span><small>Скорость чтения и голос</small></summary>
       <div class="settingsGroupBody">
-        <div class="subLabel"><span>Скорость чтения для расчёта</span><span class="val" id="wpmVal"></span></div>
+        <div class="subLabel"><span class="labelWithHint">Скорость чтения для расчёта <button class="infoHintBtn" type="button" onclick="showAppHint('readingSpeed')" aria-label="Подсказка о скорости чтения">i</button></span><span class="val" id="wpmVal"></span></div>
         <input id="wpmRange" type="range" min="120" max="300" step="10" oninput="applySettings()">
         <div class="subLabel"><span>Скорость озвучки</span><span class="val" id="ttsVal"></span></div>
         <input id="ttsRange" type="range" min="0.7" max="1.3" step="0.05" oninput="applySettings()">
@@ -252,26 +252,26 @@
         <input id="autosaveSwitch" type="checkbox" checked hidden>
         <div class="saveAlwaysRow"><b>Автосохранение статьи включено всегда</b><span>Текст сохраняется локально на устройстве примерно через секунду после изменений.</span></div>
         <div class="smallNote">Автоверсия создаётся после начала редактирования и затем не чаще одного раза в минуту.</div>
-        <div class="switchRow" style="margin-top:13px"><span>Показывать HTML-код в превью</span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Показывать HTML-код в превью <button class="infoHintBtn" type="button" onclick="showAppHint('htmlPreview')" aria-label="Подсказка об HTML-коде">i</button></span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAppHint('versions')" aria-label="Подсказка о версиях текста">i</button></div>
       </div>
     </details>
 
     <details class="settingsGroup">
       <summary><span>Редакторский анализ</span><small>Длина, повторы, структура и Markdown</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Проверять заголовки</span><input id="headingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span class="labelWithHint">Проверять заголовки <button class="infoHintBtn" type="button" onclick="showAppHint('headingCheck')" aria-label="Подсказка о проверке заголовков">i</button></span><input id="headingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="subLabel"><span>Длина заголовка</span><span class="val" id="headingVal"></span></div><input id="headingMin" class="rangeCompact" type="range" min="3" max="30" step="1" oninput="applySettings()"><input id="headingMax" class="rangeCompact" type="range" min="40" max="140" step="5" oninput="applySettings()">
         <div class="switchRow" style="margin-top:13px"><span>Длинные предложения</span><input id="sentenceCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="sentenceVal"></span></div><input id="sentenceMax" type="range" min="18" max="55" step="1" oninput="applySettings()">
         <div class="switchRow" style="margin-top:13px"><span>Длинные абзацы</span><input id="paragraphCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="paragraphVal"></span></div><input id="paragraphMax" type="range" min="250" max="1400" step="50" oninput="applySettings()">
-        <div class="switchRow" style="margin-top:13px"><span>Частые слова</span><input id="frequentCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>От скольких повторов</span><span class="val" id="frequentVal"></span></div><input id="frequentMin" type="range" min="4" max="20" step="1" oninput="applySettings()">
-        <div class="switchRow" style="margin-top:13px"><span>Повторы в соседних предложениях</span><input id="nearbyCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Большие участки без подзаголовков</span><input id="structureCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="structureVal"></span></div><input id="structureMax" type="range" min="800" max="3500" step="100" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Частые слова <button class="infoHintBtn" type="button" onclick="showAppHint('frequentWords')" aria-label="Подсказка о частых словах">i</button></span><input id="frequentCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>От скольких повторов</span><span class="val" id="frequentVal"></span></div><input id="frequentMin" type="range" min="4" max="20" step="1" oninput="applySettings()">
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Повторы в соседних предложениях <button class="infoHintBtn" type="button" onclick="showAppHint('nearbyRepeats')" aria-label="Подсказка о повторах рядом">i</button></span><input id="nearbyCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Большие участки без подзаголовков <button class="infoHintBtn" type="button" onclick="showAppHint('structure')" aria-label="Подсказка о структуре текста">i</button></span><input id="structureCheck" class="switch" type="checkbox" onchange="applySettings()"></div><div class="subLabel"><span>Порог</span><span class="val" id="structureVal"></span></div><input id="structureMax" type="range" min="800" max="3500" step="100" oninput="applySettings()">
         <div class="switchRow" style="margin-top:13px"><span>Повторяющиеся фразы</span><input id="phraseCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Одинаковые начала предложений и абзацев</span><input id="openingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Структура H1–H3</span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Структура H1–H3 <button class="infoHintBtn" type="button" onclick="showAppHint('headingStructure')" aria-label="Подсказка о структуре H1–H3">i</button></span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Ошибки Markdown</span><input id="markdownCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Признаки ИИ-стиля</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Признаки ИИ-стиля <button class="infoHintBtn" type="button" onclick="showAppHint('localAiStyle')" aria-label="Подсказка о признаках ИИ-стиля">i</button></span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Локальный фильтр отмечает типографические признаки, характерные для машинного текста. Смысловые шаблоны автоматически не оцениваются.</div>
       </div>
     </details>
@@ -280,10 +280,10 @@
       <summary><span>Проверка текста</span><small>Опечатки и Яндекс.Спеллер</small></summary>
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Онлайн-проверка орфографии</span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Онлайн-проверка орфографии <button class="infoHintBtn" type="button" onclick="showAppHint('onlineSpelling')" aria-label="Подсказка об онлайн-орфографии">i</button></span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Онлайн-проверка выполняется только после нажатия кнопки проверки. При наборе текст наружу не отправляется.</div>
         <div id="spellIgnoreStatus" class="dictStatus">Мои правильные слова: 0</div>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button></div>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAppHint('spellIgnore')" aria-label="Подсказка об исключениях орфографии">i</button></div>
         <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
       </div>
     </details>
@@ -291,7 +291,7 @@
     <details class="settingsGroup">
       <summary><span>AI-проверка соответствия Дзену</span><small>Встроенная проверка или ваш OpenAI-совместимый API</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Проверять соответствие Дзену</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span class="labelWithHint">Проверять соответствие Дзену <button class="infoHintBtn" type="button" onclick="showAppHint('dzenCheck')" aria-label="Подсказка о проверке Дзена">i</button></span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
 
         <div class="subLabel" style="margin-top:13px"><span class="labelWithHint">Режим проверки <button class="infoHintBtn" type="button" onclick="showAiHint('mode')" aria-label="Подсказка о режиме проверки">i</button></span></div>
         <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
@@ -331,7 +331,7 @@
 
         <details class="nestedDetails" style="margin-top:14px">
           <summary>Встроенная база правил</summary>
-          <div class="switchRow" style="margin-top:10px"><span>Использовать обновляемую локальную базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
+          <div class="switchRow" style="margin-top:10px"><span class="labelWithHint">Использовать обновляемую локальную базу <button class="infoHintBtn" type="button" onclick="showAppHint('localDzenBase')" aria-label="Подсказка о локальной базе Дзена">i</button></span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
           <div class="smallNote">Это прежняя проверка: статья анализируется на устройстве. Обновляется только компактная база правил.</div>
           <div id="dzenRulesStatus" class="ruleStatus"></div>
           <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить локальную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
@@ -345,15 +345,15 @@
         <div class="smallNote">Большой русский словарь встроен и работает без интернета. Свой JSON/TXT можно подключить поверх него.</div>
         <div id="dictStatus" class="dictStatus">Встроенный словарь загружается…</div>
         <div id="userSynonymStatus" class="dictStatus">Свои синонимы: пока нет</div>
-        <details class="nestedDetails" style="margin:8px 0"><summary>Мои накопленные синонимы</summary><div id="userSynonymList" class="smallNote" style="max-height:130px;overflow:auto;white-space:pre-line">Пока пусто.</div></details>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="chooseSynonymDictionary()">Импортировать свой</button><button class="nativeBtn" type="button" onclick="clearSynonymDictionary()">Удалить внешний</button><button class="nativeBtn" type="button" onclick="clearUserSynonyms()">Очистить накопленные</button></div>
+        <details class="nestedDetails" style="margin:8px 0"><summary><span class="labelWithHint">Мои накопленные синонимы <button class="infoHintBtn" type="button" onclick="event.preventDefault();event.stopPropagation();showAppHint('learnedSynonyms')" aria-label="Подсказка о накопленных синонимах">i</button></span></summary><div id="userSynonymList" class="smallNote" style="max-height:130px;overflow:auto;white-space:pre-line">Пока пусто.</div></details>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="chooseSynonymDictionary()">Импортировать свой</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAppHint('synonyms')" aria-label="Подсказка о словарях синонимов">i</button><button class="nativeBtn" type="button" onclick="clearSynonymDictionary()">Удалить внешний</button><button class="nativeBtn" type="button" onclick="clearUserSynonyms()">Очистить накопленные</button></div>
       </div>
     </details>
 
     <details class="settingsGroup">
       <summary><span>Контроль слов</span><small>Свой список слов и фраз</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Проверять риск-слова</span><input id="riskCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span class="labelWithHint">Проверять риск-слова <button class="infoHintBtn" type="button" onclick="showAppHint('riskWords')" aria-label="Подсказка о контрольных словах">i</button></span><input id="riskCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Это ваш редакторский список. По одному слову или фразе на строку.</div>
         <textarea id="riskWords" class="riskArea" rows="8" oninput="applySettings()" placeholder="VPN&#10;ВПН&#10;обход"></textarea>
         <div class="settingActions"><button class="nativeBtn" type="button" onclick="resetRiskWords()">Вернуть пример</button><button class="nativeBtn" type="button" onclick="clearRiskWords()">Очистить</button></div>
@@ -368,7 +368,7 @@
     <div class="sheetHeader"><h2>Версии текста</h2><button class="sheetClose" type="button" onclick="closeVersions()" aria-label="Закрыть версии">×</button></div>
     <div class="versionIntro">Автоматические снимки сохраняются локально во время работы. Перед импортом, очисткой и восстановлением создаётся дополнительная версия.</div>
     <div class="versionUsage">
-      <div id="versionUsageText" class="versionUsageText">История версий</div>
+      <div id="versionUsageText" class="versionUsageText labelWithHint">История версий <button class="infoHintBtn" type="button" onclick="showAppHint('historyLimit')" aria-label="Подсказка об истории версий">i</button></div>
       <div class="versionUsageTrack"><span id="versionUsageBar"></span></div>
       <div class="smallNote">Общий лимит истории: 100 МБ. При заполнении сначала удаляются старые автоматические версии.</div>
     </div>
@@ -407,7 +407,7 @@
   <div class="handle"></div><div class="sheetHeader"><h2>Редакторский анализ</h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
   <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
-  <div class="analysisExport"><div class="analysisExportTitle">Выгрузить замечания</div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — удобно передать его модели, которая будет править исходную статью.</div></div>
+  <div class="analysisExport"><div class="analysisExportTitle labelWithHint">Выгрузить замечания <button class="infoHintBtn" type="button" onclick="showAppHint('exportIssues')" aria-label="Подсказка о выгрузке замечаний">i</button></div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — удобно передать его модели, которая будет править исходную статью.</div></div>
 </div></div>
 <div id="highlightHint" class="highlightHint">Фрагмент выделен</div>
 <div id="toast" class="toast"></div><div id="copyStage" class="copyStage" aria-hidden="true"></div>
