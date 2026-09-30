@@ -1,0 +1,95 @@
+# Example only. Secrets and Dzen cookies must never be stored here.
+
+channel:
+  name: "Технологии"
+  timezone: "Europe/Amsterdam"
+
+  theme:
+    description: >-
+      Полезные программы, Android, интернет-сервисы, приватность,
+      бесплатные альтернативы популярным сервисам и практические инструкции.
+    allowed_topics:
+      - android
+      - приложения
+      - интернет-сервисы
+      - приватность
+      - бесплатные альтернативы
+      - полезные технологии
+    excluded_topics:
+      - политика
+      - медицина
+      - инвестиционные рекомендации
+      - криминальная хроника
+
+publishing:
+  auto_publish: true
+  articles_per_day: 3
+  publish_times:
+    - "09:00"
+    - "14:00"
+    - "19:00"
+  production_buffer_hours: 36
+  max_publish_retries: 3
+
+content:
+  mix:
+    news: 0.35
+    evergreen: 0.65
+  target_length_chars:
+    min: 6000
+    max: 10000
+  style: >-
+    Спокойный полезный авторский материал без искусственного кликбейта,
+    канцелярита и навязчивых AI-штампов.
+  desired_images:
+    min: 3
+    max: 5
+
+research:
+  minimum_sources: 3
+  prefer_primary_sources: true
+  source_recency_days_for_news: 14
+  reject_if_insufficient_sources: true
+
+quality:
+  max_editorial_rewrite_attempts: 3
+  require_deterministic_checks: true
+  require_fact_check: true
+  require_dzen_preflight: true
+  abandon_on_unresolved_critical_issue: true
+
+ideas:
+  semantic_duplicate_window_days: 90
+  content_history_window_days: 180
+  prefer_source_diversity: true
+  allow_dynamic_schedule_replacement: true
+
+media:
+  providers:
+    - pexels
+    - wikimedia
+    - ai
+  require_provenance: true
+  reject_visual_duplicates: true
+
+ai:
+  # Concrete model names are resolved server-side through LiteLLM roles.
+  roles:
+    topic_classifier: "cheap"
+    research: "research"
+    outline: "strong"
+    writer: "strong"
+    editor: "strong"
+    fact_checker: "research"
+    image_validator: "vision"
+  max_daily_cost: null
+  max_cost_per_article: null
+
+notifications:
+  notify_on:
+    - blocked_auth
+    - blocked_captcha
+    - publish_failed
+    - pipeline_exhausted_retries
+    - daily_budget_exhausted
+    - dzen_compatibility_broken
