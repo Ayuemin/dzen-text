@@ -700,7 +700,8 @@ body.markdown-toolbar-visible .issueNavPanel{bottom:57px}
   transition:transform .15s ease;
 }
 .drawerArticles[open]>summary::after{transform:rotate(180deg)}
-.drawerArticles>summary span{
+.drawerArticles>summary .labelWithHint{display:inline-flex;flex-direction:row;align-items:center;gap:6px;white-space:nowrap}
+.drawerArticles>summary #savedArticlesCount{
   min-width:22px;
   height:22px;
   padding:0 6px;

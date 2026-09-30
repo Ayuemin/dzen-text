@@ -12,3 +12,6 @@ captures/
 keystore.properties
 .DS_Store
 Thumbs.db
+.gh-token
+gh-token.txt
+attachments/
