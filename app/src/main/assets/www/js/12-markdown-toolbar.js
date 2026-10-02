@@ -186,6 +186,17 @@ function applyMarkdown(){return false}
     if(aiDzenRun.state==='success')return '<div class="analysisDzenNote"><b>Последняя AI-проверка завершена.</b> Осталось замечаний: '+aiDzenIssues.length+'. Новая AI-проверка запускается только вручную.</div>';
     return '';
   };
+  aiDzenStatusLine=function(){
+    const left=Array.isArray(aiDzenIssues)?aiDzenIssues.length:0;
+    if(aiDzenRun.state==='success')return '<br>Последняя AI-проверка: <b>успешно</b> · модель: '+escapeHtml(aiDzenRun.model||String(settings.dzenAiModel||'—'))+' · запросов: '+aiDzenRun.calls+' · осталось замечаний: '+left;
+    if(aiDzenRun.state==='error'){
+      let text='<br>Последняя AI-проверка: <b>ошибка</b> · '+escapeHtml(aiDzenRun.message||'неизвестная ошибка');
+      if(aiDzenRun.previousPreserved&&left)text+=' · сохранено предыдущих замечаний: '+left;
+      return text;
+    }
+    if(aiDzenRun.state==='running')return '<br>AI-проверка: <b>выполняется…</b>';
+    return '<br>AI-проверка статьи ещё не запускалась.';
+  };
 
   // Full document replacements start a different editing context. AI findings
   // are intentionally scoped to one article/version/import only.
