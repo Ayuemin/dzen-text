@@ -1,6 +1,16 @@
 function clearOnlineSpelling(){onlineSpellIssues=[];onlineSpellSource='';spellStatus=settings.onlineSpelling?'idle':'off';spellRequestId='';closeSpellPanel()}
 function setCheckRunning(v){const b=document.getElementById('checkBtn');if(!b)return;b.classList.toggle('running',!!v);b.setAttribute('aria-busy',v?'true':'false')}
-function markAnalysisStale(){if(typeof invalidateAiDzenIssues==='function')invalidateAiDzenIssues();else if(typeof clearAiDzenIssues==='function')clearAiDzenIssues();const dot=document.getElementById('analysisDot');dot.classList.remove('bad');dot.classList.add('stale');dot.setAttribute('aria-label','Текст изменён — нажмите Проверить');dot.title='Текст изменён — нажмите ✓ для полной проверки'}
+function markAnalysisStale(){
+  if(typeof invalidateAiDzenIssues==='function')invalidateAiDzenIssues();
+  const dot=document.getElementById('analysisDot');
+  if(dot){
+    dot.classList.remove('bad');
+    dot.classList.add('stale');
+    dot.setAttribute('aria-label','Текст изменён — локальная проверка обновляется');
+    dot.title='Локальная проверка обновляется';
+  }
+  if(typeof scheduleAnalysis==='function')scheduleAnalysis();
+}
 function analyzeText(){
  const src=editor.value||'',issues=[],headings=headingsFromSource(src),sentences=sentenceObjects(src),paragraphs=paragraphObjects(src),allWords=wordMatches(src),totalWords=allWords.length;
  const localEnabled=checkModeUsesLocal();
@@ -35,8 +45,16 @@ function analyzeText(){
  updateAnalysisDot();
  return currentAnalysis
 }
-function updateAnalysisDot(){const dot=document.getElementById('analysisDot');dot.classList.remove('stale');dot.classList.toggle('bad',currentAnalysis.warningCount>0);dot.setAttribute('aria-label',currentAnalysis.warningCount?`Есть замечания: ${currentAnalysis.warningCount}`:'Замечаний нет');dot.title=currentAnalysis.warningCount?`Есть замечания: ${currentAnalysis.warningCount}`:'Всё в пределах настроенных норм'}
-function issueGroups(){return [{id:'spelling',name:'Орфография'},{id:'proof',name:'Опечатки и пунктуация'},{id:'aiQuality',name:'AI · качество текста'},{id:'aiStyle',name:'Признаки ИИ-стиля'},{id:'risk',name:'Контроль слов'},{id:'dzen',name:'Правила Дзена'},{id:'heading',name:'Заголовки'},{id:'headingStructure',name:'Структура H1–H3'},{id:'sentence',name:'Длинные предложения'},{id:'paragraph',name:'Длинные абзацы'},{id:'frequent',name:'Частые слова'},{id:'nearby',name:'Повторы рядом'},{id:'phrase',name:'Повторяющиеся фразы'},{id:'opening',name:'Одинаковые начала'},{id:'markdown',name:'Markdown'},{id:'structure',name:'Структура текста'}]}
+function updateAnalysisDot(){
+  const dot=document.getElementById('analysisDot');
+  if(!dot)return;
+  dot.classList.remove('stale');
+  dot.classList.toggle('bad',currentAnalysis.warningCount>0);
+  const label=currentAnalysis.warningCount?`Открыть результаты проверки: ${currentAnalysis.warningCount} замечаний`:'Открыть результаты проверки: замечаний нет';
+  dot.setAttribute('aria-label',label);
+  dot.title=label;
+}
+function issueGroups(){return [{id:'spelling',name:'Орфография'},{id:'proof',name:'Опечатки и пунктуация'},{id:'aiQuality',name:'Качество текста'},{id:'aiStyle',name:'Признаки ИИ-стиля'},{id:'risk',name:'Контроль слов'},{id:'dzen',name:'Правила Дзена'},{id:'heading',name:'Заголовки'},{id:'headingStructure',name:'Структура H1–H3'},{id:'sentence',name:'Длинные предложения'},{id:'paragraph',name:'Длинные абзацы'},{id:'frequent',name:'Частые слова'},{id:'nearby',name:'Повторы рядом'},{id:'phrase',name:'Повторяющиеся фразы'},{id:'opening',name:'Одинаковые начала'},{id:'markdown',name:'Markdown'},{id:'structure',name:'Структура текста'}]}
 let analysisMode='problems';
 function setAnalysisMode(mode){
   analysisMode=['problems','all','dzen'].includes(mode)?mode:'problems';
