@@ -26,24 +26,9 @@ function runFullCheck(){
      analysisMode='problems';
      document.getElementById('analysisBackdrop').classList.add('open');
      setAnalysisMode('problems');
-
-     if(!settings.onlineSpelling){
-       spellStatus='off';
-       renderAnalysis();
-       continueManualAiCheck(src,'Локальная проверка готова');
-       return;
-     }
-     if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){
-       spellStatus='error';
-       renderAnalysis();
-       continueManualAiCheck(src,'Онлайн-орфография недоступна');
-       return;
-     }
-     spellStatus='checking';
-     spellRequestSource=src;
-     spellRequestId=String(Date.now())+'_'+Math.random().toString(36).slice(2);
+     spellStatus='off';
      renderAnalysis();
-     AndroidSpell.check(src,spellRequestId);
+     continueManualAiCheck(src,'Локальная проверка готова');
    }catch(e){
      setCheckRunning(false);
      toast('Не удалось завершить проверку');
