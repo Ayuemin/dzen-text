@@ -184,6 +184,20 @@ if 'addJavascriptInterface(new PublishBridge(), "AndroidPublish")' not in main_j
 if "ClipboardManager" not in main_java or "setPrimaryClip" not in main_java:
     errors.append("publication copy must write text/html and text/plain through ClipboardManager")
 
+# A full analysis costs ~200 ms at 10k words and ~570 ms at 20k, so running it
+# synchronously from the render path would freeze the editor on long articles.
+if "function scheduleAnalysis(" not in editor_js:
+    errors.append("editor must coalesce analysis requests through scheduleAnalysis")
+else:
+    render_start = editor_js.find("function render(")
+    render_block = editor_js[render_start:render_start + 900] if render_start >= 0 else ""
+    if "if(runAnalysis)analyzeText();" in render_block:
+        errors.append("render() must not run analyzeText() synchronously on every edit")
+    if "if(runAnalysis)scheduleAnalysis();" not in render_block:
+        errors.append("render() must request analysis through scheduleAnalysis")
+if "function flushPendingAnalysis(" not in editor_js:
+    errors.append("a pending debounced analysis must be flushable when leaving the screen")
+
 if errors:
     raise SystemExit("\n".join("APP LOGIC: " + e for e in errors))
 

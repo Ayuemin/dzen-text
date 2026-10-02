@@ -1311,6 +1311,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     @Override
     protected void onPause() {
         if (web != null) {
+            // Persist now: evaluateJavascript is asynchronous, so a rotation that
+            // destroys the Activity can otherwise outrun this call.
+            runJs("try{window.flushPendingAnalysis&&window.flushPendingAnalysis()}catch(e){}");
             runJs("try{window.persistCurrentArticleNow&&window.persistCurrentArticleNow()}catch(e){}");
         }
         super.onPause();

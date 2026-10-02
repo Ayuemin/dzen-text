@@ -112,12 +112,29 @@ function renderPreview(){
   previewDirty=false;
 }
 
+// A full analysis is synchronous and grows with the article: measured ~200 ms
+// at 10k words and ~570 ms at 20k, so running it on every keystroke would
+// freeze the editor. Requests are coalesced and the delay grows with the text.
+// Explicit "Проверить" runs analyzeText() directly and stays immediate.
+let analysisTimer=null;
+function scheduleAnalysis(){
+  clearTimeout(analysisTimer);
+  const size=(editor.value||'').length;
+  const delay=size>160000?900:size>80000?550:220;
+  analysisTimer=setTimeout(()=>{analysisTimer=null;try{analyzeText()}catch(e){}},delay);
+}
+function flushPendingAnalysis(){
+  if(!analysisTimer)return;
+  clearTimeout(analysisTimer);
+  analysisTimer=null;
+  try{analyzeText()}catch(e){}
+}
 function render(runAnalysis=true,forcePreview=false){
   previewDirty=true;
   const previewActive=document.getElementById('previewPane').classList.contains('active');
   if(forcePreview||previewActive)renderPreview();
   scheduleStatsUpdate(runAnalysis||forcePreview);
-  if(runAnalysis)analyzeText();
+  if(runAnalysis)scheduleAnalysis();
   if(!(typeof documentsAvailable==='function'&&documentsAvailable())&&settings.autosave){
     clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
