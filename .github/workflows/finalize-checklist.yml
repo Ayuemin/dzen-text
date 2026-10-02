@@ -57,7 +57,7 @@ jobs:
             exit "$rc"
           fi
 
-      - name: Finalize invariant paths
+      - name: Finalize invariant paths and AI helper
         shell: bash
         run: |
           python3 - <<'PY'
@@ -68,6 +68,14 @@ jobs:
           new='workflow = (JS / "12-workflow-policy.js").read_text(encoding="utf-8")'
           if old not in s:
               raise SystemExit('old invariant workflow path not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('app/src/main/assets/www/js/10-ai-dzen.js')
+          s=p.read_text(encoding='utf-8')
+          old="function shouldRunAiDzenCheck(){\n  return checkModeUsesAi();\n}"
+          new="function shouldRunAiDzenCheck(){\n  return true;\n}"
+          if old not in s:
+              raise SystemExit('legacy AI mode helper body not found')
           p.write_text(s.replace(old,new,1),encoding='utf-8')
           PY
 
