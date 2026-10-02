@@ -1,8 +1,48 @@
 function loadSettings(){try{const value={...defaultSettings,...JSON.parse(localStorage.getItem('dzenSettings')||'{}')};value.dzenCheckMode=normalizeDzenCheckMode(value.dzenCheckMode);return value}catch(e){return {...defaultSettings}}}
-function escapeHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-function inline(s){s=escapeHtml(s);s=s.replace(/`([^`]+)`/g,'<code>$1</code>');s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');s=s.replace(/__([^_]+)__/g,'<strong>$1</strong>');s=s.replace(/~~([^~]+)~~/g,'<del>$1</del>');s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');s=s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2">$1</a>');return s}
+// Escapes every character that can change HTML parsing. Quotes matter here:
+// these strings are reused as attribute values in generated markup and are
+// later written into the system clipboard as text/html.
+function escapeHtml(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+// Attribute values additionally reject quotes and whitespace so a URL can never
+// break out of href="..." and inject extra attributes into exported HTML.
+function escapeAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+function safeHttpUrl(raw){const url=String(raw==null?'':raw).trim();return /^https?:\/\/[^\s"'<>\\]+$/i.test(url)?url:''}
+// Links are extracted before escaping so the URL is validated in its original
+// form; validating after escaping would see "&quot;" and miss a real break-out.
+const MD_LINK=/\[([^\]\n]+)\]\((https?:\/\/[^\s)"'<>]+)\)/g;
+function inline(s){
+  const links=[];
+  s=String(s==null?'':s).replace(MD_LINK,(m,label,href)=>{
+    const url=safeHttpUrl(href);
+    if(!url)return m;
+    const token='\u0000'+(links.length)+'\u0000';
+    links.push('<a href="'+escapeAttr(url)+'" rel="noopener noreferrer nofollow">'+escapeHtml(label)+'</a>');
+    return token;
+  });
+  s=escapeHtml(s);
+  s=s.replace(/`([^`]+)`/g,'<code>$1</code>');
+  s=s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>');
+  s=s.replace(/__([^_]+)__/g,'<strong>$1</strong>');
+  s=s.replace(/~~([^~]+)~~/g,'<del>$1</del>');
+  s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');
+  s=s.replace(/\u0000(\d+)\u0000/g,(m,i)=>links[Number(i)]||'');
+  // A rejected link (bad scheme, quotes, whitespace in the URL) must never reach
+  // the Dzen editor as markdown syntax; it degrades to its visible label.
+  s=s.replace(/\[([^\]\n]+)\]\([^)\n]*\)/g,(m,label)=>escapeHtml(label));
+  return s;
+}
 function markdownToHtml(src){src=(src||'').replace(/\r\n?/g,'\n').trim();if(!src)return '';const lines=src.split('\n');let out=[],para=[],listType=null,quote=[];const flushPara=()=>{if(para.length){out.push('<p>'+inline(para.join(' '))+'</p>');para=[]}};const closeList=()=>{if(listType){out.push('</'+listType+'>');listType=null}};const flushQuote=()=>{if(quote.length){out.push('<blockquote><p>'+inline(quote.join(' '))+'</p></blockquote>');quote=[]}};for(let i=0;i<lines.length;i++){const raw=lines[i],t=raw.trim();if(!t){flushPara();closeList();flushQuote();continue}let m=t.match(/^(#{1,6})\s+(.+)$/);if(m){flushPara();closeList();flushQuote();let n=m[1].length;out.push(`<h${n}>${inline(m[2])}</h${n}>`);continue}if(/^([-*_])(?:\s*\1){2,}$/.test(t)){flushPara();closeList();flushQuote();out.push('<hr>');continue}m=t.match(/^>\s?(.*)$/);if(m){flushPara();closeList();quote.push(m[1]);continue}else flushQuote();m=t.match(/^[-*+]\s+(.+)$/);if(m){flushPara();if(listType!=='ul'){closeList();out.push('<ul>');listType='ul'}out.push('<li>'+inline(m[1])+'</li>');continue}m=t.match(/^\d+[.)]\s+(.+)$/);if(m){flushPara();if(listType!=='ol'){closeList();out.push('<ol>');listType='ol'}out.push('<li>'+inline(m[1])+'</li>');continue}closeList();para.push(t)}flushPara();closeList();flushQuote();return out.join('\n')}
 function plainFromHtml(html){const d=document.createElement('div');d.innerHTML=html;return (d.innerText||d.textContent||'').replace(/\n{3,}/g,'\n\n').trim()}
+
+// The published body is the single source of truth for the Dzen editor. The
+// leading "# " heading is the article title, which Dzen expects in its own form
+// field, so it must not be duplicated into the pasted body.
+function buildPublishHtml(markdown){
+  const src=String(markdown||'').replace(/\r\n?/g,'\n').replace(/^\uFEFF/,'');
+  const body=src.replace(/^\s*#[ \t]+[^\n]*\n?/,'');
+  return markdownToHtml(body);
+}
+function buildPublishPlain(html){return plainFromHtml(html)}
 function wordMatches(text){return Array.from(text.matchAll(/[A-Za-zА-Яа-яЁё0-9]+(?:[-’'][A-Za-zА-Яа-яЁё0-9]+)*/g))}
 const stopWords=new Set(('и в во не что он на я с со как а то все она так его но да ты к у же вы за бы по только ее мне было вот от меня еще нет о из ему теперь когда даже ну вдруг ли если уже или ни быть был него до вас нибудь опять уж вам ведь там потом себя ничего ей может они тут где есть надо ней для мы тебя их чем была сам чтоб без будто чего раз тоже себе под будет ж тогда кто этот того потому этого какой совсем ним здесь этом один почти мой тем чтобы нее сейчас были куда зачем сказать всех никогда сегодня можно при про это эта эти тот та те такой такая такие же очень более менее также либо через после перед между над под без около среди каждый каждый раз ещё'.split(/\s+/)));
 

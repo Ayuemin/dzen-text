@@ -49,6 +49,8 @@ Workflow **Release APK** прочитает `versionName`, соберёт под
 - `node --check` для всех JS-файлов;
 - `tools/check_editor_invariants.py`;
 - `tools/check_app_logic.py`;
+- `tools/test_publish_export.js` — поведение конвертации и безопасность экспортного HTML;
+- `tools/test_publish_copy.js` — содержимое буфера во всех сценариях копирования.
 - debug и release сборку Android.
 
 Стабильный релиз следует публиковать только после зелёного CI.

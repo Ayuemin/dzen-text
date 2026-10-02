@@ -1,6 +1,8 @@
 package ru.dzenprep.texteditor;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
@@ -96,6 +98,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web.setWebChromeClient(new WebChromeClient());
         web.addJavascriptInterface(new TtsBridge(), "AndroidTTS");
         web.addJavascriptInterface(new FileBridge(), "AndroidFile");
+        web.addJavascriptInterface(new PublishBridge(), "AndroidPublish");
         web.addJavascriptInterface(new DictionaryBridge(), "AndroidDictionary");
         web.addJavascriptInterface(new SpellBridge(), "AndroidSpell");
         web.addJavascriptInterface(new DzenAiBridge(), "AndroidDzenAI");
@@ -334,6 +337,35 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+
+    /** Copies the rendered article to the system clipboard for the Dzen editor. */
+    public class PublishBridge {
+        /**
+         * Writes both clipboard flavours explicitly: rendered HTML and its
+         * plain-text rendering. This removes the dependency on what WebView puts
+         * on the clipboard for a selection, which is how raw Markdown previously
+         * leaked into published articles.
+         */
+        @JavascriptInterface
+        public boolean copyForPublication(final String html, final String plain) {
+            final String htmlValue = html == null ? "" : html;
+            final String plainValue = plain == null ? "" : plain;
+            if (htmlValue.trim().isEmpty() && plainValue.trim().isEmpty()) return false;
+            runOnUiThread(() -> {
+                try {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard == null) return;
+                    // First item carries both flavours: editors that read only the first ClipData
+// item then still receive rich text instead of degrading to plain. The second
+// item keeps a pure text/plain alternative available.
+                    ClipData clip = new ClipData("Дзен Текст", new ClipData.Item(htmlValue, plainValue));
+                    clip.addItem(new ClipData.Item(plainValue));
+                    clipboard.setPrimaryClip(clip);
+                } catch (Exception ignored) { }
+            });
+            return true;
+        }
+    }
 
     public class DocumentsBridge {
         @JavascriptInterface public String ensureActiveArticle() { return documentStore.ensureActiveArticle(); }

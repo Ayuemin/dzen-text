@@ -138,6 +138,43 @@ for path in sorted(JS.glob("*.js")):
     if re.search(r'\brender\s*\(\s*\)', text):
         errors.append(path.name + " contains render() which triggers an implicit full analysis")
 
+# Publication export must never put raw Markdown on the clipboard: the Dzen
+# editor does not parse Markdown, so a raw copy corrupts the published article.
+copy_start = editor_js.find("function publishPayload")
+if copy_start < 0:
+    errors.append("missing publishPayload")
+else:
+    # publishPayload is the single source of truth for both clipboard flavours.
+    copy_block = editor_js[copy_start:copy_start + 1200]
+    if "buildPublishHtml(" not in copy_block:
+        errors.append("publishPayload must publish rendered HTML, not the Markdown source")
+    if "buildPublishPlain(" not in copy_block:
+        errors.append("publishPayload must build an explicit plain-text clipboard flavour")
+    copy_fn = editor_js.find("function copyRichHtml")
+    if copy_fn < 0:
+        errors.append("missing copyRichHtml")
+    else:
+        copy_block = editor_js[copy_fn:copy_fn + 2600]
+        if re.search(r"ta\.value\s*=\s*editor\.value", copy_block):
+            errors.append("copyRichHtml must not fall back to raw editor.value (Markdown) on the clipboard")
+        if "AndroidPublish" not in copy_block:
+            errors.append("copyRichHtml should use the native clipboard bridge when available")
+
+text_tools = (JS / "02-text-tools.js").read_text(encoding="utf-8")
+if "function escapeAttr(" not in text_tools or "function safeHttpUrl(" not in text_tools:
+    errors.append("exported HTML needs escapeAttr/safeHttpUrl to keep URLs inside href")
+if not re.search(r"function escapeHtml\(s\)\{[^}]*&quot;", text_tools):
+    errors.append("escapeHtml must escape double quotes: they are reused as attribute values")
+
+if "AndroidPublish" not in editor_js:
+    errors.append("publication copy should use the native clipboard bridge when available")
+
+main_java = (ROOT / "app/src/main/java/ru/dzenprep/texteditor/MainActivity.java").read_text(encoding="utf-8")
+if 'addJavascriptInterface(new PublishBridge(), "AndroidPublish")' not in main_java:
+    errors.append("PublishBridge must be registered as AndroidPublish")
+if "ClipboardManager" not in main_java or "setPrimaryClip" not in main_java:
+    errors.append("publication copy must write text/html and text/plain through ClipboardManager")
+
 if errors:
     raise SystemExit("\n".join("APP LOGIC: " + e for e in errors))
 
