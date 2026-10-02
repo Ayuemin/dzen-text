@@ -140,13 +140,23 @@ function showPane(name){
 // are derived from one payload so the two branches can never disagree, and the
 // plain flavour is always rendered HTML - never raw Markdown.
 function publishPayload(){
-  const html=buildPublishHtml(editor.value);
-  if(!html)return null;
-  return {html,plain:buildPublishPlain(html)};
+  return publishPreflight(editor.value);
 }
-function copyRichHtml(){
-  const payload=publishPayload();
-  if(!payload){toast('Текущая статья пустая');return}
+async function copyRichHtml(){
+  const result=publishPayload();
+  if(result.errors.length){
+    await appConfirm('Нельзя скопировать для публикации',result.errors.join('\n\n'),'Понятно',true);
+    return;
+  }
+  if(result.warnings.length){
+    const ok=await appConfirm('Проверьте перед публикацией',result.warnings.join('\n\n')+'\n\nВсё равно скопировать?','Скопировать',false);
+    if(!ok)return;
+  }
+  copyRichPayload(result);
+}
+function copyRichPayload(result){
+  const payload={html:result.html,plain:result.plain};
+  if(!payload.html){toast('Текущая статья пустая');return}
   if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
     let ok=false;
     try{ok=!!AndroidPublish.copyForPublication(payload.html,payload.plain)}catch(e){ok=false}

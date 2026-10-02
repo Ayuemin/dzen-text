@@ -144,12 +144,10 @@ copy_start = editor_js.find("function publishPayload")
 if copy_start < 0:
     errors.append("missing publishPayload")
 else:
-    # publishPayload is the single source of truth for both clipboard flavours.
-    copy_block = editor_js[copy_start:copy_start + 1200]
-    if "buildPublishHtml(" not in copy_block:
-        errors.append("publishPayload must publish rendered HTML, not the Markdown source")
-    if "buildPublishPlain(" not in copy_block:
-        errors.append("publishPayload must build an explicit plain-text clipboard flavour")
+    # publishPayload delegates to the preflight, which owns both flavours.
+    copy_block = editor_js[copy_start:copy_start + 600]
+    if "publishPreflight(" not in copy_block:
+        errors.append("publishPayload must return the preflight result, not raw HTML")
     copy_fn = editor_js.find("function copyRichHtml")
     if copy_fn < 0:
         errors.append("missing copyRichHtml")
@@ -157,8 +155,19 @@ else:
         copy_block = editor_js[copy_fn:copy_fn + 2600]
         if re.search(r"ta\.value\s*=\s*editor\.value", copy_block):
             errors.append("copyRichHtml must not fall back to raw editor.value (Markdown) on the clipboard")
-        if "AndroidPublish" not in copy_block:
-            errors.append("copyRichHtml should use the native clipboard bridge when available")
+        if "AndroidPublish" not in editor_js:
+            errors.append("publication copy should use the native clipboard bridge when available")
+        # Publication is gated: errors must stop the copy, warnings must ask.
+        if "result.errors.length" not in copy_block:
+            errors.append("copyRichHtml must block publication when the preflight reports errors")
+        if "result.warnings.length" not in copy_block:
+            errors.append("copyRichHtml must ask for confirmation when the preflight reports warnings")
+
+publish_js = (JS / "12-publish.js").read_text(encoding="utf-8")
+if "function sanitizePublishHtml(" not in publish_js or "function publishPreflight(" not in publish_js:
+    errors.append("publication preflight is missing its sanitiser or its report")
+if "<hr" not in publish_js or "h([4-6])" not in publish_js:
+    errors.append("preflight must drop markup the Dzen editor cannot represent (hr, H4-H6)")
 
 text_tools = (JS / "02-text-tools.js").read_text(encoding="utf-8")
 if "function escapeAttr(" not in text_tools or "function safeHttpUrl(" not in text_tools:

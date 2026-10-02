@@ -29,10 +29,14 @@ function check(name, cond, detail) {
 function loadFunctions(sandbox, file, names) {
   const src = fs.readFileSync(path.join(JS, file), 'utf8');
   for (const fn of names) {
-    const start = src.indexOf('function ' + fn);
-    if (start < 0) throw new Error('missing function ' + fn);
+    // Source may declare the function as async; slice the whole declaration
+    // so the extracted fragment parses on its own.
+    const re = new RegExp('(?:async\\s+)?function\\s+' + fn + '\\s*\\(');
+    const m = re.exec(src);
+    if (!m) throw new Error('missing function ' + fn);
+    const start = m.index;
     let depth = 0, end = -1;
-    for (let i = src.indexOf('{', start); i < src.length; i++) {
+    for (let i = src.indexOf('{', m.index); i < src.length; i++) {
       if (src[i] === '{') depth++;
       else if (src[i] === '}') { depth--; if (depth === 0) { end = i + 1; break; } }
     }
@@ -45,6 +49,7 @@ function makeEnv(opts) {
   const toasts = [];
   const nativeCalls = [];
   const execCalls = [];
+  const dialogs = [];
   let selection = [{ marker: 'user-selection' }];
 
   const stage = {
@@ -81,6 +86,10 @@ function makeEnv(opts) {
     localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
     execCommand(cmd) { execCalls.push(cmd); return !opts.execCommandFails; },
     toast(msg) { toasts.push(msg); },
+    appConfirm(title, text, label, danger) {
+      dialogs.push({ title, text, label, danger });
+      return Promise.resolve(opts.confirmAnswer !== false);
+    },
   };
   sandbox.document.execCommand = sandbox.execCommand;
 
@@ -105,6 +114,7 @@ function makeEnv(opts) {
 
   sandbox.__stage = stage;
   sandbox.__toasts = toasts;
+  sandbox.__dialogs = dialogs;
   sandbox.__nativeCalls = nativeCalls;
   sandbox.__execCalls = execCalls;
   sandbox.__selectionState = () => selection;
@@ -113,17 +123,22 @@ function makeEnv(opts) {
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(JS, '02-text-tools.js'), 'utf8'), sandbox, { filename: '02-text-tools.js' });
-  loadFunctions(sandbox, '09-editor.js', ['publishPayload', 'copyRichHtml', 'copyPayloadToWebClipboard']);
+  loadFunctions(sandbox, '09-editor.js', ['publishPayload', 'copyRichHtml', 'copyRichPayload', 'copyPayloadToWebClipboard']);
+  loadFunctions(sandbox, '12-publish.js', [
+    'sanitizePublishHtml', 'stripHtmlTags', 'publishTitleFrom',
+    'publishHeadings', 'publishPreflight',
+  ]);
   sandbox.editor = { value: opts.markdown || '' };
   return sandbox;
 }
 
 const ARTICLE = '# Заголовок статьи\n\nПервый абзац с **жирным** словом.\n\n## Подзаголовок\n\n- пункт один\n- пункт два\n\n[ссылка](https://dzen.ru/x)';
 
+async function main() {
 // --- 1. native bridge -----------------------------------------------------
 {
   const env = makeEnv({ nativeAvailable: true, markdown: ARTICLE });
-  env.copyRichHtml();
+  await env.copyRichHtml();
   check('нативный мост вызван один раз', env.__nativeCalls.length === 1, String(env.__nativeCalls.length));
   const call = env.__nativeCalls[0] || { html: '', plain: '' };
   check('в HTML нет markdown-заголовка', !call.html.includes('# '), call.html);
@@ -140,7 +155,7 @@ const ARTICLE = '# Заголовок статьи\n\nПервый абзац с
 // --- 2. browser fallback, selection copy succeeds -------------------------
 {
   const env = makeEnv({ nativeAvailable: false, markdown: ARTICLE });
-  env.copyRichHtml();
+  await env.copyRichHtml();
   check('браузерный путь вызывает execCommand', env.__execCalls.includes('copy'), JSON.stringify(env.__execCalls));
   check('браузерный путь не использует нативный мост', env.__nativeCalls.length === 0);
   check('stage очищен после копирования', env.__stage.innerHTML === '', env.__stage.innerHTML);
@@ -151,7 +166,7 @@ const ARTICLE = '# Заголовок статьи\n\nПервый абзац с
 // --- 3. selection copy fails: plain fallback must not be Markdown ---------
 {
   const env = makeEnv({ nativeAvailable: false, execCommandFails: true, markdown: ARTICLE });
-  env.copyRichHtml();
+  await env.copyRichHtml();
   check('plain fallback заполнен', env.__plainTa.value.length > 0, JSON.stringify(env.__plainTa.value));
   check('plain fallback без markdown-заголовка', !env.__plainTa.value.includes('# '), env.__plainTa.value);
   check('plain fallback без markdown-жирного', !env.__plainTa.value.includes('**'), env.__plainTa.value);
@@ -163,17 +178,64 @@ const ARTICLE = '# Заголовок статьи\n\nПервый абзац с
 // --- 4. native bridge fails: degrade instead of breaking -----------------
 {
   const env = makeEnv({ nativeAvailable: true, nativeFails: true, markdown: ARTICLE });
-  env.copyRichHtml();
+  await env.copyRichHtml();
   check('при отказе моста есть браузерный запасной путь', env.__execCalls.length > 0, JSON.stringify(env.__execCalls));
   check('при отказе моста всё равно один тост', env.__toasts.length === 1, JSON.stringify(env.__toasts));
 }
 
-// --- 5. empty article ----------------------------------------------------
+// --- 5. empty article is blocked by the preflight ------------------------
 {
   const env = makeEnv({ nativeAvailable: true, markdown: '' });
-  env.copyRichHtml();
+  await env.copyRichHtml();
   check('пустая статья не вызывает мост', env.__nativeCalls.length === 0);
-  check('пустая статья сообщает пользователю', env.__toasts[0] === 'Текущая статья пустая', JSON.stringify(env.__toasts));
+  check('пустая статья показывает блокирующий диалог', env.__dialogs.length === 1, JSON.stringify(env.__dialogs));
+  check('в диалоге сказано, что статья пустая', /пустая/i.test(env.__dialogs[0] ? env.__dialogs[0].text : ''), JSON.stringify(env.__dialogs));
+}
+
+// --- 6. preflight blocks a duplicate H1 in the body ----------------------
+{
+  const dup = '# Заголовок\n\nТекст под заголовком.\n\n# Второй заголовок\n\nИ ещё текст.\n';
+  const env = makeEnv({ nativeAvailable: true, markdown: dup });
+  await env.copyRichHtml();
+  check('дубль H1 блокирует копирование', env.__nativeCalls.length === 0, JSON.stringify(env.__nativeCalls));
+  check('показан блокирующий диалог', env.__dialogs.length === 1, JSON.stringify(env.__dialogs));
+  check('в диалоге объяснена причина', /отдельным полем/.test(env.__dialogs[0] ? env.__dialogs[0].text : ''), JSON.stringify(env.__dialogs));
+}
+
+// --- 7. preflight warns and can be declined ------------------------------
+{
+  const short = '# Заголовок\n\nСлишком коротко.';
+  const env = makeEnv({ nativeAvailable: true, markdown: short, confirmAnswer: false });
+  await env.copyRichHtml();
+  check('при отказе от предупреждения копирование не происходит', env.__nativeCalls.length === 0, JSON.stringify(env.__nativeCalls));
+  check('предупреждение показано', env.__dialogs.length === 1, JSON.stringify(env.__dialogs));
+  check('в предупреждении есть вопрос о копировании', /Всё равно скопировать/.test(env.__dialogs[0] ? env.__dialogs[0].text : ''), JSON.stringify(env.__dialogs));
+}
+
+// --- 8. preflight warns and can be accepted ------------------------------
+{
+  const short = '# Заголовок\n\nСлишком коротко.';
+  const env = makeEnv({ nativeAvailable: true, markdown: short, confirmAnswer: true });
+  await env.copyRichHtml();
+  check('подтверждение ведёт к копированию', env.__nativeCalls.length === 1, JSON.stringify(env.__nativeCalls));
+}
+
+// --- 9. sanitiser drops markup Dzen cannot represent ---------------------
+{
+  const env = makeEnv({ nativeAvailable: true, markdown: ARTICLE });
+  await env.copyRichHtml();
+  const html = env.__nativeCalls[0] ? env.__nativeCalls[0].html : '';
+  check('hr не попадает в публикацию', !html.includes('<hr'), html);
+  check('H1 первого уровня не попадает в тело', !html.includes('<h1'), html);
+}
+
+// --- 10. a clean, complete article copies without asking -----------------
+{
+  const long = '# Хороший заголовок\n\n' + 'Слово '.repeat(60) + '\n\n## Раздел\n\n' + 'Ещё текст. '.repeat(20);
+  const env = makeEnv({ nativeAvailable: true, markdown: long });
+  await env.copyRichHtml();
+  check('чистая статья копируется без диалогов', env.__dialogs.length === 0, JSON.stringify(env.__dialogs));
+  check('чистая статья дошла до моста', env.__nativeCalls.length === 1, JSON.stringify(env.__nativeCalls));
 }
 
 if (failures.length) {
@@ -182,3 +244,6 @@ if (failures.length) {
   process.exit(1);
 }
 console.log('Publish copy OK: ' + passed + ' проверок');
+}
+
+main();
