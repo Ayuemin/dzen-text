@@ -33,8 +33,10 @@ function runFullCheck(){
   },60);
 }
 
-// Compatibility no-op for old navigation/history calls. The online spelling
-// panel and its network workflow are retired; language checking belongs to AI.
+// Compatibility no-ops for the retired spelling panel. Its network workflow is
+// gone; these stay only until the old hidden DOM is physically removed.
+function navigateSpellIssue(){}
+function ignoreCurrentSpellWord(){}
 function closeSpellPanel(){
   spellNavState=null;
   const panel=document.getElementById('spellPanel');
