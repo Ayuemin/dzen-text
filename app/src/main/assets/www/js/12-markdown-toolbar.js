@@ -263,6 +263,22 @@
     if(document.body)document.body.classList.remove('markdown-toolbar-visible');
   };
 
+  // Android 1.10.6 builds ClipData.Item as Item(text, htmlText), but the bridge
+  // parameter names were wired in the opposite order. Swapping the arguments
+  // here makes item 0 contain plain text plus the matching rich HTML flavour,
+  // which is what the Dzen editor expects when pasting formatted content.
+  const baseCopyRichPayload=copyRichPayload;
+  copyRichPayload=function(result){
+    const payload={html:String(result&&result.html||''),plain:String(result&&result.plain||'')};
+    if(!payload.html){toast('Текущая статья пустая');return}
+    if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
+      let queued=false;
+      try{queued=!!AndroidPublish.copyForPublication(payload.plain,payload.html)}catch(e){queued=false}
+      if(queued){toast('Скопировано для публикации');return}
+    }
+    return baseCopyRichPayload(result);
+  };
+
   function applyWorkflowUiPolicy(){
     settings.markdownToolbar=false;
     settings.dzenCheck=true;
