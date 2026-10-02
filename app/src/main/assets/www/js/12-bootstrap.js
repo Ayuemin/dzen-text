@@ -2,7 +2,7 @@ function bootstrapDzenText(){
   if(window.__dzenTextBootstrapped)return;
   window.__dzenTextBootstrapped=true;
 
-  document.title='Дзен Текст 1.10.7';
+  document.title='Дзен Текст 1.10.8';
   settings=loadSettings();
   // Retired product concepts are migrated only after the user's saved settings
   // are loaded, so unrelated editor/appearance preferences are never replaced
