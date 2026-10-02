@@ -63,25 +63,32 @@ if "keepFocusedSheetFieldVisible" not in core or "scrollIntoView" not in core:
     errors.append("focused sheet fields must be revealed after the keyboard opens")
 
 workflow = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
+analysis_state = (JS / "05-analysis-state.js").read_text(encoding="utf-8")
+analysis_report = (JS / "06-analysis-report.js").read_text(encoding="utf-8")
 editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
 bootstrap = (JS / "12-bootstrap.js").read_text(encoding="utf-8")
+spelling = (JS / "07-spelling.js").read_text(encoding="utf-8")
 
 # Current product policy: the Markdown toolbar is temporarily disabled because it
-# competed with the status row above the Android keyboard. The file name stays in
-# the load order as a compatibility/workflow-policy slot.
+# competed with the status row above the Android keyboard. The compatibility file
+# keeps the legacy hook inert and physically hides the toolbar and its setting.
 if "settings.markdownToolbar=false" not in workflow:
     errors.append("Markdown toolbar must stay disabled until it no longer hides the status row")
 if "bar.hidden=true" not in workflow:
     errors.append("Markdown toolbar must be physically hidden, not only disabled in settings")
-if "mdSwitch.closest('details.settingsGroup')" not in workflow or "group.hidden=true" not in workflow:
+if "hideSettingsGroupFor(mdSwitch)" not in workflow:
     errors.append("obsolete Markdown-toolbar setting must stay hidden")
 
-# Local analysis is automatic and coalesced. Typing may never start an external
-# AI request, while the manual sidebar command may still run local+online+AI.
-if "if(typeof scheduleAnalysis==='function')scheduleAnalysis()" not in workflow:
+# Local analysis is automatic and coalesced. Every text edit marks the analysis
+# stale and markAnalysisStale schedules the local pass. Neither path may launch AI.
+if "scheduleAnalysis" not in analysis_state or "function markAnalysisStale" not in analysis_state:
     errors.append("every edit must schedule the local analysis pass")
-if "startAiDzenArticleCheck" in bootstrap:
-    errors.append("ordinary input/bootstrap code must never start the external AI check")
+if "markAnalysisStale();" not in bootstrap:
+    errors.append("ordinary editor input must mark/schedule the local analysis pass")
+if "startAiDzenArticleCheck" in bootstrap or "startAiDzenArticleCheck" in analysis_state:
+    errors.append("ordinary input/local analysis must never start the external AI check")
+if "startAiDzenArticleCheck(src)" not in spelling:
+    errors.append("manual full-check command must still be able to start AI")
 if "drawerCheckButton.textContent='AI-проверка текста'" not in workflow:
     errors.append("manual sidebar check must be labelled AI-проверка текста")
 if "checkButton.hidden=true" not in workflow:
@@ -90,18 +97,18 @@ if "dot.setAttribute('aria-label','Открыть результаты пров�
     errors.append("the status dot must describe opening results, not launching a check")
 
 # The old local/AI/both user mode selector is no longer part of the UX. Internal
-# code runs in combined mode only so local findings are always present and a
-# completed AI session can be layered on top.
+# code stays in combined mode so local findings are always present and a completed
+# manual AI session is layered on top of the same result set.
 if "currentCheckMode=function(){return 'both'}" not in workflow:
     errors.append("local checks and retained AI findings must share one internal result set")
-if "const mode=document.getElementById('dzenCheckMode')" not in workflow or "mode.closest('details.settingsGroup')" not in workflow:
+if "hideSettingsGroupFor(mode)" not in workflow:
     errors.append("obsolete check-mode selector must stay hidden")
 if "settings.dzenCheck=true" not in workflow:
     errors.append("local Dzen rule checks must always be enabled")
 
 # AI findings survive ordinary edits. They are retained as a session and remapped
-# by their exact checked quote; editing that quote removes only that finding.
-for marker in ("aiDzenSessionIssues", "exactQuotePositions", "remapAiDzenIssues"):
+# by exact checked quote plus context; editing that quote removes only that finding.
+for marker in ("aiDzenSessionIssues", "exactQuotePositions", "remapAiDzenIssues", "aiContextBefore", "aiContextAfter"):
     if marker not in workflow:
         errors.append("AI result retention is missing: " + marker)
 if "aiDzenSessionIssues=[]" not in workflow:
@@ -109,16 +116,20 @@ if "aiDzenSessionIssues=[]" not in workflow:
 if "baseSetEditorTextForArticle" not in workflow or "clearAiDzenIssues('idle')" not in workflow:
     errors.append("switching articles must clear the previous article's AI session")
 
-# The user-facing findings list is unified; source is still retained internally
-# as issue.ai but must not be prefixed on every card.
-if "currentCheckMode=function(){return 'local'}" not in workflow:
-    errors.append("finding cards must suppress legacy AI/Локально origin prefixes")
-if "без технических пометок об источнике" not in workflow:
+# The user-facing findings list and exported report are unified. Source remains an
+# internal issue.ai flag but must not be prefixed on individual cards or rows.
+if "escapeHtml(i.title)" not in analysis_report:
+    errors.append("finding cards must render the issue title without source prefixes")
+if "origin+i.title" in analysis_report or "AI · ':'Локально" in analysis_report:
+    errors.append("finding cards must not expose legacy AI/Локально origin prefixes")
+if "без технических пометок об источнике проверки" not in analysis_report:
     errors.append("analysis export must describe the unified result set")
+if "function buildCurrentAnalysisReport" not in analysis_report or "Dzen-Text-report-" not in analysis_report:
+    errors.append("analysis export must use one unified current report")
 
-# Publication must never ship raw Markdown. MainActivity 1.10.6 exposes its
-# parameters in historical html/plain order but ClipData.Item interprets them as
-# text/htmlText; JS compensates by passing platform order (plain, html).
+# Publication must never ship raw Markdown. The current Android 1.10.6 bridge
+# has historical html/plain parameter names but feeds ClipData.Item(text,htmlText),
+# so JavaScript compensates by passing plain first and rendered HTML second.
 if "copyForPublication(payload.plain,payload.html)" not in editor_js:
     errors.append("Android publication bridge must receive plain text before HTML")
 if "new ClipData.Item(htmlValue, plainValue)" not in main_activity:
