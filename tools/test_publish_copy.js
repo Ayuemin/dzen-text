@@ -7,6 +7,10 @@
  *   3. selection copy fails   -> plain-text fallback still carries no Markdown
  *   4. clipboard stage is emptied and the user selection survives
  *
+ * The Android 1.10.6 bridge historically names its arguments html/plain but
+ * passes them into ClipData.Item(text, htmlText). JavaScript therefore calls
+ * the bridge in Android platform order: plain first, HTML second.
+ *
  * Run: node tools/test_publish_copy.js
  */
 'use strict';
@@ -29,8 +33,6 @@ function check(name, cond, detail) {
 function loadFunctions(sandbox, file, names) {
   const src = fs.readFileSync(path.join(JS, file), 'utf8');
   for (const fn of names) {
-    // Source may declare the function as async; slice the whole declaration
-    // so the extracted fragment parses on its own.
     const re = new RegExp('(?:async\\s+)?function\\s+' + fn + '\\s*\\(');
     const m = re.exec(src);
     if (!m) throw new Error('missing function ' + fn);
@@ -95,7 +97,7 @@ function makeEnv(opts) {
 
   if (opts.nativeAvailable) {
     sandbox.AndroidPublish = {
-      copyForPublication(html, plain) {
+      copyForPublication(plain, html) {
         nativeCalls.push({ html, plain });
         return !opts.nativeFails;
       },
@@ -148,6 +150,7 @@ async function main() {
   check('в HTML есть ссылка', call.html.includes('<a href="https://dzen.ru/x"'), call.html);
   check('plain не содержит markdown', !call.plain.includes('**') && !call.plain.includes('## ') && !call.plain.includes(']('), call.plain);
   check('plain содержит текст статьи', call.plain.includes('Первый абзац'), call.plain);
+  check('plain действительно передан первым аргументом Android-моста', !call.plain.includes('<strong>') && call.html.includes('<strong>'), JSON.stringify(call));
   check('execCommand не вызывается при наличии моста', env.__execCalls.length === 0, JSON.stringify(env.__execCalls));
   check('тост об успешном копировании', env.__toasts[0] === 'Скопировано для публикации', JSON.stringify(env.__toasts));
 }
