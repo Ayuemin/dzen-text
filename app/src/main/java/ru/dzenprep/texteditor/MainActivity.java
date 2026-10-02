@@ -2,6 +2,7 @@ package ru.dzenprep.texteditor;
 
 import android.app.Activity;
 import android.content.ClipData;
+import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Intent;
 import android.database.Cursor;
@@ -358,7 +359,12 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     // First item carries both flavours: editors that read only the first ClipData
 // item then still receive rich text instead of degrading to plain. The second
 // item keeps a pure text/plain alternative available.
-                    ClipData clip = new ClipData("Дзен Текст", new ClipData.Item(htmlValue, plainValue));
+                    // ClipData has no (label, item) constructor, so the description that
+                    // declares both flavours is built explicitly. The first item carries both,
+                    // so editors reading only item 0 still receive rich text.
+                    ClipDescription description = new ClipDescription("Дзен Текст",
+                            new String[] { "text/html", "text/plain" });
+                    ClipData clip = new ClipData(description, new ClipData.Item(htmlValue, plainValue));
                     clip.addItem(new ClipData.Item(plainValue));
                     clipboard.setPrimaryClip(clip);
                 } catch (Exception ignored) { }
