@@ -113,7 +113,18 @@ function check(name,fn){try{fn();results.push(['ok',name])}catch(e){results.push
   check('knowledge build performs extractor and independent reviewer calls',()=>assert.strictEqual(chatCalls.length,2));
   check('accepted rule keeps an exact source quote',()=>assert.strictEqual(knowledge.items[0].source_quote,quote));
 
-  // 5. Unsupported source quotes are rejected.
+  // 5. A Dzen article finding must cite the exact rule id and matching source.
+  sandbox.editor.value='Автор обещает гарантированный результат.';localIssues=[];chatCalls=[];crawlCalls=0;
+  const rule=knowledge.items[0];
+  chatResponder=()=>JSON.stringify({dzen_issues:[{rule_id:rule.id,title:'Категоричное обещание',reason:'Правило запрещает гарантированный результат',quote:'гарантированный результат',severity:'warning',source_url:rule.source_url}],quality_issues:[],style_issues:[]});
+  await sandbox.startAiDzenArticleCheck(sandbox.editor.value);
+  check('Dzen finding with exact rule provenance is accepted',()=>{assert.strictEqual(sandbox.aiDzenIssues.length,1);assert.strictEqual(sandbox.aiDzenIssues[0].ruleId,rule.id)});
+  chatResponder=()=>JSON.stringify({dzen_issues:[{rule_id:'rule_invented',title:'Выдуманное правило',reason:'Нет такого правила',quote:'гарантированный результат',severity:'warning',source_url:rule.source_url}],quality_issues:[],style_issues:[]});
+  await sandbox.startAiDzenArticleCheck(sandbox.editor.value);
+  check('Dzen finding with invented rule id is rejected',()=>assert.strictEqual(sandbox.aiDzenIssues.length,0));
+  check('article check still never crawls rules implicitly',()=>assert.strictEqual(crawlCalls,0));
+
+  // 6. Unsupported source quotes are rejected during knowledge build.
   localStorage.removeItem('dzenAiKnowledgeV1');chatCalls=[];
   chatResponder=()=>JSON.stringify({items:[{...item,source_quote:'Этой цитаты на странице нет.'}]});
   const bad=await sandbox.buildDzenAiKnowledge();
