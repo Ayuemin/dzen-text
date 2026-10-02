@@ -56,7 +56,7 @@ if missing_refs:
 # Programmatic textarea replacements must participate in persistence/history.
 # Keep this narrow and explicit: formatting/replacement modules are required to
 # funnel edits through the central post-edit hook.
-for name in ["07-spelling.js", "08-navigation.js", "11-ui.js", "12-markdown-toolbar.js"]:
+for name in ["07-spelling.js", "08-navigation.js", "11-ui.js", "12-workflow-policy.js"]:
     path = JS / name
     text = path.read_text(encoding="utf-8")
     if "editor.setRangeText(" in text and "afterProgrammaticEdit(" not in text:

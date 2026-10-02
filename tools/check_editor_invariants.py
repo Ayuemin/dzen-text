@@ -43,12 +43,6 @@ if "body.keyboard-open.sheetBackdrop.open.sheet{bottom:var(--keyboardInset)!impo
 if "#riskWords.riskArea{min-height:190px!important;" not in compact_css:
     errors.append("control-word textarea must remain a comfortable multiline editor")
 
-for block in re.findall(r"\.markdownToolbar\s*\{([^}]*)\}", css, re.S):
-    if re.search(r"position\s*:\s*fixed", block):
-        errors.append("Markdown toolbar must stay in normal flex layout, never position:fixed")
-    if re.search(r"bottom\s*:\s*calc\([^)]*(?:keyboardInset|viewportBottomInset)", block):
-        errors.append("Markdown toolbar must not emulate keyboard insets")
-
 scroll_writers = []
 for path in sorted(JS.glob("*.js")):
     text = path.read_text(encoding="utf-8")
@@ -65,18 +59,70 @@ if unexpected:
 if "08-navigation.js" not in scroll_writers:
     errors.append("navigation scroll controller is missing")
 
-if "markdown-toolbar-visible .bottom{display:none" not in css.replace("\n", "").replace(" ", ""):
-    # Accept the formatted variant too.
-    compact = re.sub(r"\s+", "", css)
-    if "body.markdown-toolbar-visible.bottom{display:none!important}" in compact:
-        pass
-
 if "keepFocusedSheetFieldVisible" not in core or "scrollIntoView" not in core:
     errors.append("focused sheet fields must be revealed after the keyboard opens")
 
-toolbar = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
-if "touchDevice" not in toolbar or "keyboardExpected" not in toolbar:
-    errors.append("Markdown toolbar needs a touch-focus fallback when IME callbacks are delayed")
+workflow = (JS / "12-workflow-policy.js").read_text(encoding="utf-8")
+analysis_state = (JS / "05-analysis-state.js").read_text(encoding="utf-8")
+analysis_report = (JS / "06-analysis-report.js").read_text(encoding="utf-8")
+editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
+bootstrap = (JS / "12-bootstrap.js").read_text(encoding="utf-8")
+spelling = (JS / "07-spelling.js").read_text(encoding="utf-8")
+
+# Current product policy: the old toolbar and mode selector are removed from
+# source, not merely hidden. Undo/redo history remains implemented separately.
+workflow_path = JS / "12-workflow-policy.js"
+if "markdownToolbar" in html or "markdownToolbarSwitch" in html:
+    errors.append("obsolete Markdown toolbar UI must be removed from HTML")
+if (JS / "12-markdown-toolbar.js").exists() or "js/12-markdown-toolbar.js" in html:
+    errors.append("obsolete Markdown toolbar script must be removed")
+if not workflow_path.exists() or "js/12-workflow-policy.js" not in html:
+    errors.append("retained AI-session workflow module is missing")
+if "dzenCheckMode" in html:
+    errors.append("obsolete local/AI/both selector must be removed from HTML")
+if "id=\"dzenCheck\"" in html:
+    errors.append("local Dzen checks must no longer have an off switch")
+if "id=\"checkBtn\"" in html:
+    errors.append("old bottom manual-check button must be removed")
+if "id=\"drawerAiCheckBtn\"" not in html or ">AI-проверка текста</button>" not in html:
+    errors.append("sidebar must expose the single manual AI-check command")
+
+workflow = workflow_path.read_text(encoding="utf-8") if workflow_path.exists() else ""
+editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
+bootstrap = (JS / "12-bootstrap.js").read_text(encoding="utf-8")
+analysis_state = (JS / "05-analysis-state.js").read_text(encoding="utf-8")
+settings_js = (JS / "10-settings.js").read_text(encoding="utf-8")
+ai_js = (JS / "10-ai-dzen.js").read_text(encoding="utf-8")
+core_js = (JS / "01-core.js").read_text(encoding="utf-8")
+
+for retired in ("markdownToolbarSwitch", "settings.markdownToolbar", "dzenCheckMode", "normalizeDzenCheckMode", "checkModeUsesLocal", "checkModeUsesAi"):
+    if retired in core_js + settings_js + ai_js + analysis_state + workflow:
+        errors.append("retired check/Markdown concept remains in active JS: " + retired)
+
+if "scheduleAnalysis()" not in analysis_state:
+    errors.append("ordinary edits must schedule the local analysis pass")
+if "startAiDzenArticleCheck" in bootstrap:
+    errors.append("ordinary input/bootstrap code must never start external AI")
+if "startAiDzenArticleCheck(String(src||editor.value||''))" not in (JS / "07-spelling.js").read_text(encoding="utf-8"):
+    errors.append("manual full-check command must still be able to start AI")
+if "aiDzenSessionIssues" not in workflow or "remapAiDzenIssues" not in workflow:
+    errors.append("retained AI-session remapping is missing")
+if "без технических пометок об источнике" not in (JS / "06-analysis-report.js").read_text(encoding="utf-8"):
+    errors.append("unified analysis report description is missing")
+
+if "copyForPublication(payload.html,payload.plain)" not in editor_js:
+    errors.append("publication JS bridge must pass HTML then plain text")
+if "new ClipData.Item(plainValue, htmlValue)" not in main_activity:
+    errors.append("Android clipboard item must map plain text before HTML")
+if "CountDownLatch" not in main_activity or "done.await(" not in main_activity or "copied.get()" not in main_activity:
+    errors.append("PublishBridge success must wait for the actual clipboard write")
+if "setPrimaryClip" not in main_activity:
+    errors.append("publication copy must write through Android ClipboardManager")
+
+history_js = (JS / "12-history.js").read_text(encoding="utf-8")
+if "function undoEdit" not in history_js or "function redoEdit" not in history_js:
+    errors.append("removing the Markdown toolbar must not remove undo/redo history mechanisms")
+
 if 'placeholder="Начните писать…"' not in html:
     errors.append("empty editor invitation is missing")
 
@@ -92,10 +138,9 @@ else:
     secret_text = secret_src.read_text(encoding="utf-8")
     if "AndroidKeyStore" not in secret_text or "AES/GCM/NoPadding" not in secret_text:
         errors.append("SecretStore must encrypt with an Android Keystore AES-GCM key")
-    main_java_for_secrets = main_activity
-    if "secretStore.save(" not in main_java_for_secrets:
+    if "secretStore.save(" not in main_activity:
         errors.append("the AI API key must be written through SecretStore")
-    if 'putString("dzen_ai_api_key"' in main_java_for_secrets:
+    if 'putString("dzen_ai_api_key"' in main_activity:
         errors.append("the AI API key must not be stored as a plain SharedPreferences string")
 
 if 'android:allowBackup="false"' not in manifest:

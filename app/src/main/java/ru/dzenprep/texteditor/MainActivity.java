@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -49,6 +50,9 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int REQUEST_OPEN_TEXT = 1907;
@@ -354,24 +358,41 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             final String htmlValue = html == null ? "" : html;
             final String plainValue = plain == null ? "" : plain;
             if (htmlValue.trim().isEmpty() && plainValue.trim().isEmpty()) return false;
+
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                return writePublicationClipboard(htmlValue, plainValue);
+            }
+
+            final AtomicBoolean copied = new AtomicBoolean(false);
+            final CountDownLatch done = new CountDownLatch(1);
             runOnUiThread(() -> {
                 try {
-                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                    if (clipboard == null) return;
-                    // First item carries both flavours: editors that read only the first ClipData
-// item then still receive rich text instead of degrading to plain. The second
-// item keeps a pure text/plain alternative available.
-                    // ClipData has no (label, item) constructor, so the description that
-                    // declares both flavours is built explicitly. The first item carries both,
-                    // so editors reading only item 0 still receive rich text.
-                    ClipDescription description = new ClipDescription("Дзен Текст",
-                            new String[] { "text/html", "text/plain" });
-                    ClipData clip = new ClipData(description, new ClipData.Item(htmlValue, plainValue));
-                    clip.addItem(new ClipData.Item(plainValue));
-                    clipboard.setPrimaryClip(clip);
-                } catch (Exception ignored) { }
+                    copied.set(writePublicationClipboard(htmlValue, plainValue));
+                } finally {
+                    done.countDown();
+                }
             });
-            return true;
+            try {
+                return done.await(2500, TimeUnit.MILLISECONDS) && copied.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
+        private boolean writePublicationClipboard(String htmlValue, String plainValue) {
+            try {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (clipboard == null) return false;
+                ClipDescription description = new ClipDescription("Дзен Текст",
+                        new String[] { ClipDescription.MIMETYPE_TEXT_PLAIN, ClipDescription.MIMETYPE_TEXT_HTML });
+                ClipData clip = new ClipData(description, new ClipData.Item(plainValue, htmlValue));
+                clip.addItem(new ClipData.Item(plainValue));
+                clipboard.setPrimaryClip(clip);
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
         }
     }
 

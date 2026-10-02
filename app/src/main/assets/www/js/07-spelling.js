@@ -1,19 +1,25 @@
+function aiTextCheckConfigured(){
+  return typeof dzenAiBridgeAvailable==='function'&&dzenAiBridgeAvailable()&&
+    typeof dzenAiHasKey==='function'&&dzenAiHasKey()&&
+    !!String(settings.dzenAiBaseUrl||'').trim()&&!!String(settings.dzenAiModel||'').trim();
+}
+function continueManualAiCheck(src,prefix=''){
+  if(!aiTextCheckConfigured()){
+    setCheckRunning(false);
+    toast((prefix?prefix+' · ':'')+'AI-проверка не настроена. Укажите API, модель и ключ в настройках');
+    return;
+  }
+  toast((prefix?prefix+' · ':'')+'запускаю AI-проверку…');
+  startAiDzenArticleCheck(String(src||editor.value||''));
+}
 function runFullCheck(){
  const src=editor.value||'';
  if(!src.trim()){toast('Нет текста для проверки');return}
  editor.blur();
  clearOnlineSpelling();
- if(typeof clearAiDzenIssues==='function')clearAiDzenIssues('idle');
  setCheckRunning(true);
 
- const mode=currentCheckMode();
- if(mode==='ai'){
-   toast('Запускаю AI-проверку…');
-   startAiDzenArticleCheck(src);
-   return;
- }
-
- toast(src.length>150000?'Проверяю большой текст…':'Проверяю текст…');
+ toast(src.length>150000?'Обновляю локальную проверку большого текста…':'Обновляю локальную проверку…');
  setTimeout(()=>{
    try{
      analyzeText();
@@ -24,25 +30,13 @@ function runFullCheck(){
      if(!settings.onlineSpelling){
        spellStatus='off';
        renderAnalysis();
-       if(mode==='both'){
-         toast('Локальная проверка готова · запускаю AI');
-         startAiDzenArticleCheck(src);
-       }else{
-         setCheckRunning(false);
-         toast('Локальная проверка выполнена');
-       }
+       continueManualAiCheck(src,'Локальная проверка готова');
        return;
      }
      if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){
        spellStatus='error';
        renderAnalysis();
-       if(mode==='both'){
-         toast('Онлайн-орфография недоступна · запускаю AI');
-         startAiDzenArticleCheck(src);
-       }else{
-         setCheckRunning(false);
-         toast('Онлайн-проверка доступна только в установленном приложении');
-       }
+       continueManualAiCheck(src,'Онлайн-орфография недоступна');
        return;
      }
      spellStatus='checking';
@@ -62,7 +56,7 @@ window.onNativeSpellResult=(requestId,items)=>{
  if(editor.value!==spellRequestSource){
    setCheckRunning(false);
    spellStatus='stale';
-   toast('Текст изменился во время проверки — результат отброшен');
+   toast('Текст изменился во время онлайн-проверки — результат отброшен');
    return;
  }
  onlineSpellIssues=(Array.isArray(items)?items:[]).map(x=>({start:+x.start||0,end:+x.end||0,word:String(x.word||''),suggestions:Array.isArray(x.suggestions)?x.suggestions.map(String):[],code:+x.code||0})).filter(x=>x.end>x.start&&!spellIgnoreWords.has(spellKey(x.word||editor.value.slice(x.start,x.end))));
@@ -72,13 +66,7 @@ window.onNativeSpellResult=(requestId,items)=>{
  document.getElementById('analysisBackdrop').classList.add('open');
  setAnalysisMode('problems');
  const spellMessage=onlineSpellIssues.length?`Орфография: найдено ${onlineSpellIssues.length}`:'Орфографических ошибок не найдено';
- if(currentCheckMode()==='both'){
-   toast(spellMessage+' · запускаю AI-проверку');
-   startAiDzenArticleCheck(editor.value);
- }else{
-   setCheckRunning(false);
-   toast(spellMessage);
- }
+ continueManualAiCheck(editor.value,spellMessage);
 };
 window.onNativeSpellError=(requestId,msg)=>{
  if(String(requestId)!==String(spellRequestId))return;
@@ -87,13 +75,7 @@ window.onNativeSpellError=(requestId,msg)=>{
  onlineSpellSource='';
  analyzeText();
  renderAnalysis();
- if(currentCheckMode()==='both'){
-   toast((msg||'Онлайн-орфография недоступна')+' · запускаю AI-проверку');
-   startAiDzenArticleCheck(editor.value);
- }else{
-   setCheckRunning(false);
-   toast(msg||'Не удалось выполнить онлайн-проверку');
- }
+ continueManualAiCheck(editor.value,msg||'Онлайн-орфография недоступна');
 };
 function openSpellIssue(issueIndex){const issue=currentAnalysis.issues[issueIndex];if(!issue||issue.type!=='spelling'){return}const list=currentAnalysis.issues.filter(x=>x.type==='spelling');const idx=Math.max(0,list.indexOf(issue));spellNavState={issues:list,index:idx};closeAnalysis();if(replacementState)closeReplacement();if(nearbyState)closeNearbyRepeat();if(repeatNavState)closeRepeatNavigator();showPane('edit');renderSpellPanel();jumpSpellIssue(true)}
 function renderSpellPanel(){const panel=document.getElementById('spellPanel');if(!spellNavState||!spellNavState.issues.length){panel.classList.remove('open');return}const total=spellNavState.issues.length;spellNavState.index=((spellNavState.index%total)+total)%total;const it=spellNavState.issues[spellNavState.index];document.getElementById('spellWord').textContent=it.word||editor.value.slice(it.start,it.end);document.getElementById('spellCount').textContent=`${spellNavState.index+1} из ${total}`;document.getElementById('spellPrev').disabled=total<2;document.getElementById('spellNext').disabled=total<2;const box=document.getElementById('spellSuggestions');const arr=Array.isArray(it.suggestions)?it.suggestions:[];box.innerHTML=arr.length?arr.slice(0,8).map(x=>`<button class="proofChip" onclick='applySpellSuggestion(${JSON.stringify(x).replace(/'/g,"&#39;")})'>${escapeHtml(x)}</button>`).join(''):'<span class="smallNote">Готовой замены нет — проверьте слово вручную.</span>';panel.classList.add('open')}

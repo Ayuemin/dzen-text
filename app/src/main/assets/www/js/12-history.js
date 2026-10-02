@@ -92,12 +92,7 @@ function redoEdit(){
   updateHistoryButtons();
 }
 
-function updateHistoryButtons(){
-  const undo=document.getElementById('undoBtn');
-  const redo=document.getElementById('redoBtn');
-  if(undo)undo.disabled=!undoStack.length;
-  if(redo)redo.disabled=!redoStack.length;
-}
+function updateHistoryButtons(){}
 
 function nativeVersionsAvailable(){
   return !!(window.AndroidDocuments&&typeof AndroidDocuments.saveVersion==='function'&&activeArticleId);

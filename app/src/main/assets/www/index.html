@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Дзен Текст 1.10.3</title>
+<title>Дзен Текст 1.10.6</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
@@ -16,7 +16,7 @@
     <div class="tabs">
       <button class="tab iconTab active" id="editTab" onclick="showPane('edit')" aria-label="Редактор" title="Редактор"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="srOnly">Редактор</span></button>
       <button class="tab iconTab" id="previewTab" onclick="showPane('preview')" aria-label="Превью" title="Превью"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg><span class="srOnly">Превью</span></button>
-      <button class="tab iconTab" onclick="copyRichHtml()" aria-label="Копировать HTML" title="Копировать HTML"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg><span class="srOnly">Копировать</span></button>
+      <button class="tab iconTab" onclick="copyRichHtml()" aria-label="Скопировать для публикации" title="Скопировать для публикации"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M15 9V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h3"/></svg><span class="srOnly">Копировать</span></button>
     </div>
   </header>
 
@@ -78,33 +78,10 @@
       <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
     </div>
   </main>
-  <div class="markdownToolbar" id="markdownToolbar" aria-label="Панель Markdown">
-    <div class="markdownToolbarScroll">
-      <button type="button" class="mdBtn mdHistory" id="undoBtn" onclick="undoEdit()" aria-label="Отменить" title="Отменить">↶</button>
-      <button type="button" class="mdBtn mdHistory" id="redoBtn" onclick="redoEdit()" aria-label="Повторить" title="Повторить">↷</button>
-      <span class="mdDivider" aria-hidden="true"></span>
-      <button type="button" class="mdBtn mdStrong" onclick="applyMarkdown('bold')" aria-label="Жирный" title="Жирный">B</button>
-      <button type="button" class="mdBtn mdItalic" onclick="applyMarkdown('italic')" aria-label="Курсив" title="Курсив">I</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h1')" aria-label="Заголовок H1" title="Заголовок H1">H1</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h2')" aria-label="Заголовок H2" title="Заголовок H2">H2</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h3')" aria-label="Заголовок H3" title="Заголовок H3">H3</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h4')" aria-label="Заголовок H4" title="Заголовок H4">H4</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h5')" aria-label="Заголовок H5" title="Заголовок H5">H5</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h6')" aria-label="Заголовок H6" title="Заголовок H6">H6</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('bullet')" aria-label="Маркированный список" title="Маркированный список">•</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('number')" aria-label="Нумерованный список" title="Нумерованный список">1.</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('quote')" aria-label="Цитата" title="Цитата">❝</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('link')" aria-label="Ссылка" title="Ссылка">↗</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('strike')" aria-label="Зачёркнутый" title="Зачёркнутый">S̶</button>
-      <button type="button" class="mdBtn mdCode" onclick="applyMarkdown('code')" aria-label="Код" title="Код">&lt;/&gt;</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('hr')" aria-label="Разделитель" title="Разделитель">—</button>
-    </div>
-  </div>
   <footer class="bottom">
     <button class="bottomBtn iconOnly" id="speakBtn" onclick="toggleSpeak()" aria-label="Озвучить" title="Озвучить"><span id="speakIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11"/></svg></span><span id="speakText" class="srOnly">Озвучить</span></button>
     <div class="stats"><b id="words">0</b> слов · <b id="readTime">0 мин</b> · <b id="chars">0</b> знаков</div>
-    <button class="gear checkAction" id="checkBtn" onclick="runFullCheck()" aria-label="Проверить текст" title="Проверить текст"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M4 12h5M4 18h7"/><path d="m14 15 2.5 2.5L21 12"/></svg></button>
-    <button class="analysisDot" id="analysisDot" onclick="openAnalysis()" aria-label="Редакторский анализ"><span></span></button>
+    <button class="analysisDot" id="analysisDot" onclick="openAnalysis()" aria-label="Открыть результаты проверки" title="Открыть результаты проверки"><span></span></button>
     <button class="gear" onclick="openSettings()" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
   </footer>
 </div>
@@ -123,7 +100,7 @@
       <div class="drawerSectionLabel">Текущая статья</div>
       <nav class="drawerNav drawerActions">
         <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
-        <button type="button" onclick="drawerCheck()">Проверить текст</button>
+        <button type="button" id="drawerAiCheckBtn" onclick="drawerCheck()">AI-проверка текста</button>
         <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
         <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
         <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
@@ -229,14 +206,6 @@
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Ввод текста</span><small>Клавиатура и форматирование</small></summary>
-      <div class="settingsGroupBody">
-        <div class="switchRow"><span class="labelWithHint">Панель Markdown над клавиатурой <button class="infoHintBtn" type="button" onclick="showAppHint('markdownToolbar')" aria-label="Подсказка о панели Markdown">i</button></span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Быстрые кнопки H1–H6, жирного, курсива, списков, цитаты, ссылки и других элементов. Можно отключить полностью.</div>
-      </div>
-    </details>
-
-    <details class="settingsGroup">
       <summary><span>Чтение и озвучка</span><small>Скорость чтения и голос</small></summary>
       <div class="settingsGroupBody">
         <div class="subLabel"><span class="labelWithHint">Скорость чтения для расчёта <button class="infoHintBtn" type="button" onclick="showAppHint('readingSpeed')" aria-label="Подсказка о скорости чтения">i</button></span><span class="val" id="wpmVal"></span></div>
@@ -254,19 +223,6 @@
         <div class="smallNote">Автоверсия создаётся после начала редактирования и затем не чаще одного раза в минуту.</div>
         <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Показывать HTML-код в превью <button class="infoHintBtn" type="button" onclick="showAppHint('htmlPreview')" aria-label="Подсказка об HTML-коде">i</button></span><input id="codeSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="settingActions" style="margin-top:14px"><button class="nativeBtn" type="button" onclick="openVersions()">Открыть версии текста</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAppHint('versions')" aria-label="Подсказка о версиях текста">i</button></div>
-      </div>
-    </details>
-
-    <details class="settingsGroup">
-      <summary><span>Режим проверки</span><small>Локальная, AI или обе вместе</small></summary>
-      <div class="settingsGroupBody">
-        <div class="subLabel"><span class="labelWithHint">Как проверять текст <button class="infoHintBtn" type="button" onclick="showAiHint('mode')" aria-label="Подсказка о режиме проверки">i</button></span></div>
-        <select id="dzenCheckMode" onchange="onDzenCheckModeChanged()">
-          <option value="local">Локальная проверка</option>
-          <option value="ai">AI-проверка</option>
-          <option value="both">Обе проверки</option>
-        </select>
-        <div class="smallNote">Локальная — только встроенные проверки. AI — только выбранная модель. «Обе» запускает оба механизма и объединяет замечания в одном результате.</div>
       </div>
     </details>
 
@@ -294,7 +250,7 @@
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Онлайн-проверка орфографии <button class="infoHintBtn" type="button" onclick="showAppHint('onlineSpelling')" aria-label="Подсказка об онлайн-орфографии">i</button></span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Онлайн-проверка выполняется только после нажатия кнопки проверки. При наборе текст наружу не отправляется.</div>
+        <div class="smallNote">Онлайн-орфография запускается только вместе с ручной AI-проверкой текста. При обычном наборе текст наружу не отправляется.</div>
         <div id="spellIgnoreStatus" class="dictStatus">Мои правильные слова: 0</div>
         <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button><button class="infoHintBtn actionHintBtn" type="button" onclick="showAppHint('spellIgnore')" aria-label="Подсказка об исключениях орфографии">i</button></div>
         <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
@@ -302,18 +258,17 @@
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Локальная проверка Дзена</span><small>Правила и обновляемая локальная база</small></summary>
+      <summary><span>Правила Дзена</span><small>Автоматическая проверка и обновляемая база правил</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span class="labelWithHint">Проверять правила Дзена локально <button class="infoHintBtn" type="button" onclick="showAppHint('dzenCheck')" aria-label="Подсказка о локальной проверке Дзена">i</button></span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Использовать обновляемую локальную базу <button class="infoHintBtn" type="button" onclick="showAppHint('localDzenBase')" aria-label="Подсказка о локальной базе Дзена">i</button></span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Работает без внешней AI-модели. Статья остаётся на устройстве; обновляется только компактная база правил.</div>
+        <div class="switchRow" style="margin-top:13px"><span class="labelWithHint">Использовать обновляемую базу правил <button class="infoHintBtn" type="button" onclick="showAppHint('localDzenBase')" aria-label="Подсказка о локальной базе Дзена">i</button></span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Правила проверяются автоматически на устройстве. При обновлении загружается только компактная база правил; статья во внешнюю AI-модель не отправляется.</div>
         <div id="dzenRulesStatus" class="ruleStatus"></div>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить локальную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
+        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить базу правил</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные правила</button></div>
       </div>
     </details>
 
     <details class="settingsGroup">
-      <summary><span>AI-проверка Дзена</span><small>API, модель, база знаний и стиль</small></summary>
+      <summary><span>AI-проверка текста</span><small>API, модель, база знаний Дзена и дополнительные критерии</small></summary>
       <div class="settingsGroupBody">
         <div id="dzenAiFields" class="aiSettingsBlock">
           <div class="subLabel"><span class="labelWithHint">API URL <button class="infoHintBtn" type="button" onclick="showAiHint('api')" aria-label="Подсказка об API URL">i</button></span></div>
@@ -418,7 +373,7 @@
   <div class="analysisExport">
     <div class="analysisExportTitle labelWithHint"><span id="analysisExportTitleText">Выгрузить замечания</span> <button class="infoHintBtn" type="button" onclick="showAppHint('currentExport')" aria-label="Подсказка об отчёте">i</button></div>
     <div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyCurrentAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveCurrentAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div>
-    <div class="smallNote" id="analysisExportNote">Отчёт соответствует выбранному режиму проверки.</div>
+    <div class="smallNote" id="analysisExportNote">Отчёт содержит текущие локальные замечания и ещё актуальные замечания последней ручной AI-проверки.</div>
   </div>
 </div></div>
 <div id="highlightHint" class="highlightHint">Фрагмент выделен</div>
@@ -438,7 +393,7 @@
 <script src="js/12-dialogs.js"></script>
 <script src="js/12-articles.js"></script>
 <script src="js/12-history.js"></script>
-<script src="js/12-markdown-toolbar.js"></script>
+<script src="js/12-workflow-policy.js"></script>
 <script src="js/12-publish.js"></script>
 <script src="js/12-bootstrap.js"></script>
 </body></html>

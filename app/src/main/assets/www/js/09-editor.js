@@ -63,7 +63,7 @@ async function loadFileText(text,name=''){
   if(editor.value.length<120000){
     setTimeout(()=>{try{analyzeText()}catch(e){}},220);
   }else{
-    toast('Большой текст загружен. Полную проверку запускайте кнопкой «Проверить текст»');
+    toast('Большой текст загружен. Локальная проверка обновится автоматически; AI-проверку запускайте из бокового меню.');
   }
   toast(name?('Загружен файл: '+name):'Текст загружен из файла');
 }
@@ -115,7 +115,7 @@ function renderPreview(){
 // A full analysis is synchronous and grows with the article: measured ~200 ms
 // at 10k words and ~570 ms at 20k, so running it on every keystroke would
 // freeze the editor. Requests are coalesced and the delay grows with the text.
-// Explicit "Проверить" runs analyzeText() directly and stays immediate.
+// The local pass is scheduled automatically; external AI is never called here.
 let analysisTimer=null;
 function scheduleAnalysis(){
   clearTimeout(analysisTimer);
@@ -149,7 +149,6 @@ function showPane(name){
   document.getElementById('editTab').classList.toggle('active',name==='edit');
   document.getElementById('previewTab').classList.toggle('active',name==='preview');
   if(name==='preview'&&previewDirty)render(false,true);
-  if(typeof updateMarkdownToolbarVisibility==='function')setTimeout(updateMarkdownToolbarVisibility,20);
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
 }
 
@@ -176,7 +175,9 @@ function copyRichPayload(result){
   if(!payload.html){toast('Текущая статья пустая');return}
   if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
     let ok=false;
-    try{ok=!!AndroidPublish.copyForPublication(payload.html,payload.plain)}catch(e){ok=false}
+    try{
+      ok=!!AndroidPublish.copyForPublication(payload.html,payload.plain);
+    }catch(e){ok=false}
     if(ok){toast('Скопировано для публикации');return}
   }
   copyPayloadToWebClipboard(payload);
