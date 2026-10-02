@@ -87,7 +87,7 @@ if "markAnalysisStale();" not in bootstrap:
     errors.append("ordinary editor input must mark/schedule the local analysis pass")
 if "startAiDzenArticleCheck" in bootstrap or "startAiDzenArticleCheck" in analysis_state:
     errors.append("ordinary input/local analysis must never start the external AI check")
-if "startAiDzenArticleCheck(src)" not in spelling:
+if "startAiDzenArticleCheck(" not in spelling or "continueManualAiCheck" not in spelling:
     errors.append("manual full-check command must still be able to start AI")
 if "drawerCheckButton.textContent='AI-проверка текста'" not in workflow:
     errors.append("manual sidebar check must be labelled AI-проверка текста")
