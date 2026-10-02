@@ -6,6 +6,8 @@
  * asset remains in the load order so the policy can be applied before the
  * bootstrap listener is installed, without adding another blocking script.
  */
+function applyMarkdown(){return false}
+
 (function installEditorWorkflowPolicy(){
   const baseLoadSettings=loadSettings;
   loadSettings=function(){
@@ -161,7 +163,11 @@
 
   const baseIssueGroups=issueGroups;
   issueGroups=function(){
-    return baseIssueGroups().map(group=>group.id==='aiQuality'?{...group,name:'Качество текста'}:group);
+    return baseIssueGroups().map(group=>{
+      if(group.id==='aiQuality')return {...group,name:'Качество текста'};
+      if(group.id==='aiStyle')return {...group,name:'Стиль текста'};
+      return group;
+    });
   };
 
   const baseIssueHtml=issueHtml;
@@ -171,7 +177,9 @@
     const realMode=currentCheckMode;
     currentCheckMode=function(){return 'local'};
     try{
-      return baseIssueHtml(issue).replace('AI · качество текста — проверить','Качество текста — проверить');
+      return baseIssueHtml(issue)
+        .replace('AI · качество текста — проверить','Качество текста — проверить')
+        .replace('Маркер машинного стиля — проверить','Стиль текста — проверить');
     }finally{
       currentCheckMode=realMode;
     }
@@ -201,7 +209,8 @@
     if(box){
       box.innerHTML=box.innerHTML
         .replace('Показаны вместе локальные и AI-замечания по Дзену.','Показаны текущие замечания по правилам Дзена.')
-        .replace(/AI · качество текста — проверить/g,'Качество текста — проверить');
+        .replace(/AI · качество текста — проверить/g,'Качество текста — проверить')
+        .replace(/Маркер машинного стиля — проверить/g,'Стиль текста — проверить');
     }
   };
 
@@ -257,6 +266,16 @@
     el.innerHTML='База правил: <b>'+(enabled?'обновляемая':'встроенная')+'</b><br>Версия: <b>'+escapeHtml(String(r.version||'встроенная'))+'</b><br>Источник: официальная справка Дзена · проверен '+escapeHtml(String(r.source_checked||'—'));
   };
 
+  const baseUpdateDzenRulesFromGitHub=updateDzenRulesFromGitHub;
+  updateDzenRulesFromGitHub=async function(){
+    if(settings.dzenSmartRules===false){
+      updateDzenRulesStatus();
+      toast('Обновляемая база правил отключена в настройках');
+      return;
+    }
+    return baseUpdateDzenRulesFromGitHub();
+  };
+
   updateMarkdownToolbarVisibility=function(){
     const bar=document.getElementById('markdownToolbar');
     if(bar){bar.classList.remove('visible');bar.hidden=true}
@@ -279,11 +298,36 @@
     return baseCopyRichPayload(result);
   };
 
+  function refreshHintTexts(){
+    if(typeof APP_HINTS==='undefined')return;
+    APP_HINTS.currentExport={
+      title:'Отчёт по проверке',
+      text:'Содержит все текущие замечания. Локальная проверка работает постоянно, а замечания последней AI-проверки остаются до исправления соответствующих фрагментов.'
+    };
+    APP_HINTS.localDzenBase={
+      title:'Обновляемая база правил',
+      text:'Приложение загружает компактную базу правил и применяет её локально на устройстве. Текст статьи при такой проверке никуда не отправляется.'
+    };
+    APP_HINTS.analysisOverview={
+      title:'Редакторский анализ',
+      text:'Локальные проверки пересчитываются автоматически во время редактирования. Если ранее запускалась AI-проверка, её ещё не исправленные замечания показываются в этом же списке.'
+    };
+    APP_HINTS.localAiStyle={
+      title:'Формальные признаки стиля',
+      text:'Офлайн-фильтр отмечает отдельные формальные шаблоны текста. Он не определяет авторство и не обращается к внешней AI-модели.'
+    };
+    APP_HINTS.dzenCheck={
+      title:'Правила Дзена',
+      text:'Правила проверяются автоматически на устройстве по встроенной или обновляемой базе. Для этого внешний AI API не используется.'
+    };
+  }
+
   function applyWorkflowUiPolicy(){
     settings.markdownToolbar=false;
     settings.dzenCheck=true;
     settings.dzenCheckMode='both';
 
+    refreshHintTexts();
     updateMarkdownToolbarVisibility();
     const mdSwitch=document.getElementById('markdownToolbarSwitch');
     if(mdSwitch){
@@ -322,6 +366,17 @@
       if(note)note.textContent='Правила проверяются автоматически на устройстве. Статья не отправляется во внешнюю AI-модель; при обновлении загружается только компактная база правил.';
     }
 
+    const aiStyle=document.getElementById('aiStyleCheck');
+    if(aiStyle){
+      const label=aiStyle.closest('.switchRow')?.querySelector('.labelWithHint');
+      if(label&&label.firstChild)label.firstChild.textContent='Формальные признаки шаблонного стиля ';
+      const group=aiStyle.closest('details.settingsGroup');
+      if(group){
+        const notes=group.querySelectorAll('.smallNote');
+        if(notes.length)notes[notes.length-1].textContent='Локальный фильтр работает офлайн и не определяет авторство текста. Смысловой разбор стиля выполняется только при ручной AI-проверке.';
+      }
+    }
+
     const aiFields=document.getElementById('dzenAiFields');
     const aiGroup=aiFields&&aiFields.closest('details.settingsGroup');
     if(aiGroup){
@@ -329,6 +384,9 @@
       const sub=aiGroup.querySelector('summary > small');
       if(title)title.textContent='AI-проверка текста';
       if(sub)sub.textContent='API, модель, база знаний Дзена и стиль';
+      const prompt=document.getElementById('dzenAiStylePrompt');
+      const promptLabel=prompt&&prompt.previousElementSibling&&prompt.previousElementSibling.querySelector('.labelWithHint');
+      if(promptLabel&&promptLabel.firstChild)promptLabel.firstChild.textContent='Что искать в стиле текста ';
     }
 
     const spell=document.getElementById('onlineSpelling');
@@ -352,6 +410,14 @@
 
     updateDzenRulesStatus();
   }
+
+  const baseApplySettings=applySettings;
+  applySettings=async function(){
+    const result=await baseApplySettings();
+    applyWorkflowUiPolicy();
+    if(typeof scheduleAnalysis==='function')scheduleAnalysis();
+    return result;
+  };
 
   applyWorkflowUiPolicy();
   setTimeout(applyWorkflowUiPolicy,0);
