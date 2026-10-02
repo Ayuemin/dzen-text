@@ -46,6 +46,10 @@ for marker in [
     "changedPages",
     "Обновить базу правил Дзена",
     "Открыть базу",
+    "failedUrls",
+    "builderModel",
+    "rule_id",
+    "semanticById",
 ]:
     if marker not in workflow:
         errors.append("Dzen knowledge invariant missing: " + marker)
@@ -58,12 +62,19 @@ else:
     if "buildDzenAiKnowledge" in block:
         errors.append("article checking must not rebuild Dzen knowledge implicitly")
 
+# The workflow module runs before bootstrap. It may migrate retired flags only
+# after the real saved settings were loaded; otherwise it could overwrite a
+# user's appearance/editor preferences with defaults.
+if "window.__dzenTextBootstrapped&&typeof persistSettings==='function'" not in workflow:
+    errors.append("workflow settings migration may persist defaults before bootstrap")
+
 # Mechanical checks stay local; semantic checks go to AI without duplicating counts/repeats.
 for marker in [
     "Не сообщай то, что приложение уже проверяет механически",
     "allowQuality=k===0",
     "item.check_mode==='mechanical'",
     "MY_SEMANTIC_RULES",
+    "RUN_QUALITY_AND_STYLE=no",
 ]:
     if marker not in workflow:
         errors.append("local/semantic split missing: " + marker)
