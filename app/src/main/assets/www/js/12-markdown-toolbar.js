@@ -1,10 +1,9 @@
 /*
- * Workflow policy for the editor.
+ * Editor workflow policy.
  *
- * The Markdown toolbar is intentionally disabled for now: on Android it
- * competes with the bottom status bar while the IME is open. This legacy
- * asset remains in the load order so the policy can be applied before the
- * bootstrap listener is installed, without adding another blocking script.
+ * The old Markdown toolbar is intentionally disabled for now: on Android it
+ * competed with the bottom status row while the IME was open. This legacy file
+ * stays in the script order as the compatibility/workflow slot.
  */
 function applyMarkdown(){return false}
 
@@ -18,8 +17,8 @@ function applyMarkdown(){return false}
     return value;
   };
 
-  // There is no user-selectable check mode anymore. Local checks are always
-  // active; the AI layer is added only after the explicit manual command.
+  // The mode selector is no longer user-facing. Local checks are always active;
+  // a completed manual AI run is simply an additional layer in the same result.
   normalizeDzenCheckMode=function(){return 'both'};
   currentCheckMode=function(){return 'both'};
   checkModeUsesLocal=function(){return true};
@@ -35,6 +34,9 @@ function applyMarkdown(){return false}
     return baseClearAiDzenIssues(state,message);
   };
 
+  // Keep the exact source text behind every accepted finding. The model may
+  // normalise punctuation in the quote it returns, so the accepted source span
+  // is the only reliable anchor for later edits.
   const baseAiIssueFromItem=aiIssueFromItem;
   aiIssueFromItem=function(item,type,chunk){
     const issue=baseAiIssueFromItem(item,type,chunk);
@@ -59,6 +61,25 @@ function applyMarkdown(){return false}
     return out;
   }
 
+  function commonPrefix(a,b){
+    const n=Math.min(a.length,b.length);let i=0;
+    while(i<n&&a[i]===b[i])i++;
+    return i;
+  }
+  function commonSuffix(a,b){
+    const n=Math.min(a.length,b.length);let i=0;
+    while(i<n&&a[a.length-1-i]===b[b.length-1-i])i++;
+    return i;
+  }
+  function aiCandidateScore(src,start,issue){
+    const quote=String(issue.quote||'');
+    const before=src.slice(Math.max(0,start-64),start);
+    const after=src.slice(start+quote.length,start+quote.length+64);
+    const context=commonSuffix(before,String(issue.aiBefore||''))+commonPrefix(after,String(issue.aiAfter||''));
+    const distance=Math.abs(start-(Number(issue.aiOriginalStart)||0));
+    return context*10000-distance;
+  }
+
   function remapAiDzenIssues(src){
     src=String(src||'');
     if(!aiDzenSessionIssues.length){
@@ -70,29 +91,27 @@ function applyMarkdown(){return false}
       return;
     }
 
-    const used=new Set();
     const visible=[];
-    const ordered=aiDzenSessionIssues.slice().sort((a,b)=>(Number(a.start)||0)-(Number(b.start)||0));
-    for(const original of ordered){
+    for(const original of aiDzenSessionIssues){
       const quote=String(original.quote||'');
       if(!quote)continue;
-      const oldStart=Number(original.start)||Number(original.aiOriginalStart)||0;
-      const candidates=exactQuotePositions(src,quote).filter(pos=>!used.has(pos+'|'+(pos+quote.length)));
+      const candidates=exactQuotePositions(src,quote);
       if(!candidates.length)continue;
-      candidates.sort((a,b)=>Math.abs(a-oldStart)-Math.abs(b-oldStart));
+      candidates.sort((a,b)=>aiCandidateScore(src,b,original)-aiCandidateScore(src,a,original));
       const start=candidates[0],end=start+quote.length;
-      used.add(start+'|'+end);
+      // Several independent findings may legitimately point to one fragment.
+      // Do not treat an already-used span as occupied: all such findings should
+      // remain until that fragment itself is edited.
       visible.push({...original,start,end});
     }
     aiDzenIssues=visible;
     aiDzenSource=src;
-    if(aiDzenRun&&aiDzenRun.state==='success'){
-      aiDzenRun={...aiDzenRun,remaining:visible.length};
-    }
+    if(aiDzenRun&&aiDzenRun.state==='success')aiDzenRun={...aiDzenRun,remaining:visible.length};
   }
 
-  // Editing no longer destroys a completed AI response. Only findings whose
-  // exact checked fragment still exists remain visible; fixed fragments vanish.
+  // Ordinary editing never destroys a completed AI response. A finding remains
+  // while its checked source fragment still exists and disappears when that
+  // fragment is changed. Undo can therefore make it reappear naturally.
   invalidateAiDzenIssues=function(){
     if(!editor)return;
     const src=editor.value||'';
@@ -111,9 +130,7 @@ function applyMarkdown(){return false}
     return baseAnalyzeText();
   };
 
-  // Local checks are cheap and never call an external AI API. Every text edit
-  // schedules a coalesced local pass; the dot may be stale only for that short
-  // debounce window.
+  // Local analysis is automatic, coalesced and never calls an external model.
   markAnalysisStale=function(){
     invalidateAiDzenIssues();
     const dot=document.getElementById('analysisDot');
@@ -132,11 +149,16 @@ function applyMarkdown(){return false}
     aiDzenSessionSource=String(src||editor.value||'');
     await baseStartAiDzenArticleCheck(src);
     if(aiDzenRun&&aiDzenRun.state==='success'){
-      aiDzenSessionIssues=(Array.isArray(aiDzenIssues)?aiDzenIssues:[]).map(issue=>({
-        ...issue,
-        quote:String(issue.quote||aiDzenSessionSource.slice(Number(issue.start)||0,Number(issue.end)||0)),
-        aiOriginalStart:Number(issue.start)||0
-      }));
+      aiDzenSessionIssues=(Array.isArray(aiDzenIssues)?aiDzenIssues:[]).map(issue=>{
+        const start=Number(issue.start)||0,end=Number(issue.end)||start;
+        return {
+          ...issue,
+          quote:String(issue.quote||aiDzenSessionSource.slice(start,end)),
+          aiOriginalStart:start,
+          aiBefore:aiDzenSessionSource.slice(Math.max(0,start-64),start),
+          aiAfter:aiDzenSessionSource.slice(end,end+64)
+        };
+      });
       remapAiDzenIssues(editor.value||'');
       analyzeText();
       renderAnalysis();
@@ -150,14 +172,10 @@ function applyMarkdown(){return false}
     if(aiDzenRun.state==='success')return String(Array.isArray(aiDzenIssues)?aiDzenIssues.length:0)+' замеч.';
     return 'не запускалась';
   };
-
   aiDzenRunDiagnosticHtml=function(){
     if(aiDzenRun.state==='running')return '<div class="analysisDzenNote"><b>AI-проверка выполняется…</b> Модель: '+escapeHtml(aiDzenRun.model||String(settings.dzenAiModel||'—'))+(aiDzenRun.calls?' · запросов: '+aiDzenRun.calls:'')+'.</div>';
     if(aiDzenRun.state==='error')return '<div class="analysisDzenNote"><b>AI-проверка не завершена.</b> '+escapeHtml(aiDzenRun.message||'Неизвестная ошибка')+'.</div>';
-    if(aiDzenRun.state==='success'){
-      const left=Array.isArray(aiDzenIssues)?aiDzenIssues.length:0;
-      return '<div class="analysisDzenNote"><b>Последняя AI-проверка завершена.</b> Осталось замечаний: '+left+'. Новая AI-проверка запускается только вручную.</div>';
-    }
+    if(aiDzenRun.state==='success')return '<div class="analysisDzenNote"><b>Последняя AI-проверка завершена.</b> Осталось замечаний: '+(Array.isArray(aiDzenIssues)?aiDzenIssues.length:0)+'. Новая AI-проверка запускается только вручную.</div>';
     return '';
   };
 
@@ -172,25 +190,22 @@ function applyMarkdown(){return false}
 
   const baseIssueHtml=issueHtml;
   issueHtml=function(issue){
-    // The legacy renderer adds an origin prefix only in the internal "both"
-    // mode. Render the same card without exposing that implementation detail.
+    // Base renderer adds the source prefix only in the old "both" mode. Render
+    // each card as a unified finding while preserving issue.ai internally.
     const realMode=currentCheckMode;
     currentCheckMode=function(){return 'local'};
     try{
       return baseIssueHtml(issue)
         .replace('AI · качество текста — проверить','Качество текста — проверить')
         .replace('Маркер машинного стиля — проверить','Стиль текста — проверить');
-    }finally{
-      currentCheckMode=realMode;
-    }
+    }finally{currentCheckMode=realMode}
   };
 
   const baseRenderAnalysis=renderAnalysis;
   renderAnalysis=function(){
     baseRenderAnalysis();
     const total=Number(currentAnalysis&&currentAnalysis.warningCount)||0;
-    const aiCount=currentAnalysis&&Array.isArray(currentAnalysis.issues)
-      ?currentAnalysis.issues.filter(x=>x&&x.ai===true).length:0;
+    const aiCount=currentAnalysis&&Array.isArray(currentAnalysis.issues)?currentAnalysis.issues.filter(x=>x&&x.ai===true).length:0;
     const sum=document.getElementById('analysisSummary');
     if(sum){
       let suffix=' · локальная проверка обновляется автоматически';
@@ -209,6 +224,7 @@ function applyMarkdown(){return false}
     if(box){
       box.innerHTML=box.innerHTML
         .replace('Показаны вместе локальные и AI-замечания по Дзену.','Показаны текущие замечания по правилам Дзена.')
+        .replace('Обе проверки завершены без замечаний.','Текущих замечаний нет.')
         .replace(/AI · качество текста — проверить/g,'Качество текста — проверить')
         .replace(/Маркер машинного стиля — проверить/g,'Стиль текста — проверить');
     }
@@ -229,33 +245,25 @@ function applyMarkdown(){return false}
   };
   currentReportFileName=function(){return 'Dzen-Text-report-'+new Date().toISOString().slice(0,10)+'.txt'};
 
-  // A whole-document replacement starts another editing context. Do not carry
-  // findings from one article/import/restored version into another document.
+  // Whole-document changes start another context and must never inherit findings
+  // from the previous article/import/restored version.
   const baseSetEditorTextForArticle=setEditorTextForArticle;
   setEditorTextForArticle=function(text,focus){
     clearAiDzenIssues('idle');
     return baseSetEditorTextForArticle(text,focus);
   };
-
   const baseLoadFileText=loadFileText;
   loadFileText=async function(text,name=''){
     const before=editor.value;
     await baseLoadFileText(text,name);
-    if(editor.value!==before){
-      clearAiDzenIssues('idle');
-      analyzeText();
-    }
+    if(editor.value!==before){clearAiDzenIssues('idle');analyzeText()}
   };
-
   if(typeof restoreVersion==='function'){
     const baseRestoreVersion=restoreVersion;
     restoreVersion=async function(id){
       const before=editor.value;
       await baseRestoreVersion(id);
-      if(editor.value!==before){
-        clearAiDzenIssues('idle');
-        analyzeText();
-      }
+      if(editor.value!==before){clearAiDzenIssues('idle');analyzeText()}
     };
   }
 
@@ -265,7 +273,6 @@ function applyMarkdown(){return false}
     const enabled=settings.dzenSmartRules!==false,r=activeDzenRules();
     el.innerHTML='База правил: <b>'+(enabled?'обновляемая':'встроенная')+'</b><br>Версия: <b>'+escapeHtml(String(r.version||'встроенная'))+'</b><br>Источник: официальная справка Дзена · проверен '+escapeHtml(String(r.source_checked||'—'));
   };
-
   const baseUpdateDzenRulesFromGitHub=updateDzenRulesFromGitHub;
   updateDzenRulesFromGitHub=async function(){
     if(settings.dzenSmartRules===false){
@@ -282,76 +289,35 @@ function applyMarkdown(){return false}
     if(document.body)document.body.classList.remove('markdown-toolbar-visible');
   };
 
-  // Android 1.10.6 builds ClipData.Item as Item(text, htmlText), but the bridge
-  // parameter names were wired in the opposite order. Swapping the arguments
-  // here makes item 0 contain plain text plus the matching rich HTML flavour,
-  // which is what the Dzen editor expects when pasting formatted content.
-  const baseCopyRichPayload=copyRichPayload;
-  copyRichPayload=function(result){
-    const payload={html:String(result&&result.html||''),plain:String(result&&result.plain||'')};
-    if(!payload.html){toast('Текущая статья пустая');return}
-    if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
-      let queued=false;
-      try{queued=!!AndroidPublish.copyForPublication(payload.plain,payload.html)}catch(e){queued=false}
-      if(queued){toast('Скопировано для публикации');return}
-    }
-    return baseCopyRichPayload(result);
-  };
-
   function refreshHintTexts(){
     if(typeof APP_HINTS==='undefined')return;
-    APP_HINTS.currentExport={
-      title:'Отчёт по проверке',
-      text:'Содержит все текущие замечания. Локальная проверка работает постоянно, а замечания последней AI-проверки остаются до исправления соответствующих фрагментов.'
-    };
-    APP_HINTS.localDzenBase={
-      title:'Обновляемая база правил',
-      text:'Приложение загружает компактную базу правил и применяет её локально на устройстве. Текст статьи при такой проверке никуда не отправляется.'
-    };
-    APP_HINTS.analysisOverview={
-      title:'Редакторский анализ',
-      text:'Локальные проверки пересчитываются автоматически во время редактирования. Если ранее запускалась AI-проверка, её ещё не исправленные замечания показываются в этом же списке.'
-    };
-    APP_HINTS.localAiStyle={
-      title:'Формальные признаки стиля',
-      text:'Офлайн-фильтр отмечает отдельные формальные шаблоны текста. Он не определяет авторство и не обращается к внешней AI-модели.'
-    };
-    APP_HINTS.dzenCheck={
-      title:'Правила Дзена',
-      text:'Правила проверяются автоматически на устройстве по встроенной или обновляемой базе. Для этого внешний AI API не используется.'
-    };
+    APP_HINTS.currentExport={title:'Отчёт по проверке',text:'Содержит все текущие замечания. Локальная проверка работает постоянно, а замечания последней AI-проверки остаются до исправления соответствующих фрагментов.'};
+    APP_HINTS.localDzenBase={title:'Обновляемая база правил',text:'Приложение загружает компактную базу правил и применяет её локально на устройстве. Текст статьи при такой проверке никуда не отправляется.'};
+    APP_HINTS.analysisOverview={title:'Редакторский анализ',text:'Локальные проверки пересчитываются автоматически во время редактирования. Если ранее запускалась AI-проверка, её ещё не исправленные замечания показываются в этом же списке.'};
+    APP_HINTS.localAiStyle={title:'Формальные признаки стиля',text:'Офлайн-фильтр отмечает отдельные формальные шаблоны текста. Он не определяет авторство и не обращается к внешней AI-модели.'};
+    APP_HINTS.dzenCheck={title:'Правила Дзена',text:'Правила проверяются автоматически на устройстве по встроенной или обновляемой базе. Для этого внешний AI API не используется.'};
   }
 
   function applyWorkflowUiPolicy(){
     settings.markdownToolbar=false;
     settings.dzenCheck=true;
     settings.dzenCheckMode='both';
-
     refreshHintTexts();
     updateMarkdownToolbarVisibility();
+
     const mdSwitch=document.getElementById('markdownToolbarSwitch');
-    if(mdSwitch){
-      mdSwitch.checked=false;
-      const group=mdSwitch.closest('details.settingsGroup');
-      if(group)group.hidden=true;
-    }
+    if(mdSwitch){mdSwitch.checked=false;const group=mdSwitch.closest('details.settingsGroup');if(group)group.hidden=true}
 
     const mode=document.getElementById('dzenCheckMode');
-    if(mode){
-      mode.value='both';
-      const group=mode.closest('details.settingsGroup');
-      if(group)group.hidden=true;
-    }
+    if(mode){mode.value='both';const group=mode.closest('details.settingsGroup');if(group)group.hidden=true}
 
     const localSwitch=document.getElementById('dzenCheck');
     if(localSwitch){
       localSwitch.checked=true;
-      const row=localSwitch.closest('.switchRow');
-      if(row)row.hidden=true;
+      const row=localSwitch.closest('.switchRow');if(row)row.hidden=true;
       const group=localSwitch.closest('details.settingsGroup');
       if(group){
-        const title=group.querySelector('summary > span');
-        const sub=group.querySelector('summary > small');
+        const title=group.querySelector('summary > span'),sub=group.querySelector('summary > small');
         if(title)title.textContent='Правила Дзена';
         if(sub)sub.textContent='Автоматическая локальная проверка и база правил';
       }
@@ -361,8 +327,7 @@ function applyMarkdown(){return false}
     if(smart){
       const label=smart.closest('.switchRow')?.querySelector('.labelWithHint');
       if(label&&label.firstChild)label.firstChild.textContent='Использовать обновляемую базу правил ';
-      const group=smart.closest('details.settingsGroup');
-      const note=group&&group.querySelector('.smallNote');
+      const group=smart.closest('details.settingsGroup'),note=group&&group.querySelector('.smallNote');
       if(note)note.textContent='Правила проверяются автоматически на устройстве. Статья не отправляется во внешнюю AI-модель; при обновлении загружается только компактная база правил.';
     }
 
@@ -370,18 +335,13 @@ function applyMarkdown(){return false}
     if(aiStyle){
       const label=aiStyle.closest('.switchRow')?.querySelector('.labelWithHint');
       if(label&&label.firstChild)label.firstChild.textContent='Формальные признаки шаблонного стиля ';
-      const group=aiStyle.closest('details.settingsGroup');
-      if(group){
-        const notes=group.querySelectorAll('.smallNote');
-        if(notes.length)notes[notes.length-1].textContent='Локальный фильтр работает офлайн и не определяет авторство текста. Смысловой разбор стиля выполняется только при ручной AI-проверке.';
-      }
+      const group=aiStyle.closest('details.settingsGroup'),notes=group&&group.querySelectorAll('.smallNote');
+      if(notes&&notes.length)notes[notes.length-1].textContent='Локальный фильтр работает офлайн и не определяет авторство текста. Смысловой разбор стиля выполняется только при ручной AI-проверке.';
     }
 
-    const aiFields=document.getElementById('dzenAiFields');
-    const aiGroup=aiFields&&aiFields.closest('details.settingsGroup');
+    const aiFields=document.getElementById('dzenAiFields'),aiGroup=aiFields&&aiFields.closest('details.settingsGroup');
     if(aiGroup){
-      const title=aiGroup.querySelector('summary > span');
-      const sub=aiGroup.querySelector('summary > small');
+      const title=aiGroup.querySelector('summary > span'),sub=aiGroup.querySelector('summary > small');
       if(title)title.textContent='AI-проверка текста';
       if(sub)sub.textContent='API, модель, база знаний Дзена и стиль';
       const prompt=document.getElementById('dzenAiStylePrompt');
@@ -390,24 +350,13 @@ function applyMarkdown(){return false}
     }
 
     const spell=document.getElementById('onlineSpelling');
-    if(spell){
-      const group=spell.closest('details.settingsGroup');
-      const note=group&&group.querySelector('.smallNote');
-      if(note)note.textContent='Онлайн-орфография запускается только при ручной AI-проверке текста. При наборе текст наружу не отправляется.';
-    }
+    if(spell){const group=spell.closest('details.settingsGroup'),note=group&&group.querySelector('.smallNote');if(note)note.textContent='Онлайн-орфография запускается только при ручной AI-проверке текста. При наборе текст наружу не отправляется.'}
 
     const drawerCheckButton=document.querySelector('.drawerActions button[onclick="drawerCheck()"]');
     if(drawerCheckButton)drawerCheckButton.textContent='AI-проверка текста';
-
-    const checkButton=document.getElementById('checkBtn');
-    if(checkButton)checkButton.hidden=true;
-
-    const dot=document.getElementById('analysisDot');
-    if(dot){dot.setAttribute('aria-label','Открыть результаты проверки');dot.title='Открыть результаты проверки'}
-
-    const copy=document.querySelector('button[onclick="copyRichHtml()"]');
-    if(copy){copy.setAttribute('aria-label','Скопировать для публикации');copy.title='Скопировать для публикации'}
-
+    const checkButton=document.getElementById('checkBtn');if(checkButton)checkButton.hidden=true;
+    const dot=document.getElementById('analysisDot');if(dot){dot.setAttribute('aria-label','Открыть результаты проверки');dot.title='Открыть результаты проверки'}
+    const copy=document.querySelector('button[onclick="copyRichHtml()"]');if(copy){copy.setAttribute('aria-label','Скопировать для публикации');copy.title='Скопировать для публикации'}
     updateDzenRulesStatus();
   }
 
