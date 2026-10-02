@@ -43,12 +43,6 @@ if "body.keyboard-open.sheetBackdrop.open.sheet{bottom:var(--keyboardInset)!impo
 if "#riskWords.riskArea{min-height:190px!important;" not in compact_css:
     errors.append("control-word textarea must remain a comfortable multiline editor")
 
-for block in re.findall(r"\.markdownToolbar\s*\{([^}]*)\}", css, re.S):
-    if re.search(r"position\s*:\s*fixed", block):
-        errors.append("Markdown toolbar must stay in normal flex layout, never position:fixed")
-    if re.search(r"bottom\s*:\s*calc\([^)]*(?:keyboardInset|viewportBottomInset)", block):
-        errors.append("Markdown toolbar must not emulate keyboard insets")
-
 scroll_writers = []
 for path in sorted(JS.glob("*.js")):
     text = path.read_text(encoding="utf-8")
@@ -65,18 +59,73 @@ if unexpected:
 if "08-navigation.js" not in scroll_writers:
     errors.append("navigation scroll controller is missing")
 
-if "markdown-toolbar-visible .bottom{display:none" not in css.replace("\n", "").replace(" ", ""):
-    # Accept the formatted variant too.
-    compact = re.sub(r"\s+", "", css)
-    if "body.markdown-toolbar-visible.bottom{display:none!important}" in compact:
-        pass
-
 if "keepFocusedSheetFieldVisible" not in core or "scrollIntoView" not in core:
     errors.append("focused sheet fields must be revealed after the keyboard opens")
 
-toolbar = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
-if "touchDevice" not in toolbar or "keyboardExpected" not in toolbar:
-    errors.append("Markdown toolbar needs a touch-focus fallback when IME callbacks are delayed")
+workflow = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
+editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
+bootstrap = (JS / "12-bootstrap.js").read_text(encoding="utf-8")
+
+# Current product policy: the Markdown toolbar is temporarily disabled because it
+# competed with the status row above the Android keyboard. The file name stays in
+# the load order as a compatibility/workflow-policy slot.
+if "settings.markdownToolbar=false" not in workflow:
+    errors.append("Markdown toolbar must stay disabled until it no longer hides the status row")
+if "bar.hidden=true" not in workflow:
+    errors.append("Markdown toolbar must be physically hidden, not only disabled in settings")
+if "mdSwitch.closest('details.settingsGroup')" not in workflow or "group.hidden=true" not in workflow:
+    errors.append("obsolete Markdown-toolbar setting must stay hidden")
+
+# Local analysis is automatic and coalesced. Typing may never start an external
+# AI request, while the manual sidebar command may still run local+online+AI.
+if "if(typeof scheduleAnalysis==='function')scheduleAnalysis()" not in workflow:
+    errors.append("every edit must schedule the local analysis pass")
+if "startAiDzenArticleCheck" in bootstrap:
+    errors.append("ordinary input/bootstrap code must never start the external AI check")
+if "drawerCheckButton.textContent='AI-проверка текста'" not in workflow:
+    errors.append("manual sidebar check must be labelled AI-проверка текста")
+if "checkButton.hidden=true" not in workflow:
+    errors.append("the old bottom check button must stay hidden; the status dot only opens results")
+if "dot.setAttribute('aria-label','Открыть результаты проверки')" not in workflow:
+    errors.append("the status dot must describe opening results, not launching a check")
+
+# The old local/AI/both user mode selector is no longer part of the UX. Internal
+# code runs in combined mode only so local findings are always present and a
+# completed AI session can be layered on top.
+if "currentCheckMode=function(){return 'both'}" not in workflow:
+    errors.append("local checks and retained AI findings must share one internal result set")
+if "const mode=document.getElementById('dzenCheckMode')" not in workflow or "mode.closest('details.settingsGroup')" not in workflow:
+    errors.append("obsolete check-mode selector must stay hidden")
+if "settings.dzenCheck=true" not in workflow:
+    errors.append("local Dzen rule checks must always be enabled")
+
+# AI findings survive ordinary edits. They are retained as a session and remapped
+# by their exact checked quote; editing that quote removes only that finding.
+for marker in ("aiDzenSessionIssues", "exactQuotePositions", "remapAiDzenIssues"):
+    if marker not in workflow:
+        errors.append("AI result retention is missing: " + marker)
+if "aiDzenSessionIssues=[]" not in workflow:
+    errors.append("a new AI run/document must be able to reset the retained session")
+if "baseSetEditorTextForArticle" not in workflow or "clearAiDzenIssues('idle')" not in workflow:
+    errors.append("switching articles must clear the previous article's AI session")
+
+# The user-facing findings list is unified; source is still retained internally
+# as issue.ai but must not be prefixed on every card.
+if "currentCheckMode=function(){return 'local'}" not in workflow:
+    errors.append("finding cards must suppress legacy AI/Локально origin prefixes")
+if "без технических пометок об источнике" not in workflow:
+    errors.append("analysis export must describe the unified result set")
+
+# Publication must never ship raw Markdown. MainActivity 1.10.6 exposes its
+# parameters in historical html/plain order but ClipData.Item interprets them as
+# text/htmlText; JS compensates by passing platform order (plain, html).
+if "copyForPublication(payload.plain,payload.html)" not in editor_js:
+    errors.append("Android publication bridge must receive plain text before HTML")
+if "new ClipData.Item(htmlValue, plainValue)" not in main_activity:
+    errors.append("unexpected PublishBridge layout: review clipboard flavour ordering")
+if "ClipboardManager" not in main_activity or "setPrimaryClip" not in main_activity:
+    errors.append("publication copy must write through Android ClipboardManager")
+
 if 'placeholder="Начните писать…"' not in html:
     errors.append("empty editor invitation is missing")
 
@@ -92,10 +141,9 @@ else:
     secret_text = secret_src.read_text(encoding="utf-8")
     if "AndroidKeyStore" not in secret_text or "AES/GCM/NoPadding" not in secret_text:
         errors.append("SecretStore must encrypt with an Android Keystore AES-GCM key")
-    main_java_for_secrets = main_activity
-    if "secretStore.save(" not in main_java_for_secrets:
+    if "secretStore.save(" not in main_activity:
         errors.append("the AI API key must be written through SecretStore")
-    if 'putString("dzen_ai_api_key"' in main_java_for_secrets:
+    if 'putString("dzen_ai_api_key"' in main_activity:
         errors.append("the AI API key must not be stored as a plain SharedPreferences string")
 
 if 'android:allowBackup="false"' not in manifest:
