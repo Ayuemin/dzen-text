@@ -36,6 +36,11 @@ jobs:
           if old not in s:
               raise SystemExit('function parser marker not found')
           s=s.replace(old,new,1)
+          marker='# Physical absence checks before tests.'
+          inject="p = JS / '02-text-tools.js'\ntt = p.read_text(encoding='utf-8')\ntt = tt.replace('value.dzenCheckMode=normalizeDzenCheckMode(value.dzenCheckMode);', '')\np.write_text(tt, encoding='utf-8')\n\n"
+          if marker not in s:
+              raise SystemExit('physical absence marker not found')
+          s=s.replace(marker,inject+marker,1)
           p.write_text(s,encoding='utf-8')
           PY
 
@@ -47,8 +52,8 @@ jobs:
           rc=$?
           set -e
           if [ "$rc" -ne 0 ]; then
-            echo '--- residual dzenCheckMode references ---'
-            grep -R -n --exclude='finalize_checklist_cleanup.py' 'dzenCheckMode' app/src/main/assets/www || true
+            echo '--- residual retired references ---'
+            grep -R -n --exclude='finalize_checklist_cleanup.py' -E 'dzenCheckMode|markdownToolbarSwitch|normalizeDzenCheckMode|checkModeUsesLocal|checkModeUsesAi' app/src/main/assets/www || true
             exit "$rc"
           fi
 
