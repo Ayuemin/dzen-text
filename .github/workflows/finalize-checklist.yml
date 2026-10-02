@@ -19,6 +19,24 @@ jobs:
           ref: fix/ai-check-workflow-audit
           fetch-depth: 0
 
+      - name: Prepare cleanup script
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/finalize_checklist_cleanup.py')
+          s=p.read_text(encoding='utf-8')
+          old="""wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')
+          wf = remove_function(wf, 'hideSettingsGroupFor')
+          wf = remove_function(wf, 'applyWorkflowUiPolicy')"""
+          new="""wf = remove_function(wf, 'hideSettingsGroupFor')
+          wf = remove_function(wf, 'applyWorkflowUiPolicy')
+          wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')"""
+          if old not in s:
+              raise SystemExit('cleanup ordering marker not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+
       - name: Apply final source cleanup
         run: python3 tools/finalize_checklist_cleanup.py
 
