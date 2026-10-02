@@ -4,6 +4,13 @@ function bootstrapDzenText(){
 
   document.title='Дзен Текст 1.10.7';
   settings=loadSettings();
+  // Retired product concepts are migrated only after the user's saved settings
+  // are loaded, so unrelated editor/appearance preferences are never replaced
+  // by defaults during startup.
+  settings.onlineSpelling=false;
+  settings.riskCheck=false;
+  settings.dzenSmartRules=false;
+  if(typeof persistSettings==='function')persistSettings(false);
   userSynonyms=loadUserSynonyms();
   spellIgnoreWords=loadSpellIgnoreWords();
   dzenRules=loadDzenRules();
@@ -68,6 +75,18 @@ function bootstrapDzenText(){
   }
   if(typeof migrateLegacyVersions==='function')migrateLegacyVersions();
   syncSettingsUI();
+
+  // The remaining local style heuristic is purely typographic. Do not present
+  // it as an AI-authorship detector.
+  const aiStyle=document.getElementById('aiStyleCheck');
+  if(aiStyle){
+    const row=aiStyle.closest('.switchRow');
+    const label=row&&row.querySelector('.labelWithHint');
+    if(label&&label.childNodes&&label.childNodes[0])label.childNodes[0].nodeValue='Типографические сигналы ';
+    const note=row&&row.nextElementSibling;
+    if(note&&note.classList&&note.classList.contains('smallNote'))note.textContent='Локальная механическая проверка отдельных типографических признаков. Она не определяет авторство текста и не оценивает смысл.';
+  }
+
   updateUserSynonymStatus();
   updateDzenRulesStatus();
   updateSpellIgnoreStatus();

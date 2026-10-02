@@ -103,12 +103,16 @@ if "scheduleAnalysis()" not in analysis_state:
     errors.append("ordinary edits must schedule the local analysis pass")
 if "startAiDzenArticleCheck" in bootstrap:
     errors.append("ordinary input/bootstrap code must never start external AI")
-if "startAiDzenArticleCheck(String(src||editor.value||''))" not in (JS / "07-spelling.js").read_text(encoding="utf-8"):
+if "startAiDzenArticleCheck(String(src||editor.value||''))" not in spelling:
     errors.append("manual full-check command must still be able to start AI")
 if "aiDzenSessionIssues" not in workflow or "remapAiDzenIssues" not in workflow:
     errors.append("retained AI-session remapping is missing")
-if "без технических пометок об источнике" not in (JS / "06-analysis-report.js").read_text(encoding="utf-8"):
+if "все текущие локальные и актуальные AI-замечания" not in analysis_report:
     errors.append("unified analysis report description is missing")
+if "Переключите «Всё»" in analysis_report:
+    errors.append("analysis report UI must not reference the retired filter tabs")
+if "Яндекс.Спеллер" in analysis_report:
+    errors.append("analysis report must not expose retired Yandex.Speller attribution")
 
 if "copyForPublication(payload.html,payload.plain)" not in editor_js:
     errors.append("publication JS bridge must pass HTML then plain text")
