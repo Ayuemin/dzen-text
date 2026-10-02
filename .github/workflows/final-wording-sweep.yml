@@ -39,8 +39,21 @@ jobs:
           end='/* Paper presets stay subtle enough for long reading sessions. */'
           a=css.find(start); b=css.find(end)
           if a < 0 or b < 0 or b <= a:
-              raise SystemExit('obsolete Markdown CSS block markers not found')
-          css_path.write_text(css[:a]+css[b:],encoding='utf-8')
+              raise SystemExit('primary obsolete Markdown CSS block markers not found')
+          css=css[:a]+css[b:]
+
+          start2='/* Markdown controls are shown only while the IME is really visible. */'
+          end2='/* Settings are an accordion instead of one endless wall. */'
+          a=css.find(start2); b=css.find(end2)
+          if a < 0 or b < 0 or b <= a:
+              raise SystemExit('secondary obsolete Markdown CSS block markers not found')
+          css=css[:a]+css[b:]
+
+          old_nav='body.markdown-toolbar-visible .issueNavPanel{bottom:57px}\n'
+          if old_nav not in css:
+              raise SystemExit('obsolete issue navigator toolbar offset not found')
+          css=css.replace(old_nav,'',1)
+          css_path.write_text(css,encoding='utf-8')
 
           html=index.read_text(encoding='utf-8')
           js='\n'.join(p.read_text(encoding='utf-8') for p in (root/'js').glob('*.js'))
@@ -51,8 +64,9 @@ jobs:
           for marker in ['dzenCheckMode','markdownToolbarSwitch','normalizeDzenCheckMode','checkModeUsesLocal','checkModeUsesAi']:
               if marker in html or marker in js:
                   raise SystemExit('retired active marker remains: '+marker)
-          if 'markdownToolbar' in html or 'markdownToolbar' in css or '.mdBtn' in css:
-              raise SystemExit('obsolete Markdown toolbar source/CSS remains')
+          for marker in ['markdownToolbar','.mdBtn','markdown-toolbar-visible']:
+              if marker in html or marker in css:
+                  raise SystemExit('obsolete Markdown toolbar source/CSS remains: '+marker)
           if (root/'js/12-markdown-toolbar.js').exists():
               raise SystemExit('obsolete toolbar JS still exists')
           if not (root/'js/12-workflow-policy.js').exists():
