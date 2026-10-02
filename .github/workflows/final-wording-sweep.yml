@@ -53,6 +53,11 @@ jobs:
           if old_nav not in css:
               raise SystemExit('obsolete issue navigator toolbar offset not found')
           css=css.replace(old_nav,'',1)
+
+          old_panels='body.markdown-toolbar-visible .issueNavPanel,body.markdown-toolbar-visible .repeatNavPanel,body.markdown-toolbar-visible .replacePanel,body.markdown-toolbar-visible .nearbyPanel,body.markdown-toolbar-visible .spellPanel{\n  bottom:calc(58px + env(safe-area-inset-bottom) + var(--keyboardInset))!important;\n}\n'
+          if old_panels not in css:
+              raise SystemExit('obsolete toolbar panel offset block not found')
+          css=css.replace(old_panels,'',1)
           css_path.write_text(css,encoding='utf-8')
 
           html=index.read_text(encoding='utf-8')
