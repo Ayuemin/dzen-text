@@ -33,6 +33,15 @@ jobs:
               raise SystemExit('old analysis export note not found')
           index.write_text(s.replace(old,new,1),encoding='utf-8')
 
+          css_path=root/'css/editor-v2.css'
+          css=css_path.read_text(encoding='utf-8')
+          start='/* Markdown bar: appears while editing and sits above the keyboard. */'
+          end='/* Paper presets stay subtle enough for long reading sessions. */'
+          a=css.find(start); b=css.find(end)
+          if a < 0 or b < 0 or b <= a:
+              raise SystemExit('obsolete Markdown CSS block markers not found')
+          css_path.write_text(css[:a]+css[b:],encoding='utf-8')
+
           html=index.read_text(encoding='utf-8')
           js='\n'.join(p.read_text(encoding='utf-8') for p in (root/'js').glob('*.js'))
           css='\n'.join(p.read_text(encoding='utf-8') for p in (root/'css').glob('*.css'))
@@ -42,7 +51,7 @@ jobs:
           for marker in ['dzenCheckMode','markdownToolbarSwitch','normalizeDzenCheckMode','checkModeUsesLocal','checkModeUsesAi']:
               if marker in html or marker in js:
                   raise SystemExit('retired active marker remains: '+marker)
-          if 'markdownToolbar' in html or 'markdownToolbar' in css:
+          if 'markdownToolbar' in html or 'markdownToolbar' in css or '.mdBtn' in css:
               raise SystemExit('obsolete Markdown toolbar source/CSS remains')
           if (root/'js/12-markdown-toolbar.js').exists():
               raise SystemExit('obsolete toolbar JS still exists')
