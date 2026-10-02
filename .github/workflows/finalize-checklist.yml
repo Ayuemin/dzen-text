@@ -40,6 +40,19 @@ jobs:
           if old_regex not in s:
               raise SystemExit('function parser marker not found')
           s=s.replace(old_regex,new_regex,1)
+          old_block="""for retired in ['markdownToolbarSwitch', 'dzenCheckMode']:
+    if retired in final_html or retired in joined_js:
+        raise SystemExit(f'retired source marker still present: {retired}')"""
+          new_block="""for retired in ['markdownToolbarSwitch', 'dzenCheckMode']:
+    matches=[]
+    if retired in final_html: matches.append('index.html')
+    for source in JS.glob('*.js'):
+        if retired in source.read_text(encoding='utf-8'): matches.append(source.name)
+    if matches:
+        raise SystemExit(f'retired source marker still present: {retired} in {\", \".join(matches)}')"""
+          if old_block not in s:
+              raise SystemExit('residual marker block not found')
+          s=s.replace(old_block,new_block,1)
           p.write_text(s,encoding='utf-8')
           PY
 
