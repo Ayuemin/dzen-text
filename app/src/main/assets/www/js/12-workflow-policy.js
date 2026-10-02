@@ -476,7 +476,7 @@
     const byId=new Map(targets.map(x=>[x.target_id,x])),raw=Array.isArray(value&&value.patches)?value.patches:[],out=[];
     for(const p of raw){
       const target=byId.get(String(p&&p.target_id||''));if(!target)continue;
-      const quote=String(p&&p.quote||''),replacement=String(p&&p.replacement??'');if(!quote||quote===replacement)continue;
+      const quote=String(p&&p.quote||''),replacement=String((p&&p.replacement)??'');if(!quote||quote===replacement)continue;
       const segment=src.slice(target.start,target.end),rel=segment.indexOf(quote);if(rel<0)continue;
       const start=target.start+rel,end=start+quote.length;
       const maxReplacement=Math.min(5000,Math.max(180,quote.length*3+160));if(replacement.length>maxReplacement)continue;
