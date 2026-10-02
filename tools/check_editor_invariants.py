@@ -84,6 +84,23 @@ scripts = re.findall(r'<script\s+src="([^"]+)"', html)
 if not scripts or scripts[-1] != "js/12-bootstrap.js":
     errors.append("Bootstrap must remain the final editor script")
 
+# Secrets must not sit in plain SharedPreferences or leave the device in a backup.
+secret_src = (ROOT / "app/src/main/java/ru/dzenprep/texteditor/SecretStore.java")
+if not secret_src.exists():
+    errors.append("SecretStore is missing: the AI API key must be stored encrypted")
+else:
+    secret_text = secret_src.read_text(encoding="utf-8")
+    if "AndroidKeyStore" not in secret_text or "AES/GCM/NoPadding" not in secret_text:
+        errors.append("SecretStore must encrypt with an Android Keystore AES-GCM key")
+    main_java_for_secrets = main_activity
+    if "secretStore.save(" not in main_java_for_secrets:
+        errors.append("the AI API key must be written through SecretStore")
+    if 'putString("dzen_ai_api_key"' in main_java_for_secrets:
+        errors.append("the AI API key must not be stored as a plain SharedPreferences string")
+
+if 'android:allowBackup="false"' not in manifest:
+    errors.append("app data backup must stay disabled so articles and the API key are not exported")
+
 if errors:
     raise SystemExit("\n".join("EDITOR INVARIANT: " + e for e in errors))
 

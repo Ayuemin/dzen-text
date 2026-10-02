@@ -79,6 +79,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private volatile String pendingArticleText = "";
     private volatile String pendingArticleFileName = "article.md";
     private DocumentStore documentStore;
+    private SecretStore secretStore;
 
     @Override
     public void onCreate(Bundle state) {
@@ -87,6 +88,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web = new WebView(this);
         setContentView(web);
         documentStore = new DocumentStore(this);
+        secretStore = new SecretStore(this);
 
         WebSettings ws = web.getSettings();
         ws.setJavaScriptEnabled(true);
@@ -412,26 +414,22 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
     public class DzenAiBridge {
-        private static final String PREFS = "dzen_text_private";
-        private static final String KEY_API = "dzen_ai_api_key";
 
         @JavascriptInterface
         public boolean saveKey(String key) {
             String value = key == null ? "" : key.trim();
             if (value.length() < 6 || value.length() > 4096) return false;
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_API, value).apply();
-            return true;
+            return secretStore.save(value);
         }
 
         @JavascriptInterface
         public boolean hasKey() {
-            String value = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_API, "");
-            return value != null && !value.trim().isEmpty();
+            return secretStore.has();
         }
 
         @JavascriptInterface
         public void clearKey() {
-            getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_API).apply();
+            secretStore.clear();
         }
 
         @JavascriptInterface
@@ -456,7 +454,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             final String id = requestId == null ? "" : requestId;
             new Thread(() -> {
                 try {
-                    String key = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_API, "");
+                    String key = secretStore.load();
                     if (key == null || key.trim().isEmpty()) throw new Exception("API-ключ не сохранён");
                     String content = callOpenAiCompatible(
                             baseUrl == null ? "" : baseUrl.trim(),
