@@ -62,12 +62,21 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
+
           p=Path('tools/check_editor_invariants.py')
           s=p.read_text(encoding='utf-8')
           old='workflow = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")'
           new='workflow = (JS / "12-workflow-policy.js").read_text(encoding="utf-8")'
           if old not in s:
               raise SystemExit('old invariant workflow path not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+
+          p=Path('tools/check_app_logic.py')
+          s=p.read_text(encoding='utf-8')
+          old='["07-spelling.js", "08-navigation.js", "11-ui.js", "12-markdown-toolbar.js"]'
+          new='["07-spelling.js", "08-navigation.js", "11-ui.js", "12-workflow-policy.js"]'
+          if old not in s:
+              raise SystemExit('old app logic workflow filename not found')
           p.write_text(s.replace(old,new,1),encoding='utf-8')
 
           p=Path('app/src/main/assets/www/js/10-ai-dzen.js')
