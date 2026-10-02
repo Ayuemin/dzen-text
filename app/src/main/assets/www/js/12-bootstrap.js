@@ -7,21 +7,15 @@ function bootstrapDzenText(){
   spellIgnoreWords=loadSpellIgnoreWords();
   dzenRules=loadDzenRules();
 
-  editor.addEventListener('paste',()=>{inputWasPaste=true});
   editor.addEventListener('input',()=>{
     if(replacementState)closeReplacement();
     if(nearbyState)closeNearbyRepeat();
     if(repeatNavState&&typeof scheduleRepeatNavigatorRefresh==='function')scheduleRepeatNavigatorRefresh();
     if(typeof issueNavState!=='undefined'&&issueNavState&&typeof scheduleIssueNavigatorRefresh==='function')scheduleIssueNavigatorRefresh();
     if(spellNavState)closeSpellPanel();
-    const pasted=inputWasPaste;
-    inputWasPaste=false;
     clearOnlineSpelling();
     render(false);
     markAnalysisStale();
-    if(pasted&&editor.value.length<120000){
-      setTimeout(()=>{try{analyzeText()}catch(e){}},240);
-    }
   });
   editor.addEventListener('keydown',e=>{
     if(e.key==='Tab'){
@@ -77,6 +71,7 @@ function bootstrapDzenText(){
   updateDzenRulesStatus();
   updateSpellIgnoreStatus();
   render(false);
+  if(typeof scheduleAnalysis==='function')scheduleAnalysis();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
   if(typeof updateDrawerSpeakLabel==='function')updateDrawerSpeakLabel();
   setTimeout(updateDictStatus,80);
