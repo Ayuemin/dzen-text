@@ -1,20 +1,5 @@
-/*
- * Compatibility policy for the 1.10.x editor layout.
- *
- * The old Markdown toolbar asset remains in the established script order, but
- * the toolbar itself is disabled. This file now owns only compatibility glue:
- * persistent AI findings across edits, document-boundary resets, and UI cleanup.
- */
-function applyMarkdown(){return false}
-
+/* Retained AI-session policy and document-boundary resets. */
 (function installEditorWorkflowPolicy(){
-  // Local analysis is always active. AI is an additional manual layer, not a
-  // user-selectable replacement for local checks.
-  normalizeDzenCheckMode=function(){return 'both'};
-  currentCheckMode=function(){return 'both'};
-  checkModeUsesLocal=function(){return true};
-  checkModeUsesAi=function(){return true};
-
   const baseClearAiDzenIssues=clearAiDzenIssues;
   const baseAiIssueFromItem=aiIssueFromItem;
   const baseAnalyzeText=analyzeText;
@@ -233,75 +218,4 @@ function applyMarkdown(){return false}
 
   // The toolbar conflicts with the bottom status row while the Android IME is
   // open. Keep it disabled until it can be redesigned in a non-competing area.
-  updateMarkdownToolbarVisibility=function(){
-    const bar=document.getElementById('markdownToolbar');
-    if(bar){bar.classList.remove('visible');bar.hidden=true}
-    if(document.body)document.body.classList.remove('markdown-toolbar-visible');
-  };
-
-  function hideSettingsGroupFor(control){
-    if(!control)return;
-    const group=control.closest('details.settingsGroup');
-    if(group)group.hidden=true;
-  }
-  function applyWorkflowUiPolicy(){
-    settings.markdownToolbar=false;
-    settings.dzenCheck=true;
-    settings.dzenCheckMode='both';
-
-    updateMarkdownToolbarVisibility();
-    const mdSwitch=document.getElementById('markdownToolbarSwitch');
-    if(mdSwitch)mdSwitch.checked=false;
-    hideSettingsGroupFor(mdSwitch);
-
-    const mode=document.getElementById('dzenCheckMode');
-    if(mode)mode.value='both';
-    hideSettingsGroupFor(mode);
-
-    const localSwitch=document.getElementById('dzenCheck');
-    if(localSwitch){localSwitch.checked=true;const row=localSwitch.closest('.switchRow');if(row)row.hidden=true}
-    const smart=document.getElementById('dzenSmartRules');
-    if(smart){
-      const group=smart.closest('details.settingsGroup');
-      if(group){
-        const title=group.querySelector('summary > span'),sub=group.querySelector('summary > small');
-        if(title)title.textContent='Правила Дзена';
-        if(sub)sub.textContent='Автоматическая проверка и обновляемая база правил';
-        const note=group.querySelector('.smallNote');
-        if(note)note.textContent='Правила проверяются автоматически на устройстве. При обновлении загружается только компактная база правил; статья во внешнюю AI-модель не отправляется.';
-        const buttons=group.querySelectorAll('.settingActions .nativeBtn');
-        if(buttons[0])buttons[0].textContent='Обновить базу правил';
-        if(buttons[1])buttons[1].textContent='Вернуть встроенные правила';
-      }
-      const label=smart.closest('.switchRow')?.querySelector('.labelWithHint');
-      if(label&&label.firstChild)label.firstChild.textContent='Использовать обновляемую базу правил ';
-    }
-
-    const aiFields=document.getElementById('dzenAiFields');
-    const aiGroup=aiFields&&aiFields.closest('details.settingsGroup');
-    if(aiGroup){
-      const title=aiGroup.querySelector('summary > span'),sub=aiGroup.querySelector('summary > small');
-      if(title)title.textContent='AI-проверка текста';
-      if(sub)sub.textContent='API, модель, база знаний Дзена и дополнительные критерии';
-    }
-
-    const spell=document.getElementById('onlineSpelling');
-    if(spell){
-      const group=spell.closest('details.settingsGroup'),note=group&&group.querySelector('.smallNote');
-      if(note)note.textContent='Онлайн-орфография запускается только вместе с ручной AI-проверкой текста. При обычном наборе текст наружу не отправляется.';
-    }
-
-    const drawerCheckButton=document.querySelector('.drawerActions button[onclick="drawerCheck()"]');
-    if(drawerCheckButton)drawerCheckButton.textContent='AI-проверка текста';
-    const checkButton=document.getElementById('checkBtn');
-    if(checkButton)checkButton.hidden=true;
-    const dot=document.getElementById('analysisDot');
-    if(dot){dot.setAttribute('aria-label','Открыть результаты проверки');dot.title='Открыть результаты проверки'}
-    const copy=document.querySelector('button[onclick="copyRichHtml()"]');
-    if(copy){copy.setAttribute('aria-label','Скопировать для публикации');copy.title='Скопировать для публикации'}
-    updateDzenRulesStatus();
-  }
-
-  applyWorkflowUiPolicy();
-  setTimeout(applyWorkflowUiPolicy,0);
 })();

@@ -201,7 +201,7 @@ function onFontSelectChanged(){
 function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';persistSettings();syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
 window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';persistSettings();}else if(settings.font==='custom'){settings.font='serif';persistSettings();}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
 window.onNativeFontError=(msg)=>toast(msg||'Не удалось подключить шрифт');
-function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;markdownToolbarSwitch.checked=settings.markdownToolbar!==false;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus();if(typeof syncDzenAiSettingsUI==='function')syncDzenAiSettingsUI()}
+function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;proofCheck.checked=settings.proofCheck;onlineSpelling.checked=settings.onlineSpelling;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenSmartRules.checked=settings.dzenSmartRules!==false;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();updateSpellIgnoreStatus();if(typeof syncDzenAiSettingsUI==='function')syncDzenAiSettingsUI()}
 async function applySettings(){
   const oldAiSignature=typeof dzenAiSettingsSignature==='function'?dzenAiSettingsSignature():'';
   let wantsOnline=onlineSpelling.checked;
@@ -233,7 +233,6 @@ async function applySettings(){
     tts:+ttsRange.value,
     autosave:autosaveSwitch.checked,
     showCode:codeSwitch.checked,
-    markdownToolbar:markdownToolbarSwitch.checked,
     proofCheck:proofCheck.checked,
     onlineSpelling:wantsOnline,
     headingCheck:headingCheck.checked,
@@ -253,9 +252,7 @@ async function applySettings(){
     headingStructureCheck:headingStructureCheck.checked,
     markdownCheck:markdownCheck.checked,
     aiStyleCheck:aiStyleCheck.checked,
-    dzenCheck:dzenCheck.checked,
     dzenSmartRules:dzenSmartRules.checked,
-    dzenCheckMode:normalizeDzenCheckMode(document.getElementById('dzenCheckMode')?.value),
     dzenAiBaseUrl:String(document.getElementById('dzenAiBaseUrl')?.value||settings.dzenAiBaseUrl||'').trim(),
     dzenAiModel:String(document.getElementById('dzenAiModel')?.value||settings.dzenAiModel||'').trim(),
     dzenAiSources:String(document.getElementById('dzenAiSources')?.value||settings.dzenAiSources||'').trim(),
@@ -266,14 +263,13 @@ async function applySettings(){
   if(settings.headingMin>=settings.headingMax)settings.headingMin=Math.max(3,settings.headingMax-5);
   persistSettings();
   applyVisualSettings();
-  render(false,false);
+  render(true,false);
   const code=document.getElementById('htmlCode');
   if(code)code.style.display=settings.showCode?'block':'none';
   updateSettingLabels();
   if(typeof syncDzenAiVisibility==='function')syncDzenAiVisibility();
   if(typeof updateDzenAiStatus==='function')updateDzenAiStatus();
   if(oldAiSignature&&typeof dzenAiSettingsSignature==='function'&&oldAiSignature!==dzenAiSettingsSignature())clearAiDzenIssues();
-  if(typeof updateMarkdownToolbarVisibility==='function')updateMarkdownToolbarVisibility();
 }
 function updateSettingLabels(){backgroundVeilVal.textContent=Math.round(Number(settings.backgroundVeil||0)*100)+'%';const sw=document.getElementById('accentPreview');if(sw)sw.style.background=normalizeAccentHex(settings.accent);const names={system:'Системный',serif:'Книжный',classic:'Классический',sans:'Нейтральный',mono:'Моно',custom:'Свой'};fontVal.textContent=names[settings.font];sizeVal.textContent=settings.size+' px';lineVal.textContent=Number(settings.line).toFixed(2);wpmVal.textContent=settings.wpm+' слов/мин';ttsVal.textContent=Number(settings.tts).toFixed(2)+'×';headingVal.textContent=`${settings.headingMin}–${settings.headingMax} знаков`;sentenceVal.textContent=`>${settings.sentenceMax} слов`;paragraphVal.textContent=`>${settings.paragraphMax} знаков`;frequentVal.textContent=`${settings.frequentMin}+`;structureVal.textContent=`>${settings.structureMax} знаков`}
 function resetRiskWords(){riskWords.value=exampleRiskWords;applySettings();toast('Пример списка восстановлен')}

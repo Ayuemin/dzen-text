@@ -62,7 +62,6 @@ function aiDzenRunText(){
   return 'не запускалась';
 }
 function aiDzenRunDiagnosticHtml(){
-  if(!checkModeUsesAi())return '';
   if(aiDzenRun.state==='running')return '<div class="analysisDzenNote"><b>AI-проверка выполняется…</b> Модель: '+escapeHtml(aiDzenRun.model||String(settings.dzenAiModel||'—'))+(aiDzenRun.calls?' · запросов: '+aiDzenRun.calls:'')+'.</div>';
   if(aiDzenRun.state==='error')return '<div class="analysisDzenNote"><b>AI-проверка не завершена.</b> '+escapeHtml(aiDzenRun.message||'Неизвестная ошибка')+'.</div>';
   if(aiDzenRun.state==='stale')return '<div class="analysisDzenNote"><b>AI-результат устарел.</b> Текст был изменён после последней проверки.</div>';
@@ -83,13 +82,11 @@ function syncDzenAiVisibility(){
   if(box)box.hidden=false;
 }
 function syncDzenAiSettingsUI(){
-  const mode=document.getElementById('dzenCheckMode');
   const base=document.getElementById('dzenAiBaseUrl');
   const model=document.getElementById('dzenAiModel');
   const sources=document.getElementById('dzenAiSources');
   const prompt=document.getElementById('dzenAiStylePrompt');
   const key=document.getElementById('dzenAiApiKey');
-  if(mode)mode.value=normalizeDzenCheckMode(settings.dzenCheckMode);
   if(base)base.value=settings.dzenAiBaseUrl||'https://openrouter.ai/api/v1';
   if(model)model.value=settings.dzenAiModel||'openrouter/free';
   if(sources)sources.value=settings.dzenAiSources||'https://dzen.ru/help/ru/requirements/rules.html';
@@ -151,25 +148,6 @@ function updateDzenAiStatus(message=''){
   const pages=Number(k.crawl?.processed||k.pages||0);
   el.innerHTML='Подключение: <b>'+key+'</b><br>AI-база: <b>'+state+'</b> · страниц: '+pages+' · пунктов: '+k.items.length+'<br>Собрана: '+escapeHtml(date)+aiDzenStatusLine();
   renderDzenAiPageReport();
-}
-async function onDzenCheckModeChanged(){
-  const select=document.getElementById('dzenCheckMode');
-  const next=normalizeDzenCheckMode(select?.value);
-  const previous=normalizeDzenCheckMode(settings.dzenCheckMode);
-  const enablesAi=(next==='ai'||next==='both')&&!(previous==='ai'||previous==='both');
-  if(enablesAi){
-    const ok=await appConfirm(
-      'Включить AI-проверку?',
-      'После нажатия «Проверить» текст статьи и подготовленная база знаний Дзена будут отправлены в указанный вами OpenAI-совместимый API. При обычном наборе текста ничего не отправляется.',
-      'Включить',
-      false
-    );
-    if(!ok){
-      if(select)select.value=previous;
-      return;
-    }
-  }
-  await applySettings();
 }
 function saveDzenAiApiKey(){
   const input=document.getElementById('dzenAiApiKey');
@@ -445,7 +423,7 @@ async function buildDzenAiKnowledge(options={}){
   }finally{aiDzenBusy=false;dzenAiLiveCrawl=null;updateDzenAiStatus()}
 }
 function shouldRunAiDzenCheck(){
-  return checkModeUsesAi();
+  return true;
 }
 async function ensureDzenAiKnowledge(){
   let k=dzenAiKnowledge();

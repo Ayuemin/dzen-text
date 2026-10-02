@@ -1,4 +1,4 @@
-function loadSettings(){try{const value={...defaultSettings,...JSON.parse(localStorage.getItem('dzenSettings')||'{}')};value.dzenCheckMode=normalizeDzenCheckMode(value.dzenCheckMode);return value}catch(e){return {...defaultSettings}}}
+function loadSettings(){try{const value={...defaultSettings,...JSON.parse(localStorage.getItem('dzenSettings')||'{}')};return value}catch(e){return {...defaultSettings}}}
 // Escapes every character that can change HTML parsing. Quotes matter here:
 // these strings are reused as attribute values in generated markup and are
 // later written into the system clipboard as text/html.

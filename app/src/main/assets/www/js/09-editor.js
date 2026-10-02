@@ -149,7 +149,6 @@ function showPane(name){
   document.getElementById('editTab').classList.toggle('active',name==='edit');
   document.getElementById('previewTab').classList.toggle('active',name==='preview');
   if(name==='preview'&&previewDirty)render(false,true);
-  if(typeof updateMarkdownToolbarVisibility==='function')setTimeout(updateMarkdownToolbarVisibility,20);
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
 }
 
@@ -177,10 +176,7 @@ function copyRichPayload(result){
   if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
     let ok=false;
     try{
-      // MainActivity 1.10.6 constructed ClipData.Item as (firstArg, secondArg).
-      // Android interprets those fields as (plainText, htmlText), so pass the
-      // payload in platform order until the native bridge itself is migrated.
-      ok=!!AndroidPublish.copyForPublication(payload.plain,payload.html);
+      ok=!!AndroidPublish.copyForPublication(payload.html,payload.plain);
     }catch(e){ok=false}
     if(ok){toast('Скопировано для публикации');return}
   }

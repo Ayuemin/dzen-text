@@ -129,7 +129,7 @@ const FILES = [
   '01-core.js', '02-text-tools.js', '03-analysis-core.js', '04-dzen-analysis.js',
   '05-analysis-state.js', '06-analysis-report.js', '07-spelling.js', '08-navigation.js',
   '09-editor.js', '10-settings.js', '10-ai-dzen.js', '11-ui.js', '12-dialogs.js',
-  '12-articles.js', '12-history.js', '12-markdown-toolbar.js', '12-publish.js',
+  '12-articles.js', '12-history.js', '12-workflow-policy.js', '12-publish.js',
 ];
 vm.runInContext(FILES.map(f => fs.readFileSync(path.join(JS, f), 'utf8')).join('\n;\n'), sandbox, { filename: 'editor-bundle.js' });
 sandbox.editor = elements.editor;
