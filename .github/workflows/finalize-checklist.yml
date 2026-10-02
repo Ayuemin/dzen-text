@@ -26,15 +26,21 @@ jobs:
           from pathlib import Path
           p=Path('tools/finalize_checklist_cleanup.py')
           s=p.read_text(encoding='utf-8')
-          old="""wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')
+          old_order="""wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')
           wf = remove_function(wf, 'hideSettingsGroupFor')
           wf = remove_function(wf, 'applyWorkflowUiPolicy')"""
-          new="""wf = remove_function(wf, 'hideSettingsGroupFor')
+          new_order="""wf = remove_function(wf, 'hideSettingsGroupFor')
           wf = remove_function(wf, 'applyWorkflowUiPolicy')
           wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')"""
-          if old not in s:
+          if old_order not in s:
               raise SystemExit('cleanup ordering marker not found')
-          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          s=s.replace(old_order,new_order,1)
+          old_regex="m = re.search(r'(?m)^(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
+          new_regex="m = re.search(r'(?m)^[ \\t]*(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
+          if old_regex not in s:
+              raise SystemExit('function parser marker not found')
+          s=s.replace(old_regex,new_regex,1)
+          p.write_text(s,encoding='utf-8')
           PY
 
       - name: Apply final source cleanup
