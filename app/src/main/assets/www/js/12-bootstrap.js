@@ -2,6 +2,7 @@ function bootstrapDzenText(){
   if(window.__dzenTextBootstrapped)return;
   window.__dzenTextBootstrapped=true;
 
+  document.title='Дзен Текст 1.10.6';
   settings=loadSettings();
   userSynonyms=loadUserSynonyms();
   spellIgnoreWords=loadSpellIgnoreWords();
