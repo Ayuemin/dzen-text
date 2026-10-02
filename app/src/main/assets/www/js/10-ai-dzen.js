@@ -468,13 +468,88 @@ function splitArticleForAi(src,maxChars=18000){
   }
   return out;
 }
+// A model rarely returns a byte-identical quote: it normalises ё to е, turns
+// «ёлочки» into "quotes", swaps — for a hyphen and often appends an ellipsis.
+// Comparing raw strings therefore threw away valid findings. This builds a
+// comparison form where those differences collapse, and keeps an index map so a
+// match in the folded text can be translated back to exact source offsets.
+const AI_QUOTE_FOLD={'\u00ab':'"','\u00bb':'"','\u201c':'"','\u201d':'"','\u201e':'"','\u201f':'"','\u2013':'-','\u2014':'-','\u2212':'-','\u2018':"'",'\u2019':"'",'\u00b4':"'",'\u00a0':' ','\u2026':'...','\u00ad':'','\u0451':'\u0435','\u0401':'\u0415'};
+function foldAiQuoteChar(c){
+  const mapped=AI_QUOTE_FOLD[c];
+  return mapped!==undefined?mapped:c;
+}
+function foldAiQuoteText(s){
+  const lower=String(s||'').toLowerCase();
+  let out='';
+  const map=[];
+  for(let i=0;i<lower.length;i++){
+    const folded=foldAiQuoteChar(lower[i]);
+    for(let k=0;k<folded.length;k++)map.push(i);
+    out+=folded;
+  }
+  return {text:out,map};
+}
+// A model shortens a quotation with an ellipsis, wraps it in its own quotes or
+// drops a leading one. Each variant is tried in turn, longest first, so the
+// match stays as close to what the model actually said as possible.
+function aiQuoteNeedles(quote){
+  const raw=String(quote||'').trim();
+  if(!raw)return [];
+  const trimmed=raw.replace(/[.\u2026]+$/,'').trim();
+  const unquoted=raw.replace(/^[^\w\u0400-\u04ff]+/,'').replace(/[^\w\u0400-\u04ff]+$/,'').trim();
+  const variants=[raw,trimmed,unquoted,unquoted.replace(/[.\u2026]+$/,'').trim()];
+  const out=[];
+  for(const v of variants){
+    if(!v)continue;
+    const folded=foldAiQuoteText(v).text.replace(/\s+/g,' ').trim();
+    if(folded.length>=8&&!out.includes(folded))out.push(folded);
+  }
+  return out;
+}
+// Folding a chunk costs O(chunk length), and a single model answer can carry
+// dozens of issues. The result only depends on the chunk text, so it is cached
+// per chunk object and reused for every quote of that chunk.
+const AI_QUOTE_HAY_CACHE=new WeakMap();
+function aiQuoteHaystack(chunk){
+  const cached=AI_QUOTE_HAY_CACHE.get(chunk);
+  if(cached)return cached;
+  const hay=foldAiQuoteText(chunk.text);
+  // Whitespace-collapsed haystack plus a map back to original offsets.
+  const map=[];
+  let spaced='';
+  for(let i=0;i<hay.text.length;i++){
+    const c=hay.text[i];
+    if(/\s/.test(c)){
+      if(spaced.endsWith(' '))continue;
+      spaced+=' ';
+    }else spaced+=c;
+    map.push(hay.map[i]);
+  }
+  const value={spaced,map};
+  AI_QUOTE_HAY_CACHE.set(chunk,value);
+  return value;
+}
 function findAiQuote(chunk,quote){
   const q=String(quote||'').trim();
   if(!q)return null;
+  // Fast path: the quote is already byte-identical to the source.
   let at=chunk.text.indexOf(q);
-  if(at<0)at=chunk.text.toLocaleLowerCase('ru-RU').indexOf(q.toLocaleLowerCase('ru-RU'));
-  if(at<0)return null;
-  return {start:chunk.start+at,end:chunk.start+at+q.length,quote:q};
+  if(at>=0)return {start:chunk.start+at,end:chunk.start+at+q.length,quote:q};
+  at=chunk.text.toLowerCase().indexOf(q.toLowerCase());
+  if(at>=0)return {start:chunk.start+at,end:chunk.start+at+q.length,quote:q};
+  // Slow path: compare folded text and map the hit back to real offsets.
+  const needles=aiQuoteNeedles(q);
+  if(!needles.length)return null;
+  const {spaced,map}=aiQuoteHaystack(chunk);
+  for(const needle of needles){
+    const found=spaced.indexOf(needle);
+    if(found<0)continue;
+    const startLocal=map[found];
+    const endLocal=map[Math.min(map.length-1,found+needle.length-1)];
+    if(!Number.isFinite(startLocal)||!Number.isFinite(endLocal))continue;
+    return {start:chunk.start+startLocal,end:chunk.start+endLocal+1,quote:chunk.text.slice(startLocal,endLocal+1)};
+  }
+  return null;
 }
 function aiIssueFromItem(item,type,chunk){
   const found=findAiQuote(chunk,item?.quote);

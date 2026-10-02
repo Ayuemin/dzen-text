@@ -55,6 +55,7 @@ jobs:
           python3 tools/check_app_logic.py
           node tools/test_publish_export.js
           node tools/test_publish_copy.js
+          node tools/test_ai_dzen_flow.js
 
       - uses: gradle/actions/setup-gradle@v4
         with:
