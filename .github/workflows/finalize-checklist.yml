@@ -57,6 +57,20 @@ jobs:
             exit "$rc"
           fi
 
+      - name: Finalize invariant paths
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('tools/check_editor_invariants.py')
+          s=p.read_text(encoding='utf-8')
+          old='workflow = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")'
+          new='workflow = (JS / "12-workflow-policy.js").read_text(encoding="utf-8")'
+          if old not in s:
+              raise SystemExit('old invariant workflow path not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+
       - name: Check JavaScript and regression suite
         shell: bash
         run: |
