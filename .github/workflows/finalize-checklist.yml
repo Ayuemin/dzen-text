@@ -26,38 +26,31 @@ jobs:
           from pathlib import Path
           p=Path('tools/finalize_checklist_cleanup.py')
           s=p.read_text(encoding='utf-8')
-          old_order="""wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')
-          wf = remove_function(wf, 'hideSettingsGroupFor')
-          wf = remove_function(wf, 'applyWorkflowUiPolicy')"""
-          new_order="""wf = remove_function(wf, 'hideSettingsGroupFor')
-          wf = remove_function(wf, 'applyWorkflowUiPolicy')
-          wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')"""
-          if old_order not in s:
+          old="wf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')\nwf = remove_function(wf, 'hideSettingsGroupFor')\nwf = remove_function(wf, 'applyWorkflowUiPolicy')"
+          new="wf = remove_function(wf, 'hideSettingsGroupFor')\nwf = remove_function(wf, 'applyWorkflowUiPolicy')\nwf = remove_assigned_function(wf, 'updateMarkdownToolbarVisibility')"
+          if old not in s:
               raise SystemExit('cleanup ordering marker not found')
-          s=s.replace(old_order,new_order,1)
-          old_regex="m = re.search(r'(?m)^(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
-          new_regex="m = re.search(r'(?m)^[ \\t]*(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
-          if old_regex not in s:
+          s=s.replace(old,new,1)
+          old="m = re.search(r'(?m)^(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
+          new="m = re.search(r'(?m)^[ \\t]*(?:async\\s+)?function\\s+' + re.escape(name) + r'\\s*\\(', text)"
+          if old not in s:
               raise SystemExit('function parser marker not found')
-          s=s.replace(old_regex,new_regex,1)
-          old_block="""for retired in ['markdownToolbarSwitch', 'dzenCheckMode']:
-    if retired in final_html or retired in joined_js:
-        raise SystemExit(f'retired source marker still present: {retired}')"""
-          new_block="""for retired in ['markdownToolbarSwitch', 'dzenCheckMode']:
-    matches=[]
-    if retired in final_html: matches.append('index.html')
-    for source in JS.glob('*.js'):
-        if retired in source.read_text(encoding='utf-8'): matches.append(source.name)
-    if matches:
-        raise SystemExit(f'retired source marker still present: {retired} in {\", \".join(matches)}')"""
-          if old_block not in s:
-              raise SystemExit('residual marker block not found')
-          s=s.replace(old_block,new_block,1)
+          s=s.replace(old,new,1)
           p.write_text(s,encoding='utf-8')
           PY
 
       - name: Apply final source cleanup
-        run: python3 tools/finalize_checklist_cleanup.py
+        shell: bash
+        run: |
+          set +e
+          python3 tools/finalize_checklist_cleanup.py
+          rc=$?
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            echo '--- residual dzenCheckMode references ---'
+            grep -R -n --exclude='finalize_checklist_cleanup.py' 'dzenCheckMode' app/src/main/assets/www || true
+            exit "$rc"
+          fi
 
       - name: Check JavaScript and regression suite
         shell: bash
