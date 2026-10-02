@@ -79,7 +79,7 @@
       .analysisFixButton{width:100%;min-height:44px;border:0;border-radius:13px;background:var(--accent);color:#fff;font-weight:760;font-size:14px;padding:10px 12px}
       .analysisFixButton:disabled{opacity:.42}.aiSpinner{width:18px;height:18px;border-radius:50%;border:2px solid color-mix(in srgb,var(--accent) 24%,var(--border));border-top-color:var(--accent);animation:dzenAiSpin .8s linear infinite;flex:0 0 auto}
       @keyframes dzenAiSpin{to{transform:rotate(360deg)}}
-      .knowledgeSheet{max-height:88vh}.knowledgeSummary{font-size:12px;color:var(--muted);margin:-4px 0 12px}.knowledgeRule{border-top:1px solid var(--border);padding:11px 0}.knowledgeRule:first-child{border-top:0}.knowledgeRule summary{cursor:pointer;font-weight:720;font-size:14px}.knowledgeRuleMeta{font-size:11px;color:var(--muted);margin:5px 0}.knowledgeRuleText{font-size:13px;line-height:1.45;margin:7px 0}.knowledgeQuote{font-size:12px;line-height:1.45;background:var(--surface2);border-radius:10px;padding:9px 10px;white-space:pre-wrap}.knowledgeBadge{display:inline-block;border-radius:999px;padding:2px 7px;background:var(--surface2);font-size:10px;color:var(--muted);margin-right:5px}.workflowMyRules textarea{min-height:120px}.aiSynonymAction{margin:4px 0 8px;width:100%}
+      .knowledgeSheet{max-height:88vh}.knowledgeSummary{font-size:12px;color:var(--muted);margin:-4px 0 12px;line-height:1.5}.knowledgeRule{border-top:1px solid var(--border);padding:11px 0}.knowledgeRule:first-child{border-top:0}.knowledgeRule summary{cursor:pointer;font-weight:720;font-size:14px}.knowledgeRuleMeta{font-size:11px;color:var(--muted);margin:5px 0}.knowledgeRuleText{font-size:13px;line-height:1.45;margin:7px 0}.knowledgeQuote{font-size:12px;line-height:1.45;background:var(--surface2);border-radius:10px;padding:9px 10px;white-space:pre-wrap}.knowledgeBadge{display:inline-block;border-radius:999px;padding:2px 7px;background:var(--surface2);font-size:10px;color:var(--muted);margin-right:5px}.knowledgeFailures{margin:8px 0 12px;padding:9px 10px;border-radius:10px;background:var(--surface2);font-size:11px;color:var(--muted);line-height:1.45}.knowledgeFailures div{word-break:break-all;margin-top:4px}.workflowMyRules textarea{min-height:120px}.aiSynonymAction{margin:4px 0 8px;width:100%}
     `;
     document.head.appendChild(style);
   }
@@ -97,7 +97,9 @@
     settings.onlineSpelling=false;
     settings.riskCheck=false;
     settings.dzenSmartRules=false;
-    try{if(typeof persistSettings==='function')persistSettings(false)}catch(e){}
+    // This module is loaded before bootstrap. Never persist default settings
+    // before bootstrap has loaded the user's real saved configuration.
+    try{if(window.__dzenTextBootstrapped&&typeof persistSettings==='function')persistSettings(false)}catch(e){}
     const online=document.getElementById('onlineSpelling');if(online)online.checked=false;
     const risk=document.getElementById('riskCheck');if(risk)risk.checked=false;
     const legacyDzen=document.getElementById('dzenSmartRules');if(legacyDzen)legacyDzen.checked=false;
@@ -151,13 +153,16 @@
     const semantic=knowledge.items.length-mechanical;
     const date=knowledge.builtAt?new Date(knowledge.builtAt).toLocaleString('ru-RU'):'—';
     const crawl=knowledge.crawl||{};
-    summary.textContent='Обновлено: '+date+' · страниц: '+Number(crawl.processed||knowledge.pages||0)+' · правил: '+knowledge.items.length+' · механических: '+mechanical+' · смысловых: '+semantic;
-    list.innerHTML=knowledge.items.map(function(item){
+    const discovered=Number(crawl.discovered||knowledge.pages||0),processed=Number(crawl.processed||knowledge.pages||0),skipped=Number(crawl.skipped||0);
+    summary.innerHTML='Обновлено: <b>'+escapeHtml(date)+'</b><br>Модель сборки: <b>'+escapeHtml(String(knowledge.builderModel||'—'))+'</b><br>Страниц найдено: <b>'+discovered+'</b> · обработано: <b>'+processed+'</b> · ошибок: <b>'+skipped+'</b><br>Правил: <b>'+knowledge.items.length+'</b> · механических: '+mechanical+' · смысловых: '+semantic;
+    const failed=Array.isArray(crawl.failedUrls)?crawl.failedUrls:[];
+    const failedHtml=failed.length?'<div class="knowledgeFailures"><b>Не удалось обработать страницы: '+failed.length+'</b>'+failed.slice(0,30).map(url=>'<div>'+escapeHtml(String(url))+'</div>').join('')+(failed.length>30?'<div>…и ещё '+(failed.length-30)+'</div>':'')+'</div>':'';
+    list.innerHTML=failedHtml+knowledge.items.map(function(item){
       const mode=item.check_mode==='mechanical'?'механическое':'смысловое';
       const source=escapeHtml(String(item.source_url||'—'));
       const terms=Array.isArray(item.terms)&&item.terms.length?'<div class="knowledgeRuleText"><b>Точные маркеры:</b> '+escapeHtml(item.terms.join(', '))+'</div>':'';
       const exceptions=item.exceptions?'<div class="knowledgeRuleText"><b>Исключения:</b> '+escapeHtml(item.exceptions)+'</div>':'';
-      return '<details class="knowledgeRule"><summary><span class="knowledgeBadge">'+mode+'</span>'+escapeHtml(item.title||'Правило')+'</summary><div class="knowledgeRuleMeta">Источник: '+source+'</div><div class="knowledgeRuleText">'+escapeHtml(item.guidance||'')+'</div>'+exceptions+terms+'<div class="knowledgeQuote">«'+escapeHtml(item.source_quote||'')+'»</div></details>';
+      return '<details class="knowledgeRule"><summary><span class="knowledgeBadge">'+mode+'</span>'+escapeHtml(item.title||'Правило')+'</summary><div class="knowledgeRuleMeta">ID: '+escapeHtml(item.id||'—')+' · Источник: '+source+'</div><div class="knowledgeRuleText">'+escapeHtml(item.guidance||'')+'</div>'+exceptions+terms+'<div class="knowledgeQuote">«'+escapeHtml(item.source_quote||'')+'»</div></details>';
     }).join('');
   }
   function openDzenKnowledge(){renderDzenKnowledge();document.getElementById('dzenKnowledgeBackdrop')?.classList.add('open')}
@@ -242,7 +247,7 @@
         for(let i=0;i<batches.length;i++){
           updateDzenAiStatus('AI выделяет правила из изменившихся страниц…');
           const parsed=parseAiJson(await aiChat(extractionSystem,batches[i].text));extractCalls++;
-          extracted.push(...normalizeKnowledgePayload(parsed,pageMap));
+          extracted.push(...normalizeKnowledgePayload(parsed,pageMap).filter(x=>batches[i].text.includes(x.source_quote)));
         }
         extracted=dedupeKnowledgeV3(extracted);
 
@@ -253,7 +258,7 @@
           const prompt='SOURCE_MATERIAL:\n'+batches[i].text+'\n\nCANDIDATE_ITEMS:\n'+JSON.stringify({items:candidates});
           updateDzenAiStatus('Независимый AI-ревизор проверяет базу…');
           const parsed=parseAiJson(await aiChat(reviewSystem,prompt));reviewCalls++;
-          reviewed.push(...normalizeKnowledgePayload(parsed,pageMap));
+          reviewed.push(...normalizeKnowledgePayload(parsed,pageMap).filter(x=>urls.has(x.source_url)&&batches[i].text.includes(x.source_quote)));
         }
         reviewed=dedupeKnowledgeV3(reviewed);
         if(!reviewed.length)throw new Error('Ревизор не подтвердил ни одного правила на изменившихся страницах');
@@ -374,16 +379,23 @@
     return baseAnalyzeText();
   };
 
-  function normalizeArticleResult(value,chunk,allowQuality,allowedDzenSources){
+  function normalizeArticleResult(value,chunk,allowQuality,semanticById){
     const out=[];let raw=0;
     const push=function(arr,type){
       for(const x of Array.isArray(arr)?arr:[]){
         raw++;
+        let rule=null;
         if(type==='dzen'){
+          const ruleId=String(x&&x.rule_id||'').trim();
+          rule=semanticById.get(ruleId);
           const source=canonicalAiSourceUrl(x&&x.source_url||'');
-          if(!source||!allowedDzenSources.has(source))continue;
+          if(!rule||!source||source!==canonicalAiSourceUrl(rule.source_url))continue;
         }
-        const item=aiIssueFromItem(x,type,chunk);if(item)out.push(item);
+        const item=aiIssueFromItem(x,type,chunk);
+        if(item){
+          if(rule){item.ruleId=rule.id;item.sourceUrl=rule.source_url}
+          out.push(item);
+        }
       }
     };
     push(value&&value.dzen_issues,'dzen');
@@ -400,19 +412,19 @@
       aiDzenBusy=true;
       const semantic=knowledge?knowledge.items.filter(x=>x.check_mode!=='mechanical'):[];
       const knowledgeBatches=semantic.length?packKnowledgeItems(semantic):[[]];
-      const allowedSources=new Set(semantic.map(x=>canonicalAiSourceUrl(x.source_url)).filter(Boolean));
+      const semanticById=new Map(semantic.map(x=>[String(x.id||''),x]).filter(x=>x[0]));
       const stylePrompt=String(settings.dzenAiStylePrompt||'').trim();
       const mySemantic=loadMyRules().semantic;
       const chunks=splitArticleForAi(source);
       const result=[];
       let calls=0,rawCount=0,rejected=0;
-      const system='Ты выполняешь смысловую редакторскую проверку статьи. DZEN_ISSUES: используй только переданные смысловые правила Дзена и никогда не придумывай норм вне базы. QUALITY_ISSUES: найди орфографические, грамматические и сложные пунктуационные ошибки, неудачные или двусмысленные формулировки, внутренние логические противоречия, неуместную лексику и другие дефекты, требующие понимания контекста. Не сообщай то, что приложение уже проверяет механически: частоту и повторы слов, повторы в соседних предложениях, одинаковые начала, длину предложений/абзацев/заголовков, структуру H1-H3, Markdown, пробелы, простые повторяющиеся знаки, точные слова/фразы, количество ссылок и другие числовые/структурные сигналы. STYLE_ISSUES используй только по STYLE_INSTRUCTION. MY_SEMANTIC_RULES — пользовательские требования, их замечания относись к QUALITY_ISSUES, а не к правилам Дзена. Каждое замечание обязано содержать точную короткую quote из ARTICLE_CHUNK. Верни только JSON {"dzen_issues":[{"title":"...","reason":"...","quote":"...","severity":"warning|critical","source_url":"..."}],"quality_issues":[{"title":"...","reason":"...","quote":"...","severity":"warning|critical"}],"style_issues":[{"title":"...","reason":"...","quote":"...","severity":"warning"}]}.';
+      const system='Ты выполняешь смысловую редакторскую проверку статьи. DZEN_ISSUES: используй только переданные смысловые правила Дзена и никогда не придумывай норм вне базы. Для каждого DZEN_ISSUE обязательно верни точный rule_id из DZEN_KNOWLEDGE и source_url именно этого правила. QUALITY_ISSUES: найди орфографические, грамматические и сложные пунктуационные ошибки, неудачные или двусмысленные формулировки, внутренние логические противоречия, неуместную лексику и другие дефекты, требующие понимания контекста. Не сообщай то, что приложение уже проверяет механически: частоту и повторы слов, повторы в соседних предложениях, одинаковые начала, длину предложений/абзацев/заголовков, структуру H1-H3, Markdown, пробелы, простые повторяющиеся знаки, точные слова/фразы, количество ссылок и другие числовые/структурные сигналы. STYLE_ISSUES используй только по STYLE_INSTRUCTION. MY_SEMANTIC_RULES — пользовательские требования, их замечания относись к QUALITY_ISSUES, а не к правилам Дзена. Каждое замечание обязано содержать точную короткую quote из ARTICLE_CHUNK. Если RUN_QUALITY_AND_STYLE=no, quality_issues и style_issues обязаны быть пустыми. Верни только JSON {"dzen_issues":[{"rule_id":"rule_...","title":"...","reason":"...","quote":"...","severity":"warning|critical","source_url":"..."}],"quality_issues":[{"title":"...","reason":"...","quote":"...","severity":"warning|critical"}],"style_issues":[{"title":"...","reason":"...","quote":"...","severity":"warning"}]}.';
       for(let i=0;i<chunks.length;i++){
         for(let k=0;k<knowledgeBatches.length;k++){
           const allowQuality=k===0;calls++;aiDzenRun.calls=calls;updateDzenAiStatus('AI проверяет статью…');renderAnalysis();
           const prompt='RUN_QUALITY_AND_STYLE: '+(allowQuality?'yes':'no')+'\nDZEN_KNOWLEDGE:\n'+JSON.stringify({items:knowledgeBatches[k]})+'\n\nMY_SEMANTIC_RULES:\n'+JSON.stringify(allowQuality?mySemantic:[])+'\n\nSTYLE_INSTRUCTION:\n'+(allowQuality?stylePrompt:'')+'\n\nARTICLE_CHUNK absolute_offset='+chunks[i].start+':\n'+chunks[i].text;
           const parsed=parseAiJson(await aiChat(system,prompt));
-          const normalized=normalizeArticleResult(parsed,chunks[i],allowQuality,allowedSources);
+          const normalized=normalizeArticleResult(parsed,chunks[i],allowQuality,semanticById);
           rawCount+=normalized.raw;rejected+=Math.max(0,normalized.raw-normalized.issues.length);result.push(...normalized.issues);
         }
       }
