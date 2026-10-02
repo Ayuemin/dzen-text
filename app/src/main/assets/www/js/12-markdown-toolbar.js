@@ -68,10 +68,10 @@ function applyMarkdown(){return false}
     while(n<limit&&expected[n]===actual[n])n++;
     return n;
   }
-  function chooseAiOccurrence(src,issue,used){
+  function chooseAiOccurrence(src,issue){
     const quote=String(issue.quote||'');
     if(!quote)return null;
-    const positions=exactQuotePositions(src,quote).filter(pos=>!used.has(pos+'|'+(pos+quote.length)));
+    const positions=exactQuotePositions(src,quote);
     if(!positions.length)return null;
     const anchor=Number.isFinite(Number(issue.aiLastStart))?Number(issue.aiLastStart):Number(issue.aiOriginalStart)||0;
     const before=String(issue.aiContextBefore||''),after=String(issue.aiContextAfter||'');
@@ -96,13 +96,15 @@ function applyMarkdown(){return false}
       aiDzenSource=src;
       return;
     }
-    const used=new Set(),survivors=[];
+    const survivors=[];
     for(const original of aiDzenSessionIssues){
-      const start=chooseAiOccurrence(src,original,used);
+      // Different AI findings may legitimately refer to the exact same source
+      // span. Context and the previous position disambiguate repeated quotes in
+      // different places, so findings must not reserve a range from one another.
+      const start=chooseAiOccurrence(src,original);
       if(start==null)continue;
       const quote=String(original.quote||'');
       const end=start+quote.length;
-      used.add(start+'|'+end);
       survivors.push({...original,start,end,aiLastStart:start});
     }
     // Once the checked fragment itself has been changed, that finding is
