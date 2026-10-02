@@ -29,7 +29,7 @@ let historyPoints=0;
 let toasts=[];
 
 const sandbox={console,JSON,Math,Date,Promise,Map,Set,WeakMap,RegExp,String,Number,Object,Array,URL,setTimeout,clearTimeout,
-  window:{handleNativeBack:()=>false},document,localStorage,
+  window:{handleNativeBack:()=>false},document,localStorage,DZEN_AI_KNOWLEDGE_KEY:'dzenAiKnowledgeV1',
   settings:{onlineSpelling:false,riskCheck:false,dzenSmartRules:false,dzenAiBaseUrl:'https://api.test/v1',dzenAiModel:'test/model',dzenAiSources:'https://dzen.ru/help/ru/rules',dzenAiStylePrompt:''},
   editor:{value:'',selectionStart:0,selectionEnd:0,blur(){},focus(){}},
   currentAnalysis:{issues:[],overflowTotal:0},analysisMode:'problems',
