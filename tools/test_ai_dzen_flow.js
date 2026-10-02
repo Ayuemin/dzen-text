@@ -4,6 +4,8 @@
  * The harness injects a fake AndroidDzenAI bridge and executes the same classic
  * scripts as the WebView. It verifies both the model pipeline and the product
  * rule introduced after 1.10.6: editing must not throw away the whole AI run.
+ * A finding whose checked fragment was edited is handled for that AI session and
+ * can only be created again by another explicit AI check.
  *
  * Run: node tools/test_ai_dzen_flow.js
  */
@@ -240,10 +242,14 @@ function check(name, fn) {
   check('other AI findings remain after one fix', () => assert.strictEqual(run('aiDzenIssues.length'), 2));
   check('two findings on the untouched shared fragment both remain', () => assert.strictEqual(run('aiDzenIssues.filter(x=>x.quote===' + JSON.stringify(SHARED_QUOTE) + ').length'), 2));
 
-  // 4. Undo-like restoration makes the original unresolved finding visible again.
+  // 4. Undo-like text restoration must not resurrect a handled finding inside
+  // the same AI session. A new explicit AI run is the only way to create it again.
   run('editor.value=editor.value.replace(' + JSON.stringify('Проверьте тему на актуальность и конкретность.') + ',' + JSON.stringify(STYLE_QUOTE) + '); markAnalysisStale(); analyzeText();');
-  check('restoring the checked fragment restores its finding', () => assert.ok(run('aiDzenIssues.some(x=>x.title==="Однотипное начало")')));
-  check('restoring the text returns the full AI finding count', () => assert.strictEqual(run('aiDzenIssues.length'), 3));
+  check('restoring text does not resurrect a handled finding', () => assert.ok(!run('aiDzenIssues.some(x=>x.title==="Однотипное начало")')));
+  check('handled finding remains removed in the same session', () => assert.strictEqual(run('aiDzenIssues.length'), 2));
+  await startAiCheck();
+  check('a new manual AI run may create the finding again', () => assert.ok(run('aiDzenIssues.some(x=>x.title==="Однотипное начало")')));
+  check('new manual AI run rebuilds the complete result', () => assert.strictEqual(run('aiDzenIssues.length'), 3));
 
   // 5. Changing a fragment shared by two findings resolves both, not the third.
   run('editor.value=editor.value.replace(' + JSON.stringify(SHARED_QUOTE) + ',' + JSON.stringify('Тема влияет на интерес читателя, но это стоит подтверждать фактами.') + '); markAnalysisStale(); analyzeText();');
