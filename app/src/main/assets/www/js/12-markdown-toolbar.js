@@ -3,8 +3,7 @@
  *
  * The old Markdown toolbar asset remains in the established script order, but
  * the toolbar itself is disabled. This file now owns only compatibility glue:
- * persistent AI findings across edits, document-boundary resets, UI cleanup,
- * and the 1.10.6 Android clipboard argument correction.
+ * persistent AI findings across edits, document-boundary resets, and UI cleanup.
  */
 function applyMarkdown(){return false}
 
@@ -227,21 +226,6 @@ function applyMarkdown(){return false}
     const bar=document.getElementById('markdownToolbar');
     if(bar){bar.classList.remove('visible');bar.hidden=true}
     if(document.body)document.body.classList.remove('markdown-toolbar-visible');
-  };
-
-  // Android 1.10.6 wires the bridge variables opposite to ClipData.Item's
-  // Item(text, htmlText) constructor. Pass plain first and HTML second so item 0
-  // exposes the formats in the order Android and the Dzen editor expect.
-  const baseCopyRichPayload=copyRichPayload;
-  copyRichPayload=function(result){
-    const payload={html:String(result&&result.html||''),plain:String(result&&result.plain||'')};
-    if(!payload.html){toast('Текущая статья пустая');return}
-    if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
-      let queued=false;
-      try{queued=!!AndroidPublish.copyForPublication(payload.plain,payload.html)}catch(e){queued=false}
-      if(queued){toast('Скопировано для публикации');return}
-    }
-    return baseCopyRichPayload(result);
   };
 
   function hideSettingsGroupFor(control){
