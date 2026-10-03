@@ -1,0 +1,36 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'io.github.ayuemin.texteditor.spellprobe.morfologik'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'io.github.ayuemin.texteditor.spellprobe.morfologik'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '0.1-morfologik-probe'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    implementation 'org.carrot2:morfologik-speller:2.2.0'
+    // Resources only: the Russian module JAR carries ru_RU.dict + ru_RU.info.
+    // We intentionally do not pull the LanguageTool engine transitively for this probe.
+    implementation('org.languagetool:language-ru:6.8') {
+        transitive = false
+    }
+}
