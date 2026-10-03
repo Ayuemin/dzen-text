@@ -36,7 +36,12 @@ jobs:
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
             "platform-tools" \
             "platforms;android-35" \
-            "build-tools;35.0.0"
+            "build-tools;35.0.0" \
+            "ndk;27.2.12479018" \
+            "cmake;3.22.1"
+
+      - name: Prepare pinned Hunspell probe inputs
+        run: bash tools/prepare_hunspell_probe.sh
 
       - name: Check editor JavaScript
         run: |
@@ -72,8 +77,8 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build editor and spelling probe
-        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease :spellprobe-morfologik:assembleDebug
+      - name: Build editor and spelling probes
+        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease :spellprobe-morfologik:assembleDebug :spellprobe-hunspell:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -94,4 +99,11 @@ jobs:
         with:
           name: Spelling-Probe-Morfologik-2.2.0
           path: spellprobe-morfologik/build/outputs/apk/debug/spellprobe-morfologik-debug.apk
+          if-no-files-found: error
+
+      - name: Upload Hunspell spelling probe APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spelling-Probe-Hunspell-1.7.2
+          path: spellprobe-hunspell/build/outputs/apk/debug/spellprobe-hunspell-debug.apk
           if-no-files-found: error
