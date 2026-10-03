@@ -37,10 +37,6 @@ public class SemanticActivity extends MainActivity {
         localNli = new LocalNliEngine(this);
         semanticWebView = findWebView(findViewById(android.R.id.content));
         if (semanticWebView != null) {
-            // MainActivity starts the first asset load before this subclass can attach
-            // AndroidSemanticModel. Stop that pending load while we are still inside
-            // onCreate, attach the bridge, then perform one clean load. This avoids the
-            // transient first bootstrap that used to show "Ошибка запуска редактора".
             semanticWebView.stopLoading();
             semanticWebView.addJavascriptInterface(new LocalNliBridge(this, localNli), "AndroidSemanticModel");
             semanticWebView.loadUrl(EDITOR_URL);
@@ -70,6 +66,12 @@ public class SemanticActivity extends MainActivity {
         return localNli.clearModel();
     }
 
+    boolean cancelLocalNliAnalysis() {
+        if (!semanticBusy.get() || localNli == null) return false;
+        localNli.requestCancel();
+        return true;
+    }
+
     long startLocalNliAnalysis(String text, String categoriesJson) {
         if (localNli == null) return -1L;
         final long requestId = requestSeq.incrementAndGet();
@@ -92,11 +94,6 @@ public class SemanticActivity extends MainActivity {
         return requestId;
     }
 
-    /**
-     * A broad fallback category is useful when nothing more specific matches, but it
-     * should not duplicate a precise result for the same sentence. Likewise a medical
-     * hit wins over the broad bypass category if both happen to fire on one segment.
-     */
     private String postProcessSemanticResult(String resultJson) {
         if (resultJson == null || resultJson.trim().isEmpty()) return resultJson;
         try {
@@ -229,6 +226,7 @@ public class SemanticActivity extends MainActivity {
     @Override
     protected void onDestroy() {
         if (localNli != null) {
+            localNli.requestCancel();
             localNli.close();
             localNli = null;
         }
