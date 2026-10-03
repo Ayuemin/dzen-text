@@ -387,10 +387,14 @@ function scheduleLocalAnalysis(){
   },delay);
 }
 
+let bootstrapStage='не начат';
+function setBootstrapStage(stage){bootstrapStage=stage;window.__bootstrapStage=stage}
+
 function bootstrapEditor(){
   if(window.__platformTextBootstrapped)return;
   window.__platformTextBootstrapped=true;
 
+  setBootstrapStage('загрузка настроек');
   document.title='Редактор текста · прототип';
   settings=loadSettings();
   controlLists=loadControlLists();
@@ -398,6 +402,7 @@ function bootstrapEditor(){
   userSynonyms=loadUserSynonyms();
   activeRulePack=loadRulePack();
 
+  setBootstrapStage('события редактора');
   editor.addEventListener('paste',()=>{inputWasPaste=true});
   editor.addEventListener('input',()=>{
     if(replacementState)closeReplacement();
@@ -420,7 +425,9 @@ function bootstrapEditor(){
     }
   });
 
-  document.getElementById('fileInput').addEventListener('change',e=>{
+  setBootstrapStage('обработчики файлов');
+  const fileInput=document.getElementById('fileInput');
+  if(fileInput)fileInput.addEventListener('change',e=>{
     const f=e.target.files&&e.target.files[0];
     e.target.value='';
     if(!f)return;
@@ -430,7 +437,8 @@ function bootstrapEditor(){
     r.readAsText(f,'UTF-8');
   });
 
-  document.getElementById('synonymFileInput').addEventListener('change',e=>{
+  const synonymFileInput=document.getElementById('synonymFileInput');
+  if(synonymFileInput)synonymFileInput.addEventListener('change',e=>{
     const f=e.target.files&&e.target.files[0];
     e.target.value='';
     if(!f)return;
@@ -440,21 +448,25 @@ function bootstrapEditor(){
     r.readAsText(f,'UTF-8');
   });
 
-  document.getElementById('rulePackFileInput').addEventListener('change',e=>{
+  const rulePackFileInput=document.getElementById('rulePackFileInput');
+  if(rulePackFileInput)rulePackFileInput.addEventListener('change',e=>{
     const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=()=>window.onNativeRulePackLoaded(String(r.result||''),f.name);r.onerror=()=>toast('Не удалось прочитать JSON');r.readAsText(f,'UTF-8');
   });
 
-  document.getElementById('manualReplacement').addEventListener('keydown',e=>{
+  const manualReplacement=document.getElementById('manualReplacement');
+  if(manualReplacement)manualReplacement.addEventListener('keydown',e=>{
     if(e.key==='Enter'){
       e.preventDefault();
       applyManualReplacement();
     }
   });
 
+  setBootstrapStage('озвучка');
   window.onNativeTtsDone=()=>setSpeaking(false);
   window.onNativeTtsError=(msg)=>{setSpeaking(false);toast(msg||'Ошибка системной озвучки')};
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&speaking)stopSpeak()});
 
+  setBootstrapStage('рабочая область');
   applyVisualSettings();
   let managed=false;
   if(typeof initArticleWorkspace==='function')managed=initArticleWorkspace();
@@ -463,28 +475,35 @@ function bootstrapEditor(){
     if(draft)editor.value=draft;
   }
   if(typeof migrateLegacyVersions==='function')migrateLegacyVersions();
+
+  setBootstrapStage('интерфейс настроек');
   upgradeLocalSettingsUi();
   syncSettingsUI();
   renderControlListsSettings();
   updateUserSynonymStatus();
   updateRulePackStatus();
-  ensureLocalClassifierSettings();
-  refreshLocalClassifierStatus();
+
+  // Старый локальный классификатор больше не инициализируем в bootstrap.
+  // Новый смысловой модуль 13-local-llm.js создаёт собственный интерфейс после загрузки страницы.
+  setBootstrapStage('первый рендер');
   render(false);
   scheduleLocalAnalysis();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
   if(typeof updateDrawerSpeakLabel==='function')updateDrawerSpeakLabel();
   setTimeout(updateDictStatus,80);
   setTimeout(updateDictStatus,800);
+  setBootstrapStage('готово');
 }
 
 try{
   bootstrapEditor();
 }catch(error){
-  console.error('Editor bootstrap failed',error);
+  const message=String(error&&error.message||error&&error.name||error||'неизвестная ошибка').slice(0,180);
+  window.__lastBootstrapError={stage:bootstrapStage,message,stack:String(error&&error.stack||'').slice(0,1200)};
+  console.error('Editor bootstrap failed ['+bootstrapStage+']',error);
   const t=document.getElementById('toast');
   if(t){
-    t.textContent='Ошибка запуска редактора. Перезапустите приложение.';
+    t.textContent='Ошибка запуска ['+bootstrapStage+']: '+message;
     t.classList.add('show');
   }
 }
