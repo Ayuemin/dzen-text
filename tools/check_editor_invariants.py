@@ -43,11 +43,16 @@ if "body.keyboard-open.sheetBackdrop.open.sheet{bottom:var(--keyboardInset)!impo
 if "#riskWords.riskArea{min-height:190px!important;" not in compact_css:
     errors.append("control-word textarea must remain a comfortable multiline editor")
 
-for block in re.findall(r"\.markdownToolbar\s*\{([^}]*)\}", css, re.S):
-    if re.search(r"position\s*:\s*fixed", block):
-        errors.append("Markdown toolbar must stay in normal flex layout, never position:fixed")
-    if re.search(r"bottom\s*:\s*calc\([^)]*(?:keyboardInset|viewportBottomInset)", block):
-        errors.append("Markdown toolbar must not emulate keyboard insets")
+# The formatting toolbar was intentionally retired. Keep history/undo logic,
+# but do not let the keyboard toolbar, its settings, or CSS return accidentally.
+if (JS / "12-markdown-toolbar.js").exists():
+    errors.append("retired Markdown toolbar module must stay removed")
+if "markdownToolbar" in html or "markdown-toolbar-visible" in css:
+    errors.append("retired Markdown toolbar UI/CSS must stay removed")
+
+history = (JS / "12-history.js").read_text(encoding="utf-8")
+if "function undoEdit()" not in history or "function redoEdit()" not in history:
+    errors.append("Undo/Redo history engine must stay available")
 
 scroll_writers = []
 for path in sorted(JS.glob("*.js")):
@@ -65,18 +70,9 @@ if unexpected:
 if "08-navigation.js" not in scroll_writers:
     errors.append("navigation scroll controller is missing")
 
-if "markdown-toolbar-visible .bottom{display:none" not in css.replace("\n", "").replace(" ", ""):
-    # Accept the formatted variant too.
-    compact = re.sub(r"\s+", "", css)
-    if "body.markdown-toolbar-visible.bottom{display:none!important}" in compact:
-        pass
-
 if "keepFocusedSheetFieldVisible" not in core or "scrollIntoView" not in core:
     errors.append("focused sheet fields must be revealed after the keyboard opens")
 
-toolbar = (JS / "12-markdown-toolbar.js").read_text(encoding="utf-8")
-if "touchDevice" not in toolbar or "keyboardExpected" not in toolbar:
-    errors.append("Markdown toolbar needs a touch-focus fallback when IME callbacks are delayed")
 if 'placeholder="Начните писать…"' not in html:
     errors.append("empty editor invitation is missing")
 
