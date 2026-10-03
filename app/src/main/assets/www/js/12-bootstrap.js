@@ -4,6 +4,10 @@ function localClassifierBridgeAvailable(){
   return !!(window.AndroidLocalClassifier&&typeof AndroidLocalClassifier.status==='function'&&typeof AndroidLocalClassifier.analyze==='function');
 }
 
+function localClassifierManageAvailable(){
+  return !!(window.AndroidLocalClassifier&&typeof AndroidLocalClassifier.pickPackage==='function'&&typeof AndroidLocalClassifier.clearUserModel==='function');
+}
+
 function localClassifierStatus(){
   if(!localClassifierBridgeAvailable())return {installed:false,available:false,browser:true};
   try{return JSON.parse(AndroidLocalClassifier.status()||'{}')}catch(e){return {installed:false,available:false,error:String(e&&e.message||e)}}
@@ -15,7 +19,7 @@ function ensureLocalClassifierSettings(){
   const group=document.createElement('details');
   group.className='settingsGroup';
   group.id='localClassifierSettingsGroup';
-  group.innerHTML='<summary><span>Локальная смысловая модель</span><small>ONNX-классификатор предложений на устройстве</small></summary><div class="settingsGroupBody"><div class="ruleStatus" data-local-classifier-status></div><div class="smallNote">Модель не использует интернет. Если её нет или она не загрузилась, остальные проверки продолжают работать как обычно.</div></div>';
+  group.innerHTML='<summary><span>Локальная смысловая модель</span><small>ONNX-классификатор предложений на устройстве</small></summary><div class="settingsGroupBody"><div class="ruleStatus" data-local-classifier-status></div><div class="settingActions localClassifierActions"><button id="localClassifierInstallBtn" class="nativeBtn primarySettingBtn" type="button" onclick="installLocalClassifierPackage()">Установить модель</button><button id="localClassifierRemoveBtn" class="nativeBtn" type="button" onclick="removeLocalClassifierModel()" hidden>Удалить модель</button></div><div class="smallNote">Модель работает полностью на устройстве. Для установки выберите ZIP-пакет с файлами <b>model.onnx</b> и <b>metadata.json</b>. Перед заменой приложение проверит совместимость модели.</div></div>';
   const rulePack=document.querySelector('#rulePackStatus');
   const before=rulePack&&rulePack.closest?rulePack.closest('.settingsGroup'):null;
   if(before&&before.parentNode===wrap)wrap.insertBefore(group,before);else wrap.appendChild(group);
@@ -26,20 +30,58 @@ function refreshLocalClassifierStatus(){
   const el=document.querySelector('[data-local-classifier-status]');
   if(!el)return;
   const status=localClassifierStatus();
+  const installBtn=document.getElementById('localClassifierInstallBtn');
+  const removeBtn=document.getElementById('localClassifierRemoveBtn');
+  if(installBtn){installBtn.hidden=!localClassifierManageAvailable();installBtn.textContent=status.userInstalled?'Заменить модель':'Установить модель'}
+  if(removeBtn)removeBtn.hidden=!(localClassifierManageAvailable()&&status.userInstalled);
   if(status.browser){
     el.innerHTML='<b>Доступно только в Android-приложении.</b>';
     return;
   }
   if(!status.installed){
-    el.innerHTML='<b>Модель не установлена.</b><br>Обычные локальные проверки работают без неё.';
+    el.innerHTML='<b>Модель не установлена.</b><br>Обычные локальные проверки работают без неё.'+(status.error?'<br><span class="warn">'+escapeHtml(status.error)+'</span>':'');
     return;
   }
   if(!status.available){
     el.innerHTML='<b>Модель найдена, но не загрузилась.</b>'+(status.error?'<br>'+escapeHtml(status.error):'');
     return;
   }
-  el.innerHTML='<b>'+escapeHtml(status.name||'Локальная смысловая модель')+'</b>'+(status.version?' · '+escapeHtml(status.version):'')+'<br>Категорий: <b>'+Number(status.labels||0)+'</b><br>Статус: <b>применяется локально</b>';
+  const source=status.source==='user'?'установлена пользователем':'встроена в приложение';
+  const pkg=status.packageName?'<br>Файл: '+escapeHtml(status.packageName):'';
+  el.innerHTML='<b>'+escapeHtml(status.name||'Локальная смысловая модель')+'</b>'+(status.version?' · '+escapeHtml(status.version):'')+'<br>Категорий: <b>'+Number(status.labels||0)+'</b><br>Источник: '+source+pkg+'<br>Статус: <b>применяется локально</b>'+(status.error?'<br><span class="smallNote">'+escapeHtml(status.error)+'</span>':'');
 }
+
+function invalidateLocalClassifierCache(){
+  localClassifierCache={text:null,issues:[],error:'',segments:0};
+}
+
+function installLocalClassifierPackage(){
+  if(!localClassifierManageAvailable()){toast('Установка модели доступна в Android-приложении');return}
+  invalidateLocalClassifierCache();
+  try{AndroidLocalClassifier.pickPackage();toast('Выберите ZIP-пакет локальной модели')}catch(e){toast('Не удалось открыть выбор модели')}
+}
+
+async function removeLocalClassifierModel(){
+  if(!localClassifierManageAvailable())return;
+  const ok=typeof appConfirm==='function'?await appConfirm('Удалить локальную модель?','Пользовательская ONNX-модель будет удалена только из приложения. Остальные локальные проверки продолжат работать.','Удалить',true):true;
+  if(!ok)return;
+  let removed=false;
+  try{removed=!!AndroidLocalClassifier.clearUserModel()}catch(e){}
+  invalidateLocalClassifierCache();
+  refreshLocalClassifierStatus();
+  try{analyzeText()}catch(e){console.error(e)}
+  toast(removed?'Локальная модель удалена':'Не удалось полностью удалить модель');
+}
+
+window.onNativeLocalClassifierInstalling=()=>toast('Проверяю и устанавливаю локальную модель…');
+window.onNativeLocalClassifierChanged=(statusText)=>{
+  invalidateLocalClassifierCache();
+  refreshLocalClassifierStatus();
+  try{window.__runLocalSemantic=true;analyzeText()}catch(e){console.error(e)}finally{window.__runLocalSemantic=false}
+  let name='';try{const s=JSON.parse(statusText||'{}');name=s&&s.name?String(s.name):''}catch(e){}
+  toast(name?'Модель установлена: '+name:'Локальная модель установлена');
+};
+window.onNativeLocalClassifierError=(msg)=>{refreshLocalClassifierStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
 
 function runLocalClassifier(src){
   if(!localClassifierBridgeAvailable())return {available:false,issues:[]};
