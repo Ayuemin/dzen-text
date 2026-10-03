@@ -2,6 +2,10 @@ package io.github.ayuemin.texteditor;
 
 import android.webkit.JavascriptInterface;
 
+import org.json.JSONObject;
+
+import java.util.Locale;
+
 final class LocalLlmBridge {
     private final SemanticActivity activity;
     private final LocalLlmEngine engine;
@@ -28,10 +32,15 @@ final class LocalLlmBridge {
 
     @JavascriptInterface
     public long analyzeAsync(String text, String criteria, String exclusions) {
-        // Qwen3 supports /no_think as a soft switch in user/system messages.
-        // Keep it native so users can freely edit their visible criteria without
-        // accidentally turning long chain-of-thought generation back on.
-        String fixedExclusions = (exclusions == null ? "" : exclusions) + "\n/no_think";
+        String fixedExclusions = exclusions == null ? "" : exclusions;
+        // Qwen3 understands /no_think and otherwise tends to spend a large part
+        // of the token budget on reasoning before the required JSON. Keep this
+        // optimization model-specific so another compatible GGUF stays untouched.
+        try {
+            JSONObject status = new JSONObject(engine.statusJson());
+            String modelName = status.optString("name", "").toLowerCase(Locale.ROOT);
+            if (modelName.contains("qwen3")) fixedExclusions += "\n/no_think";
+        } catch (Exception ignored) { }
         return activity.startLocalLlmAnalysis(text, criteria, fixedExclusions);
     }
 }
