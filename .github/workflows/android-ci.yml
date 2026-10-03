@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - local-first-v1.9
   pull_request:
     branches:
       - main
