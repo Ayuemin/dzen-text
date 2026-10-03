@@ -93,3 +93,23 @@ let settings={...defaultSettings}; let speaking=false; let saveTimer=null; let c
 let inputWasPaste=false;
 const USER_SYNONYMS_KEY='editorUserSynonymsV1';
 let userSynonyms={};
+
+// Optional P1 analyzers are loaded after all parser-included editor scripts have
+// evaluated. This keeps 12-bootstrap.js the final static script while allowing
+// context-aware modules to override legacy functions only after those functions
+// exist. If a module fails to load, the editor remains usable with the baseline
+// deterministic checks instead of blocking startup.
+function loadDeferredEditorModule(src,id){
+  const load=function(){
+    if(id&&document.getElementById(id))return;
+    const script=document.createElement('script');
+    if(id)script.id=id;
+    script.src=src;
+    script.async=false;
+    script.onerror=function(){try{console.error('Deferred editor module failed:',src)}catch(e){}};
+    document.head.appendChild(script);
+  };
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',load,{once:true});
+  else load();
+}
+loadDeferredEditorModule('js/16-proof-context.js','proofContextModuleV2');
