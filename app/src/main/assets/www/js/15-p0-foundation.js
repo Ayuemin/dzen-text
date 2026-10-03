@@ -196,7 +196,7 @@ function patchAnalysisStateLabel(){
   }
 }
 function markSemanticExperimental(){
-  const group=document.getElementById('semanticClassifierSettings');
+  const group=document.querySelector('#semanticClassifierSettings');
   if(!group)return;
   const summary=group.querySelector('summary');
   if(summary){
