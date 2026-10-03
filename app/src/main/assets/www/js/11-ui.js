@@ -193,7 +193,6 @@ function handleNativeBack(){
   if(settingsSheet&&settingsSheet.classList.contains('open')){closeSettings();return true}
   const analysis=document.getElementById('analysisBackdrop');
   if(analysis&&analysis.classList.contains('open')){closeAnalysis();return true}
-  if(typeof spellNavState!=='undefined'&&spellNavState){closeSpellPanel();return true}
   if(typeof replacementState!=='undefined'&&replacementState){closeReplacement();return true}
   if(typeof nearbyState!=='undefined'&&nearbyState){closeNearbyRepeat();return true}
   if(typeof repeatNavState!=='undefined'&&repeatNavState){closeRepeatNavigator();return true}

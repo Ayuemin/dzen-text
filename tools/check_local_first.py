@@ -42,6 +42,9 @@ require('buildPublishHtml' in (js_dir / '02-text-tools.js').read_text(encoding='
 require(not (root / '.github/workflows/update-dzen-rules.yml').exists(), 'AI Dzen updater workflow must stay removed')
 require(not (root / 'tools/update_dzen_rules.py').exists(), 'AI Dzen updater script must stay removed')
 require('clearOnlineSpelling' not in all_js, 'Legacy spelling compatibility calls must stay removed')
+require('spellNavState' not in all_js and 'closeSpellPanel' not in all_js and 'spellPanel' not in all_js, 'Legacy spelling panel navigation must stay removed')
+require('id="sideBackdrop"' in html and 'sideBackdropClick(event)' in html, 'Side drawer backdrop must match the runtime handler')
+require('sideDrawerBackdropClick' not in html, 'Stale side drawer backdrop handler must stay removed')
 require('OpenRouter receives only' not in all_js, 'Built-in local rule pack must not retain remote-generator provenance')
 
 require(not (js_dir / '12-markdown-toolbar.js').exists(), 'Retired Markdown toolbar module must stay removed')
