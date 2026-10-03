@@ -23,7 +23,13 @@ let semanticRunning=false;
 
 function semanticBridgeAvailable(){return !!(window.AndroidSemanticModel&&typeof AndroidSemanticModel.status==='function'&&typeof AndroidSemanticModel.analyzeAsync==='function')}
 function semanticManageAvailable(){return !!(window.AndroidSemanticModel&&typeof AndroidSemanticModel.pickModel==='function'&&typeof AndroidSemanticModel.clearModel==='function')}
-function semanticStatus(){if(!semanticBridgeAvailable())return {installed:false,available:false,browser:true};try{return JSON.parse(AndroidSemanticModel.status()||'{}')}catch(e){return {installed:false,available:false,error:String(e&&e.message||e)}}}
+function devLogAvailable(){return !!(window.AndroidSemanticModel&&typeof AndroidSemanticModel.debugLog==='function'&&typeof AndroidSemanticModel.logClient==='function')}
+function appDevLog(message){try{if(devLogAvailable())AndroidSemanticModel.logClient(String(message||''))}catch(e){}}
+window.appDevLog=appDevLog;
+window.addEventListener('error',e=>appDevLog('JS window.error: '+String(e&&e.message||'unknown')+(e&&e.filename?' @ '+e.filename+':'+e.lineno+':'+e.colno:'')));
+window.addEventListener('unhandledrejection',e=>appDevLog('JS unhandledrejection: '+String(e&&e.reason&&e.reason.message||e&&e.reason||'unknown')));
+
+function semanticStatus(){if(!semanticBridgeAvailable())return {installed:false,available:false,browser:true};try{return JSON.parse(AndroidSemanticModel.status()||'{}')}catch(e){appDevLog('semanticStatus parse error: '+String(e&&e.message||e));return {installed:false,available:false,error:String(e&&e.message||e)}}}
 function cloneDefaults(){return DEFAULT_SEMANTIC_CATEGORIES.map(x=>({...x}))}
 function defaultCategory(id){return DEFAULT_SEMANTIC_CATEGORIES.find(x=>x.id===id)||null}
 function cleanSemanticText(v,max){return String(v||'').trim().replace(/\s+/g,' ').slice(0,max)}
@@ -55,7 +61,7 @@ function loadSemanticCategories(){
 }
 let semanticCategories=loadSemanticCategories();
 function semanticKey(){return JSON.stringify(semanticCategories)}
-function saveSemanticCategories(){try{localStorage.setItem(SEMANTIC_CATEGORIES_KEY,JSON.stringify(semanticCategories))}catch(e){}invalidateSemanticCache();if(semanticPending)semanticPending.stale=true}
+function saveSemanticCategories(){try{localStorage.setItem(SEMANTIC_CATEGORIES_KEY,JSON.stringify(semanticCategories))}catch(e){}invalidateSemanticCache();if(semanticPending)semanticPending.stale=true;appDevLog('semantic categories saved; enabled='+semanticCategories.filter(x=>x.enabled).length+' total='+semanticCategories.length)}
 function invalidateSemanticCache(){semanticCache={text:null,key:'',issues:[],meta:null,error:''}}
 function formatSemanticSize(bytes){let n=Number(bytes)||0;if(!n)return '';const u=['Б','КБ','МБ','ГБ'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return (i>=2?n.toFixed(n>=100?0:1):Math.round(n))+' '+u[i]}
 
@@ -71,7 +77,7 @@ function removeLegacySemanticUi(){
 function ensureSemanticStyles(){
   if(document.querySelector('#semanticClassifierStyle'))return;
   const s=document.createElement('style');s.id='semanticClassifierStyle';
-  s.textContent='.semanticStatus{margin-bottom:10px}.semanticActions{margin:10px 0}.semanticIntro{margin:12px 0}.semanticCards{display:flex;flex-direction:column;gap:9px}.semanticCard{border:1px solid var(--border);border-radius:13px;background:var(--surface)}.semanticCard>summary{padding:12px 13px;cursor:pointer;display:flex;gap:8px;align-items:center}.semanticCard>summary span{font-weight:700;flex:1}.semanticCard>summary small{color:var(--muted)}.semanticBody{border-top:1px solid var(--border);padding:12px}.semanticField{display:block;font-size:12px;color:var(--muted);margin:9px 0 5px}.semanticInput,.semanticDescription{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:9px 10px;font:inherit}.semanticDescription{min-height:78px;resize:vertical;line-height:1.4}.semanticThreshold{display:flex;gap:8px;align-items:center}.semanticThreshold input{width:90px}.semanticRunning{font-weight:650}.semanticHint{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.35}';
+  s.textContent='.semanticStatus{margin-bottom:10px}.semanticActions{margin:10px 0}.semanticIntro{margin:12px 0}.semanticCards{display:flex;flex-direction:column;gap:9px}.semanticCard{border:1px solid var(--border);border-radius:13px;background:var(--surface)}.semanticCard>summary{padding:12px 13px;cursor:pointer;display:flex;gap:8px;align-items:center}.semanticCard>summary span{font-weight:700;flex:1}.semanticCard>summary small{color:var(--muted)}.semanticBody{border-top:1px solid var(--border);padding:12px}.semanticField{display:block;font-size:12px;color:var(--muted);margin:9px 0 5px}.semanticInput,.semanticDescription{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:9px 10px;font:inherit}.semanticDescription{min-height:78px;resize:vertical;line-height:1.4}.semanticThreshold{display:flex;gap:8px;align-items:center}.semanticThreshold input{width:90px}.semanticRunning{font-weight:650}.semanticHint{margin-top:6px;color:var(--muted);font-size:12px;line-height:1.35}.devLogWrap{margin-top:16px}.devLogArea{width:100%;box-sizing:border-box;min-height:220px;max-height:420px;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:9px;font:11px/1.35 monospace;white-space:pre;overflow:auto}';
   document.head.appendChild(s);
 }
 function semanticCardHtml(c,index){
@@ -84,7 +90,7 @@ function ensureSemanticSettings(){
   let group=document.querySelector('#semanticClassifierSettings');
   if(!group){
     group=document.createElement('details');group.className='settingsGroup';group.id='semanticClassifierSettings';
-    group.innerHTML='<summary><span>Смысловая проверка</span><small>Быстрый локальный классификатор ONNX</small></summary><div class="settingsGroupBody"><div class="ruleStatus semanticStatus" data-semantic-status></div><div class="settingActions semanticActions"><button class="nativeBtn primarySettingBtn" data-semantic-install type="button" onclick="installSemanticModel()">Установить модель</button><button class="nativeBtn dangerText" data-semantic-remove type="button" onclick="removeSemanticModel()" hidden>Удалить модель</button></div><div class="smallNote semanticIntro">Для каждой категории задаются два коротких смысла: что считать сигналом и что считать безопасным контекстом. Модель ничего не генерирует и не пишет JSON — она только сравнивает эти смыслы с фрагментами статьи.</div><div class="semanticCards" data-semantic-categories></div><div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="addSemanticCategory()">＋ Категория</button><button class="nativeBtn" type="button" onclick="resetSemanticCategories()">Вернуть стандартные</button></div></div>';
+    group.innerHTML='<summary><span>Смысловая проверка</span><small>Быстрый локальный классификатор ONNX</small></summary><div class="settingsGroupBody"><div class="ruleStatus semanticStatus" data-semantic-status></div><div class="settingActions semanticActions"><button class="nativeBtn primarySettingBtn" data-semantic-install type="button" onclick="installSemanticModel()">Установить модель</button><button class="nativeBtn dangerText" data-semantic-remove type="button" onclick="removeSemanticModel()" hidden>Удалить модель</button></div><div class="smallNote semanticIntro">Для каждой категории задаются два коротких смысла: что считать сигналом и что считать безопасным контекстом. Модель ничего не генерирует и не пишет JSON — она только сравнивает эти смыслы с фрагментами статьи.</div><div class="semanticCards" data-semantic-categories></div><div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="addSemanticCategory()">＋ Категория</button><button class="nativeBtn" type="button" onclick="resetSemanticCategories()">Вернуть стандартные</button></div><details class="nestedDetails devLogWrap"><summary>Диагностика разработки</summary><div class="smallNote">Временный журнал работы приложения: запуск, WebView/JS, модель, смысловая проверка, зависания и ошибки. Текст статьи целиком в журнал не записывается.</div><div class="settingActions"><button class="nativeBtn" type="button" onclick="refreshAppDebugLog()">Обновить лог</button><button class="nativeBtn primarySettingBtn" type="button" onclick="copyAppDebugLog()">Скопировать лог</button><button class="nativeBtn dangerText" type="button" onclick="clearAppDebugLog()">Очистить</button></div><textarea class="devLogArea" data-app-debug-log readonly placeholder="Нажмите «Обновить лог»"></textarea></details></div>';
     const control=document.querySelector('#controlListsSettingsGroup');if(control&&control.parentNode===wrap)wrap.insertBefore(group,control);else wrap.appendChild(group);
   }
   renderSemanticCategories();refreshSemanticStatus();
@@ -99,8 +105,12 @@ function refreshSemanticStatus(){
   el.innerHTML='<b>'+escapeHtml(s.name||'NLI-модель')+'</b>'+(s.version?' · '+escapeHtml(s.version):'')+(s.sizeBytes?' · '+formatSemanticSize(s.sizeBytes):'')+'<br>Движок: <b>ONNX Runtime</b> · режим: <b>контрастная NLI-классификация</b><br>Статус: <b>'+(s.available?'готова':'ошибка')+'</b>'+(s.error?'<br><span class="warn">'+escapeHtml(s.error)+'</span>':'');
 }
 
-window.installSemanticModel=function(){if(!semanticManageAvailable()){toast('Установка модели доступна в Android-приложении');return}try{AndroidSemanticModel.pickModel();toast('Выберите ZIP-пакет смысловой модели')}catch(e){toast('Не удалось открыть выбор модели')}};
-window.removeSemanticModel=async function(){if(!semanticManageAvailable())return;const ok=typeof appConfirm==='function'?await appConfirm('Удалить смысловую модель?','Внутренняя копия модели будет удалена. Редакторские проверки и контрольные списки останутся.','Удалить',true):true;if(!ok)return;let removed=false;try{removed=!!AndroidSemanticModel.clearModel()}catch(e){}invalidateSemanticCache();refreshSemanticStatus();try{analyzeText()}catch(e){}toast(removed?'Смысловая модель удалена':'Не удалось удалить модель')};
+window.refreshAppDebugLog=function(){const area=document.querySelector('[data-app-debug-log]');if(!area)return;if(!devLogAvailable()){area.value='Нативный журнал недоступен в этой сборке.';return}try{area.value=String(AndroidSemanticModel.debugLog()||'Журнал пока пуст.');area.scrollTop=area.scrollHeight}catch(e){area.value='Не удалось прочитать журнал: '+String(e&&e.message||e)}};
+window.copyAppDebugLog=function(){let text='';try{text=devLogAvailable()?String(AndroidSemanticModel.debugLog()||''):''}catch(e){}if(!text){toast('Журнал пока пуст');return}if(typeof copyPlainReport==='function'&&copyPlainReport(text))toast('Диагностический журнал скопирован');else toast('Не удалось скопировать журнал')};
+window.clearAppDebugLog=function(){try{if(devLogAvailable()&&typeof AndroidSemanticModel.clearDebugLog==='function')AndroidSemanticModel.clearDebugLog()}catch(e){}const area=document.querySelector('[data-app-debug-log]');if(area)area.value='Журнал очищен.';toast('Диагностический журнал очищен')};
+
+window.installSemanticModel=function(){appDevLog('UI installSemanticModel');if(!semanticManageAvailable()){toast('Установка модели доступна в Android-приложении');return}try{AndroidSemanticModel.pickModel();toast('Выберите ZIP-пакет смысловой модели')}catch(e){appDevLog('installSemanticModel exception: '+String(e&&e.message||e));toast('Не удалось открыть выбор модели')}};
+window.removeSemanticModel=async function(){appDevLog('UI removeSemanticModel');if(!semanticManageAvailable())return;const ok=typeof appConfirm==='function'?await appConfirm('Удалить смысловую модель?','Внутренняя копия модели будет удалена. Редакторские проверки и контрольные списки останутся.','Удалить',true):true;if(!ok)return;let removed=false;try{removed=!!AndroidSemanticModel.clearModel()}catch(e){appDevLog('clearModel exception: '+String(e&&e.message||e))}invalidateSemanticCache();refreshSemanticStatus();try{analyzeText()}catch(e){}toast(removed?'Смысловая модель удалена':'Не удалось удалить модель')};
 window.toggleSemanticCategory=(i,v)=>{if(semanticCategories[i]){semanticCategories[i].enabled=!!v;saveSemanticCategories();renderSemanticCategories()}};
 window.renameSemanticCategory=(i,v)=>{if(semanticCategories[i]){semanticCategories[i].name=cleanSemanticText(v,80)||semanticCategories[i].name;saveSemanticCategories();renderSemanticCategories()}};
 window.signalSemanticCategory=(i,v)=>{if(semanticCategories[i]){const x=cleanSemanticText(v,320);if(x)semanticCategories[i].signal=x;saveSemanticCategories()}};
@@ -134,12 +144,12 @@ function patchSemanticSummary(){
 }
 
 function installSemanticIntegration(){
-  if(window.__semanticContrastInstalled)return;window.__semanticContrastInstalled=true;
+  if(window.__semanticContrastInstalled)return;window.__semanticContrastInstalled=true;appDevLog('installSemanticIntegration start; bridge='+semanticBridgeAvailable());
   removeLegacySemanticUi();
-  try{const priorGroups=issueGroups;issueGroups=function(){const groups=priorGroups().filter(x=>x.id!=='rules');if(!groups.some(x=>x.id==='semantic'))groups.splice(2,0,{id:'semantic',name:'Смысловые категории'});return groups}}catch(e){}
+  try{const priorGroups=issueGroups;issueGroups=function(){const groups=priorGroups().filter(x=>x.id!=='rules');if(!groups.some(x=>x.id==='semantic'))groups.splice(2,0,{id:'semantic',name:'Смысловые категории'});return groups}}catch(e){appDevLog('issueGroups hook failed: '+String(e&&e.message||e))}
   const priorRender=renderAnalysis;renderAnalysis=function(){priorRender();document.querySelectorAll('.analysisFilter[data-mode="rules"]').forEach(x=>x.remove());patchSemanticSummary()};window.renderAnalysis=renderAnalysis;
   const priorAnalyze=analyzeText;analyzeText=function(){const result=priorAnalyze(),src=editor.value||'',key=semanticKey();if(semanticCache.text===src&&semanticCache.key===key&&Array.isArray(semanticCache.issues))appendSemanticIssues(src,{issues:semanticCache.issues,modelName:semanticCache.meta&&semanticCache.meta.modelName});recountSemantic();renderAnalysis();updateAnalysisDot();return currentAnalysis};window.analyzeText=analyzeText;
-  const priorOpenSettings=openSettings;openSettings=function(){removeLegacySemanticUi();priorOpenSettings();ensureSemanticSettings();refreshSemanticStatus()};window.openSettings=openSettings;
+  const priorOpenSettings=openSettings;openSettings=function(){appDevLog('UI openSettings');removeLegacySemanticUi();priorOpenSettings();ensureSemanticSettings();refreshSemanticStatus()};window.openSettings=openSettings;
   const priorReport=buildAnalysisReport;buildAnalysisReport=function(){
     analyzeText();const src=editor.value||'',a=currentAnalysis||{},lines=[],semantic=Number(a.semanticCount)||0,editorCount=Math.max(0,(Number(a.warningCount)||0)-semantic);
     lines.push('ОТЧЁТ РЕДАКТОРА ПО ЛОКАЛЬНОЙ ПРОВЕРКЕ');lines.push('Создан: '+new Date().toLocaleString('ru-RU'));lines.push('Всего замечаний: '+(a.warningCount||0)+'; редакторских: '+editorCount+'; смысловых: '+semantic+'.');
@@ -155,29 +165,36 @@ function installSemanticIntegration(){
   if(priorRun){
     runFullCheck=function(){
       if(semanticRunning){
-        let stopping=false;try{if(window.AndroidSemanticModel&&typeof AndroidSemanticModel.cancelAnalysis==='function')stopping=!!AndroidSemanticModel.cancelAnalysis()}catch(e){}
+        appDevLog('UI runFullCheck pressed while semanticRunning=true; requesting cancel');
+        let stopping=false;try{if(window.AndroidSemanticModel&&typeof AndroidSemanticModel.cancelAnalysis==='function')stopping=!!AndroidSemanticModel.cancelAnalysis()}catch(e){appDevLog('cancelAnalysis exception: '+String(e&&e.message||e))}
         toast(stopping?'Останавливаю смысловую проверку…':'Смысловая проверка уже выполняется');return;
       }
       invalidateSemanticCache();semanticPending=null;priorRun();
-      const src=editor.value||'',status=semanticStatus();if(!src.trim()||!semanticBridgeAvailable()||!status.installed||!status.available)return;
-      const key=semanticKey();let id=-1;try{id=Number(AndroidSemanticModel.analyzeAsync(src,key))||-1}catch(e){id=-1}
+      const src=editor.value||'',status=semanticStatus();
+      appDevLog('UI runFullCheck; textChars='+src.length+'; enabledCategories='+semanticCategories.filter(x=>x.enabled).length+'; bridge='+semanticBridgeAvailable()+'; installed='+!!status.installed+'; available='+!!status.available);
+      if(!src.trim()||!semanticBridgeAvailable()||!status.installed||!status.available){appDevLog('semantic launch skipped because prerequisites are not satisfied');return}
+      const key=semanticKey();let id=-1;try{id=Number(AndroidSemanticModel.analyzeAsync(src,key))||-1}catch(e){appDevLog('analyzeAsync exception: '+String(e&&e.message||e));id=-1}
+      appDevLog('analyzeAsync returned requestId='+id);
       if(id<1){toast('Не удалось запустить смысловую проверку');return}
       semanticPending={id,text:src,key,stale:false};semanticRunning=true;setCheckRunning(true);renderAnalysis();toast('Смысловой классификатор проверяет текст…');
     };window.runFullCheck=runFullCheck;
   }
   editor.addEventListener('input',()=>{invalidateSemanticCache();if(semanticPending)semanticPending.stale=true});ensureSemanticSettings();
+  appDevLog('installSemanticIntegration complete');
 }
 
-window.onNativeSemanticModelInstalling=()=>toast('Копирую и проверяю смысловую модель…');
-window.onNativeSemanticModelChanged=statusText=>{invalidateSemanticCache();refreshSemanticStatus();let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'Смысловая модель установлена')};
-window.onNativeSemanticModelError=msg=>{refreshSemanticStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
+window.onNativeSemanticModelInstalling=()=>{appDevLog('native callback: model installing');toast('Копирую и проверяю смысловую модель…')};
+window.onNativeSemanticModelChanged=statusText=>{appDevLog('native callback: model changed; payloadChars='+String(statusText||'').length);invalidateSemanticCache();refreshSemanticStatus();let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'Смысловая модель установлена')};
+window.onNativeSemanticModelError=msg=>{appDevLog('native callback: model error: '+String(msg||''));refreshSemanticStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
 window.onNativeSemanticResult=function(requestId,payload){
-  const pending=semanticPending;if(!pending||Number(requestId)!==Number(pending.id))return;
+  appDevLog('native callback: semantic result requestId='+requestId+' payloadChars='+String(payload||'').length);
+  const pending=semanticPending;if(!pending||Number(requestId)!==Number(pending.id)){appDevLog('semantic result ignored: pending='+(pending&&pending.id)+' incoming='+requestId);return}
   semanticPending=null;semanticRunning=false;setCheckRunning(false);
-  let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать результат классификатора'}}
-  if(pending.stale||pending.text!==(editor.value||'')||pending.key!==semanticKey()){toast('Смысловая проверка завершилась, но текст или категории уже изменены — результат не применён');renderAnalysis();return}
+  let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){appDevLog('semantic result JSON parse failed: '+String(e&&e.message||e));result={available:false,issues:[],error:'Не удалось разобрать результат классификатора'}}
+  appDevLog('semantic result parsed: available='+!!result.available+' issues='+(Array.isArray(result.issues)?result.issues.length:0)+' elapsedMs='+(Number(result.elapsedMs)||0)+' timedOut='+!!result.timedOut+' cancelled='+!!result.cancelled+' partial='+!!result.partial+' pairs='+(Number(result.pairs)||0)+' runs='+(Number(result.runs)||0)+' chunks='+(Number(result.screeningChunks)||0)+' candidates='+(Number(result.candidatePairs)||0)+(result.error?' error='+String(result.error):''));
+  if(pending.stale||pending.text!==(editor.value||'')||pending.key!==semanticKey()){appDevLog('semantic result rejected as stale');toast('Смысловая проверка завершилась, но текст или категории уже изменены — результат не применён');renderAnalysis();return}
   const error=String(result.error||'');
-  if(result.cancelled){invalidateSemanticCache();analyzeText();toast('Смысловая проверка остановлена');return}
+  if(result.cancelled){appDevLog('semantic result says cancelled');invalidateSemanticCache();analyzeText();toast('Смысловая проверка остановлена');return}
   const rawIssues=Array.isArray(result.issues)?result.issues:[];
   const filteredIssues=rawIssues.filter(issue=>{
     const signal=Number(issue&&issue.signalScore);
@@ -186,11 +203,13 @@ window.onNativeSemanticResult=function(requestId,payload){
   result.filteredLowSignal=Math.max(0,rawIssues.length-filteredIssues.length);
   result.issues=filteredIssues;
   semanticCache={text:pending.text,key:pending.key,issues:filteredIssues,meta:result,error};analyzeText();
+  appDevLog('semantic result applied: finalIssues='+filteredIssues.length+' lowSignalFiltered='+result.filteredLowSignal);
   if(!result.available&&error)toast('Смысловая модель: '+error);
   else if(result.timedOut)toast('Смысловая проверка остановлена по лимиту времени: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
   else toast('Смысловая проверка: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
 };
-window.onNativeSemanticAnalysisError=function(requestId,msg){if(semanticPending&&Number(requestId)===Number(semanticPending.id))semanticPending=null;semanticRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'))};
+window.onNativeSemanticAnalysisError=function(requestId,msg){appDevLog('native callback: semantic analysis error requestId='+requestId+' msg='+String(msg||''));if(semanticPending&&Number(requestId)===Number(semanticPending.id))semanticPending=null;semanticRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'))};
 
-setTimeout(function(){try{installSemanticIntegration()}catch(e){console.error('Semantic classifier integration failed',e)}},0);
+appDevLog('13-local-llm.js loaded; bridge='+semanticBridgeAvailable());
+setTimeout(function(){try{installSemanticIntegration()}catch(e){appDevLog('Semantic classifier integration failed: '+String(e&&e.stack||e));console.error('Semantic classifier integration failed',e)}},0);
 })();
