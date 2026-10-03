@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - local-first-v1.9
+      - prototype/editorial-rule-packs
   pull_request:
     branches:
       - main
@@ -57,7 +58,7 @@ jobs:
           PY
           python3 tools/check_editor_invariants.py
           python3 tools/check_app_logic.py
-          python3 tools/check_local_first.py
+          python3 tools/check_offline_editor.py
           node tools/test_publish_export.js
           node tools/test_publish_copy.js
 
@@ -70,7 +71,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Dzen-Text-v${{ env.APP_VERSION }}-APKs
+          name: Text-Editor-v${{ env.APP_VERSION }}-APKs
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/release/app-release-unsigned.apk
