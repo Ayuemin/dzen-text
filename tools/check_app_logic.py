@@ -54,14 +54,13 @@ if missing_refs:
     errors.append("getElementById targets missing from HTML: " + ", ".join(missing_refs))
 
 # Programmatic textarea replacements must participate in persistence/history.
-# Keep this narrow and explicit: formatting/replacement modules are required to
-# funnel edits through the central post-edit hook.
-for name in ["07-spelling.js", "08-navigation.js", "11-ui.js", "12-markdown-toolbar.js"]:
+# Keep this narrow and explicit: replacement modules are required to funnel edits
+# through the central post-edit hook. The old Markdown formatting toolbar is retired.
+for name in ["07-spelling.js", "08-navigation.js", "11-ui.js"]:
     path = JS / name
     text = path.read_text(encoding="utf-8")
     if "editor.setRangeText(" in text and "afterProgrammaticEdit(" not in text:
         errors.append(name + " changes editor text without afterProgrammaticEdit()")
-
 
 # Destructive article replacement must be protected by a version snapshot.
 editor_js = (JS / "09-editor.js").read_text(encoding="utf-8")
