@@ -1,258 +1,93 @@
 (function(){
 'use strict';
 
-const LOCAL_LLM_CRITERIA_KEY='localLlmCriteriaV1';
-const LOCAL_LLM_EXCLUSIONS_KEY='localLlmExclusionsV1';
-const DEFAULT_LOCAL_LLM_CRITERIA=`Ищи смысловые сигналы, которые стоит перепроверить перед публикацией:
-- финансовые обещания, гарантированный доход, отсутствие риска;
-- угрозы, насилие, агрессивные призывы;
-- продажу или продвижение ограниченных товаров и услуг;
-- опасные медицинские рекомендации и самостоятельное изменение лечения;
-- навязчивое стимулирование подписок, лайков, репостов и другой активности;
-- азартные игры и ставки;
-- мошеннические предложения и вводящие в заблуждение гарантии;
-- способы обхода блокировок, ограничений и запретов;
-- незаконные действия;
-- сексуальный или шокирующий контент;
-- другие формулировки, которые разумно перепроверить перед публикацией.
+const SEMANTIC_CATEGORIES_KEY='semanticCategoriesV1';
+const DEFAULT_SEMANTIC_CATEGORIES=[
+  {id:'finance',name:'Финансовые обещания',description:'В тексте есть обещание гарантированной прибыли, дохода или отсутствия финансового риска.',threshold:.72,enabled:true},
+  {id:'threat',name:'Угрозы и запугивание',description:'В тексте есть прямая или косвенная угроза человеку, запугивание или обещание причинить вред.',threshold:.72,enabled:true},
+  {id:'restricted',name:'Ограниченные товары',description:'В тексте предлагают купить, продать или получить незаконный, опасный или ограниченный товар или услугу.',threshold:.72,enabled:true},
+  {id:'medical',name:'Опасные медицинские советы',description:'В тексте есть опасный медицинский совет или предложение самостоятельно изменить лечение или дозировку.',threshold:.72,enabled:true},
+  {id:'engagement',name:'Манипулятивный призыв',description:'В тексте призывают подписаться, поставить лайк, сделать репост или другое действие ради подарка, бонуса или выгоды.',threshold:.72,enabled:true},
+  {id:'gambling',name:'Азартные игры',description:'В тексте продвигают ставки, казино, азартную игру или обещают выгоду от участия в азартной игре.',threshold:.74,enabled:true},
+  {id:'bypass',name:'Обход ограничений',description:'В тексте предлагают практический способ обойти блокировку, запрет, техническое или правовое ограничение.',threshold:.74,enabled:true},
+  {id:'illegal',name:'Опасные или незаконные действия',description:'В тексте призывают совершить незаконное или опасное действие либо дают практическую инструкцию для него.',threshold:.75,enabled:true},
+  {id:'explicit',name:'Шокирующий или откровенный контент',description:'В тексте содержится явное предложение, инструкция или одобрение сексуального, жестокого или шокирующего действия.',threshold:.76,enabled:true}
+];
 
-Не реагируй только на отдельное слово: важен смысл фрагмента.`;
-const DEFAULT_LOCAL_LLM_EXCLUSIONS=`Не считать проблемой само по себе:
-- нейтральное упоминание темы;
-- цитирование или пересказ без одобрения;
-- осуждение, предупреждение или опровержение;
-- явное отрицание, например «доход не гарантируется»;
-- историческое, художественное, образовательное или информационное описание;
-- обсуждение запрета или риска без предложения совершить действие.`;
+let semanticCache={text:null,key:'',issues:[],meta:null,error:''};
+let semanticPending=null;
+let semanticRunning=false;
 
-let localLlmCache={text:null,promptKey:'',issues:[],meta:null,error:''};
-let localLlmPending=null;
-let localLlmRunning=false;
+function semanticBridgeAvailable(){return !!(window.AndroidSemanticModel&&typeof AndroidSemanticModel.status==='function'&&typeof AndroidSemanticModel.analyzeAsync==='function')}
+function semanticManageAvailable(){return !!(window.AndroidSemanticModel&&typeof AndroidSemanticModel.pickModel==='function'&&typeof AndroidSemanticModel.clearModel==='function')}
+function semanticStatus(){if(!semanticBridgeAvailable())return {installed:false,available:false,browser:true};try{return JSON.parse(AndroidSemanticModel.status()||'{}')}catch(e){return {installed:false,available:false,error:String(e&&e.message||e)}}}
+function cloneDefaults(){return DEFAULT_SEMANTIC_CATEGORIES.map(x=>({...x}))}
+function cleanCategory(raw,index){
+  if(!raw||typeof raw!=='object')return null;
+  const name=String(raw.name||'').trim().slice(0,80),description=String(raw.description||'').trim().replace(/\s+/g,' ').slice(0,420);
+  if(!name||!description)return null;
+  const id=String(raw.id||('cat'+index)).toLocaleLowerCase('ru-RU').replace(/[^a-zа-яё0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,64)||('cat'+index);
+  return {id,name,description,threshold:Math.max(.05,Math.min(.99,Number(raw.threshold)||.72)),enabled:raw.enabled!==false};
+}
+function loadSemanticCategories(){try{const raw=localStorage.getItem(SEMANTIC_CATEGORIES_KEY);if(raw){const a=JSON.parse(raw);if(Array.isArray(a)){const clean=a.map(cleanCategory).filter(Boolean).slice(0,24);if(clean.length)return clean}}}catch(e){}return cloneDefaults()}
+let semanticCategories=loadSemanticCategories();
+function semanticKey(){return JSON.stringify(semanticCategories)}
+function saveSemanticCategories(){try{localStorage.setItem(SEMANTIC_CATEGORIES_KEY,JSON.stringify(semanticCategories))}catch(e){}invalidateSemanticCache();if(semanticPending)semanticPending.stale=true}
+function invalidateSemanticCache(){semanticCache={text:null,key:'',issues:[],meta:null,error:''}}
+function formatSemanticSize(bytes){let n=Number(bytes)||0;if(!n)return '';const u=['Б','КБ','МБ','ГБ'];let i=0;while(n>=1024&&i<u.length-1){n/=1024;i++}return (i>=2?n.toFixed(n>=100?0:1):Math.round(n))+' '+u[i]}
 
-function localLlmBridgeAvailable(){
-  return !!(window.AndroidLocalLlm&&typeof AndroidLocalLlm.status==='function'&&typeof AndroidLocalLlm.analyzeAsync==='function');
-}
-function localLlmManageAvailable(){
-  return !!(window.AndroidLocalLlm&&typeof AndroidLocalLlm.pickModel==='function'&&typeof AndroidLocalLlm.clearModel==='function');
-}
-function localLlmStatus(){
-  if(!localLlmBridgeAvailable())return {installed:false,available:false,browser:true};
-  try{return JSON.parse(AndroidLocalLlm.status()||'{}')}catch(e){return {installed:false,available:false,error:String(e&&e.message||e)}}
-}
-function localLlmCriteria(){
-  try{return localStorage.getItem(LOCAL_LLM_CRITERIA_KEY)||DEFAULT_LOCAL_LLM_CRITERIA}catch(e){return DEFAULT_LOCAL_LLM_CRITERIA}
-}
-function localLlmExclusions(){
-  try{return localStorage.getItem(LOCAL_LLM_EXCLUSIONS_KEY)||DEFAULT_LOCAL_LLM_EXCLUSIONS}catch(e){return DEFAULT_LOCAL_LLM_EXCLUSIONS}
-}
-function localLlmPromptKey(){return localLlmCriteria()+'\u0000'+localLlmExclusions()}
-function saveLocalLlmPrompt(){
-  const c=document.getElementById('localLlmCriteria'),x=document.getElementById('localLlmExclusions');
-  try{
-    if(c)localStorage.setItem(LOCAL_LLM_CRITERIA_KEY,c.value.trim()||DEFAULT_LOCAL_LLM_CRITERIA);
-    if(x)localStorage.setItem(LOCAL_LLM_EXCLUSIONS_KEY,x.value.trim()||DEFAULT_LOCAL_LLM_EXCLUSIONS);
-  }catch(e){}
-  invalidateLocalLlmCache();
-  if(localLlmPending)localLlmPending.stale=true;
-}
-function invalidateLocalLlmCache(){localLlmCache={text:null,promptKey:'',issues:[],meta:null,error:''}}
-function formatLocalLlmSize(bytes){
-  let n=Number(bytes)||0;if(!n)return '';
-  const units=['Б','КБ','МБ','ГБ'];let i=0;while(n>=1024&&i<units.length-1){n/=1024;i++}
-  return (i>=2?n.toFixed(n>=100?0:1):Math.round(n))+' '+units[i];
+function removeLegacySemanticUi(){
+  try{activeRulePack=null}catch(e){}try{lastRulePackDiagnostics={checked:0,matches:0,errors:[]}}catch(e){}
+  const pack=document.querySelector('#rulePackStatus');if(pack&&pack.closest('.settingsGroup'))pack.closest('.settingsGroup').remove();
+  const backdrop=document.querySelector('#rulePackBackdrop');if(backdrop)backdrop.remove();const input=document.querySelector('#rulePackFileInput');if(input)input.remove();
+  const oldOnnx=document.querySelector('#localClassifierSettingsGroup');if(oldOnnx)oldOnnx.remove();const oldLlm=document.querySelector('#localLlmSettingsGroup');if(oldLlm)oldLlm.remove();
+  document.querySelectorAll('.analysisFilter[data-mode="rules"]').forEach(x=>x.remove());try{if(analysisMode==='rules')analysisMode='problems'}catch(e){}
+  try{ensureLocalClassifierSettings=function(){}}catch(e){}try{refreshLocalClassifierStatus=function(){}}catch(e){}
 }
 
-function removeLegacyRulePackUi(){
-  try{activeRulePack=null}catch(e){}
-  try{lastRulePackDiagnostics={checked:0,matches:0,errors:[]}}catch(e){}
-  const pack=document.getElementById('rulePackStatus');
-  if(pack&&pack.closest('.settingsGroup'))pack.closest('.settingsGroup').remove();
-  const backdrop=document.getElementById('rulePackBackdrop');if(backdrop)backdrop.remove();
-  const input=document.getElementById('rulePackFileInput');if(input)input.remove();
-  document.querySelectorAll('.analysisFilter[data-mode="rules"]').forEach(x=>x.remove());
-  try{if(analysisMode==='rules')analysisMode='problems'}catch(e){}
-  const oldModel=document.getElementById('localClassifierSettingsGroup');if(oldModel)oldModel.remove();
-  try{ensureLocalClassifierSettings=function(){}}catch(e){}
-  try{refreshLocalClassifierStatus=function(){}}catch(e){}
-}
-
-function ensureLocalLlmStyles(){
-  if(document.getElementById('localLlmRuntimeStyle'))return;
-  const style=document.createElement('style');style.id='localLlmRuntimeStyle';
-  style.textContent='.localLlmPromptLabel{display:block;font-size:12px;color:var(--muted);margin:13px 0 6px}.localLlmPrompt{width:100%;box-sizing:border-box;min-height:132px;resize:vertical;border:1px solid var(--border);border-radius:12px;background:var(--surface2);color:var(--text);padding:11px;font:inherit;line-height:1.45}.localLlmStatus{margin-bottom:10px}.localLlmProgress{margin-top:8px;color:var(--muted);font-size:12px}.localLlmActions{margin:10px 0}.analysisSummary .semanticRunning{font-weight:650}';
-  document.head.appendChild(style);
-}
-
-function ensureLocalLlmSettings(){
-  removeLegacyRulePackUi();ensureLocalLlmStyles();
-  const wrap=document.querySelector('#settingsBackdrop .settingsGroupWrap');if(!wrap)return;
-  let group=document.getElementById('localLlmSettingsGroup');
-  if(!group){
-    group=document.createElement('details');group.className='settingsGroup';group.id='localLlmSettingsGroup';
-    group.innerHTML='<summary><span>Локальная смысловая модель</span><small>Любая совместимая GGUF-модель на устройстве</small></summary><div class="settingsGroupBody"><div class="ruleStatus localLlmStatus" data-local-llm-status></div><div class="settingActions localLlmActions"><button class="nativeBtn primarySettingBtn" data-local-llm-install type="button" onclick="installLocalLlmModel()">Установить модель</button><button class="nativeBtn dangerText" data-local-llm-remove type="button" onclick="removeLocalLlmModel()" hidden>Удалить модель</button></div><div class="smallNote">Выберите файл <b>.gguf</b> на телефоне. Приложение проверит модель и скопирует её во внутреннее хранилище. После установки исходный файл в «Загрузках» приложению больше не нужен.</div><label class="localLlmPromptLabel" for="localLlmCriteria">Что искать</label><textarea id="localLlmCriteria" class="localLlmPrompt" rows="8" maxlength="12000"></textarea><label class="localLlmPromptLabel" for="localLlmExclusions">Что не считать проблемой</label><textarea id="localLlmExclusions" class="localLlmPrompt" rows="6" maxlength="12000"></textarea><div class="smallNote">Служебная инструкция и обязательный JSON-формат ответа зашиты в приложение и здесь не редактируются.</div><div class="settingActions"><button class="nativeBtn" type="button" onclick="resetLocalLlmPrompt()">Вернуть рекомендуемые критерии</button></div></div>';
-    const control=document.getElementById('controlListsSettingsGroup');
-    if(control&&control.parentNode===wrap)wrap.insertBefore(group,control);else wrap.appendChild(group);
-    const c=group.querySelector('#localLlmCriteria'),x=group.querySelector('#localLlmExclusions');
-    if(c)c.addEventListener('input',saveLocalLlmPrompt);if(x)x.addEventListener('input',saveLocalLlmPrompt);
+function ensureSemanticStyles(){if(document.querySelector('#semanticClassifierStyle'))return;const s=document.createElement('style');s.id='semanticClassifierStyle';s.textContent='.semanticStatus{margin-bottom:10px}.semanticActions{margin:10px 0}.semanticIntro{margin:12px 0}.semanticCards{display:flex;flex-direction:column;gap:9px}.semanticCard{border:1px solid var(--border);border-radius:13px;background:var(--surface)}.semanticCard>summary{padding:12px 13px;cursor:pointer;display:flex;gap:8px;align-items:center}.semanticCard>summary span{font-weight:700;flex:1}.semanticCard>summary small{color:var(--muted)}.semanticBody{border-top:1px solid var(--border);padding:12px}.semanticField{display:block;font-size:12px;color:var(--muted);margin:7px 0 5px}.semanticInput,.semanticDescription{width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:10px;background:var(--surface2);color:var(--text);padding:9px 10px;font:inherit}.semanticDescription{min-height:86px;resize:vertical;line-height:1.4}.semanticThreshold{display:flex;gap:8px;align-items:center}.semanticThreshold input{width:90px}.semanticRunning{font-weight:650}';document.head.appendChild(s)}
+function semanticCardHtml(c,index){const id=String(c.id).replace(/'/g,'');return '<details class="semanticCard" data-semantic="'+escapeHtml(id)+'"><summary><input type="checkbox" '+(c.enabled?'checked':'')+' onclick="event.stopPropagation()" onchange="toggleSemanticCategory('+index+',this.checked)"><span>'+escapeHtml(c.name)+'</span><small>порог '+Math.round(c.threshold*100)+'%</small></summary><div class="semanticBody"><label class="semanticField">Название</label><input class="semanticInput" maxlength="80" value="'+escapeHtml(c.name)+'" onchange="renameSemanticCategory('+index+',this.value)"><label class="semanticField">Что означает эта категория</label><textarea class="semanticDescription" maxlength="420" onchange="describeSemanticCategory('+index+',this.value)">'+escapeHtml(c.description)+'</textarea><label class="semanticField">Порог срабатывания</label><div class="semanticThreshold"><input type="number" min="5" max="99" step="1" value="'+Math.round(c.threshold*100)+'" onchange="thresholdSemanticCategory('+index+',this.value)"><span>%</span></div><div class="settingActions"><button class="nativeBtn dangerText" type="button" onclick="deleteSemanticCategory('+index+')">Удалить категорию</button></div></div></details>'}
+function renderSemanticCategories(){const root=document.querySelector('[data-semantic-categories]');if(!root)return;root.innerHTML=semanticCategories.length?semanticCategories.map(semanticCardHtml).join(''):'<div class="smallNote">Смысловых категорий пока нет.</div>'}
+function ensureSemanticSettings(){
+  removeLegacySemanticUi();ensureSemanticStyles();const wrap=document.querySelector('#settingsBackdrop .settingsGroupWrap');if(!wrap)return;
+  let group=document.querySelector('#semanticClassifierSettings');
+  if(!group){group=document.createElement('details');group.className='settingsGroup';group.id='semanticClassifierSettings';group.innerHTML='<summary><span>Смысловая проверка</span><small>Быстрый локальный классификатор ONNX</small></summary><div class="settingsGroupBody"><div class="ruleStatus semanticStatus" data-semantic-status></div><div class="settingActions semanticActions"><button class="nativeBtn primarySettingBtn" data-semantic-install type="button" onclick="installSemanticModel()">Установить модель</button><button class="nativeBtn dangerText" data-semantic-remove type="button" onclick="removeSemanticModel()" hidden>Удалить модель</button></div><div class="smallNote semanticIntro">Модель ничего не генерирует: она сравнивает каждый фрагмент статьи с короткими смысловыми категориями. Названия и описания можно менять без переобучения.</div><div class="semanticCards" data-semantic-categories></div><div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="addSemanticCategory()">＋ Категория</button><button class="nativeBtn" type="button" onclick="resetSemanticCategories()">Вернуть стандартные</button></div></div>';
+    const control=document.querySelector('#controlListsSettingsGroup');if(control&&control.parentNode===wrap)wrap.insertBefore(group,control);else wrap.appendChild(group)
   }
-  const c=document.getElementById('localLlmCriteria'),x=document.getElementById('localLlmExclusions');
-  if(c&&document.activeElement!==c)c.value=localLlmCriteria();
-  if(x&&document.activeElement!==x)x.value=localLlmExclusions();
-  refreshLocalLlmStatus();
+  renderSemanticCategories();refreshSemanticStatus();
+}
+function refreshSemanticStatus(){const el=document.querySelector('[data-semantic-status]');if(!el)return;const s=semanticStatus(),install=document.querySelector('[data-semantic-install]'),remove=document.querySelector('[data-semantic-remove]');if(install){install.hidden=!semanticManageAvailable();install.textContent=s.installed?'Заменить модель':'Установить модель'}if(remove)remove.hidden=!(semanticManageAvailable()&&s.installed);if(s.browser){el.innerHTML='<b>Доступно только в Android-приложении.</b>';return}if(!s.installed){el.innerHTML='<b>Смысловая модель не установлена.</b><br>Редакторские проверки и контрольные списки работают без неё.'+(s.error?'<br><span class="warn">'+escapeHtml(s.error)+'</span>':'');return}el.innerHTML='<b>'+escapeHtml(s.name||'NLI-модель')+'</b>'+(s.version?' · '+escapeHtml(s.version):'')+(s.sizeBytes?' · '+formatSemanticSize(s.sizeBytes):'')+'<br>Движок: <b>ONNX Runtime</b> · режим: <b>NLI-классификация</b><br>Статус: <b>'+(s.available?'готова':'ошибка')+'</b>'+(s.error?'<br><span class="warn">'+escapeHtml(s.error)+'</span>':'')}
+
+window.installSemanticModel=function(){if(!semanticManageAvailable()){toast('Установка модели доступна в Android-приложении');return}try{AndroidSemanticModel.pickModel();toast('Выберите ZIP-пакет смысловой модели')}catch(e){toast('Не удалось открыть выбор модели')}};
+window.removeSemanticModel=async function(){if(!semanticManageAvailable())return;const ok=typeof appConfirm==='function'?await appConfirm('Удалить смысловую модель?','Внутренняя копия модели будет удалена. Редакторские проверки и контрольные списки останутся.','Удалить',true):true;if(!ok)return;let removed=false;try{removed=!!AndroidSemanticModel.clearModel()}catch(e){}invalidateSemanticCache();refreshSemanticStatus();try{analyzeText()}catch(e){}toast(removed?'Смысловая модель удалена':'Не удалось удалить модель')};
+window.toggleSemanticCategory=(i,v)=>{if(semanticCategories[i]){semanticCategories[i].enabled=!!v;saveSemanticCategories();renderSemanticCategories()}};
+window.renameSemanticCategory=(i,v)=>{if(semanticCategories[i]){semanticCategories[i].name=String(v||'').trim().slice(0,80)||semanticCategories[i].name;saveSemanticCategories();renderSemanticCategories()}};
+window.describeSemanticCategory=(i,v)=>{if(semanticCategories[i]){const x=String(v||'').trim().replace(/\s+/g,' ').slice(0,420);if(x)semanticCategories[i].description=x;saveSemanticCategories()}};
+window.thresholdSemanticCategory=(i,v)=>{if(semanticCategories[i]){semanticCategories[i].threshold=Math.max(.05,Math.min(.99,(Number(v)||72)/100));saveSemanticCategories();renderSemanticCategories()}};
+window.deleteSemanticCategory=async i=>{if(!semanticCategories[i])return;const ok=typeof appConfirm==='function'?await appConfirm('Удалить смысловую категорию?','«'+semanticCategories[i].name+'» больше не будет проверяться моделью.','Удалить',true):true;if(!ok)return;semanticCategories.splice(i,1);saveSemanticCategories();renderSemanticCategories()};
+window.addSemanticCategory=()=>{const n=semanticCategories.length+1;semanticCategories.push({id:'custom-'+Date.now().toString(36),name:'Новая категория '+n,description:'В тексте есть смысл, который нужно дополнительно проверить перед публикацией.',threshold:.72,enabled:true});saveSemanticCategories();renderSemanticCategories();const cards=document.querySelectorAll('.semanticCard');if(cards.length)cards[cards.length-1].open=true};
+window.resetSemanticCategories=async()=>{const ok=typeof appConfirm==='function'?await appConfirm('Вернуть стандартные категории?','Ваши изменения смысловых категорий будут заменены стандартным набором.','Вернуть',false):true;if(!ok)return;semanticCategories=cloneDefaults();saveSemanticCategories();renderSemanticCategories();toast('Стандартные категории восстановлены')};
+
+function appendSemanticIssues(src,result){if(!result||!Array.isArray(result.issues)||!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;for(const raw of result.issues){const start=Math.max(0,Math.min(src.length,Number(raw.start)||0)),end=Math.max(start,Math.min(src.length,Number(raw.end)||start)),score=Number(raw.score);let detail=String(raw.message||'Проверьте смысл и контекст этого фрагмента.');if(Number.isFinite(score))detail+=' · оценка модели '+Math.round(score*100)+'%';const issue=addIssue(currentAnalysis.issues,'semantic',String(raw.title||raw.category||'Смысловой сигнал'),detail,start,end,'warning');if(issue){issue.semanticScore=score;issue.semanticCategory=String(raw.category||'');issue.semanticModel=String(result.modelName||'')}}}
+function recountSemantic(){if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;const issues=currentAnalysis.issues,overflow={...(issues._overflow||{})},overflowTotal=Object.values(overflow).reduce((a,b)=>a+(Number(b)||0),0),countType=t=>issues.filter(x=>x.type===t).length+(Number(overflow[t])||0),warningCount=issues.length+overflowTotal,semanticCount=countType('semantic');currentAnalysis.issueOverflow=overflow;currentAnalysis.overflowTotal=overflowTotal;currentAnalysis.warningCount=warningCount;currentAnalysis.semanticCount=semanticCount;currentAnalysis.rulesCount=0;currentAnalysis.editorCount=Math.max(0,warningCount-semanticCount)}
+function patchSemanticSummary(){const a=currentAnalysis||{},sum=document.querySelector('#analysisSummary');if(!sum)return;const total=Number(a.warningCount)||0,semantic=Number(a.semanticCount)||0,editor=Math.max(0,total-semantic);if(total)sum.innerHTML='Редакторских замечаний: <b>'+editor+'</b> · смысловых: <b>'+semantic+'</b> · всего: <b>'+total+'</b>.'+(semanticRunning?' <span class="semanticRunning">Смысловая модель проверяет текст…</span>':'');else sum.innerHTML='<b>По локальным проверкам замечаний нет.</b>'+(semanticRunning?' <span class="semanticRunning">Смысловая модель ещё проверяет текст…</span>':' Финальная вычитка всё равно нужна.')}
+
+function installSemanticIntegration(){
+  removeLegacySemanticUi();
+  try{const priorGroups=issueGroups;issueGroups=function(){const groups=priorGroups().filter(x=>x.id!=='rules');if(!groups.some(x=>x.id==='semantic'))groups.splice(2,0,{id:'semantic',name:'Смысловые категории'});return groups}}catch(e){}
+  const priorRender=renderAnalysis;renderAnalysis=function(){priorRender();document.querySelectorAll('.analysisFilter[data-mode="rules"]').forEach(x=>x.remove());patchSemanticSummary()};
+  const priorAnalyze=analyzeText;analyzeText=function(){const result=priorAnalyze(),src=editor.value||'',key=semanticKey();if(semanticCache.text===src&&semanticCache.key===key&&Array.isArray(semanticCache.issues))appendSemanticIssues(src,{issues:semanticCache.issues,modelName:semanticCache.meta&&semanticCache.meta.modelName});recountSemantic();renderAnalysis();updateAnalysisDot();return currentAnalysis};window.analyzeText=analyzeText;
+  const priorOpenSettings=openSettings;openSettings=function(){removeLegacySemanticUi();priorOpenSettings();ensureSemanticSettings();refreshSemanticStatus()};window.openSettings=openSettings;
+  const priorReport=buildAnalysisReport;buildAnalysisReport=function(){analyzeText();const src=editor.value||'',a=currentAnalysis||{},lines=[],semantic=Number(a.semanticCount)||0,editorCount=Math.max(0,(Number(a.warningCount)||0)-semantic);lines.push('ОТЧЁТ РЕДАКТОРА ПО ЛОКАЛЬНОЙ ПРОВЕРКЕ');lines.push('Создан: '+new Date().toLocaleString('ru-RU'));lines.push('Всего замечаний: '+(a.warningCount||0)+'; редакторских: '+editorCount+'; смысловых: '+semantic+'.');const st=semanticStatus();lines.push(st.installed?'Смысловая модель: '+String(st.name||'NLI-модель')+' · локально через ONNX Runtime.':'Смысловая модель: не установлена.');if(semanticCache.meta&&semanticCache.text===src){const m=semanticCache.meta;lines.push('Обработано смысловой моделью: '+Number(m.segments||0)+' фрагментов · '+Number(m.categories||0)+' категорий · '+Number(m.pairs||0)+' сравнений'+(m.elapsedMs?' · '+(Number(m.elapsedMs)/1000).toFixed(2)+' с':'')+'.')}if(semanticCache.error&&semanticCache.text===src)lines.push('Предупреждение смысловой модели: '+cleanReportText(semanticCache.error));if(a.overflowTotal)lines.push('В интерфейсе сохранено '+a.issues.length+' из '+a.warningCount+' замечаний; '+a.overflowTotal+' однотипных срабатываний скрыто.');lines.push('');if(!a.issues||!a.issues.length){lines.push('Замечаний не найдено.');return lines.join('\n')}a.issues.forEach((i,n)=>{const start=Number.isFinite(i.start)?i.start:0,end=Number.isFinite(i.end)?i.end:start;let marker=cleanReportText(src.slice(start,end));if(!marker)marker=cleanReportText(i.word||i.title);lines.push((n+1)+'. ['+reportTypeName(i.type)+'] '+cleanReportText(i.title));lines.push('Метка поиска: «'+marker+'»');const context=shortContext(src,start,end);if(context)lines.push('Контекст: '+context);lines.push('Позиция: символы '+(start+1)+'–'+Math.max(start+1,end));if(i.detail)lines.push('Комментарий: '+cleanReportText(i.detail));lines.push('')});return lines.join('\n')};window.buildAnalysisReport=buildAnalysisReport;
+  const priorRun=typeof runFullCheck==='function'?runFullCheck:null;if(priorRun){runFullCheck=function(){if(semanticRunning){toast('Смысловая проверка уже выполняется');return}invalidateSemanticCache();semanticPending=null;priorRun();const src=editor.value||'',status=semanticStatus();if(!src.trim()||!semanticBridgeAvailable()||!status.installed||!status.available)return;const key=semanticKey();let id=-1;try{id=Number(AndroidSemanticModel.analyzeAsync(src,key))||-1}catch(e){id=-1}if(id<1){toast('Не удалось запустить смысловую проверку');return}semanticPending={id,text:src,key};semanticRunning=true;setCheckRunning(true);renderAnalysis();toast('Смысловой классификатор проверяет текст…')};window.runFullCheck=runFullCheck}
+  editor.addEventListener('input',()=>{invalidateSemanticCache();if(semanticPending)semanticPending.stale=true});ensureSemanticSettings();
 }
 
-function refreshLocalLlmStatus(){
-  const el=document.querySelector('[data-local-llm-status]');if(!el)return;
-  const s=localLlmStatus(),install=document.querySelector('[data-local-llm-install]'),remove=document.querySelector('[data-local-llm-remove]');
-  if(install){install.hidden=!localLlmManageAvailable();install.textContent=s.installed?'Заменить модель':'Установить модель'}
-  if(remove)remove.hidden=!(localLlmManageAvailable()&&s.installed);
-  if(s.browser){el.innerHTML='<b>Доступно только в Android-приложении.</b>';return}
-  if(!s.installed){el.innerHTML='<b>Модель не установлена.</b><br>Редакторские проверки и контрольные списки работают без неё.'+(s.error?'<br><span class="warn">'+escapeHtml(s.error)+'</span>':'');return}
-  const size=s.sizeBytes?' · '+formatLocalLlmSize(s.sizeBytes):'';
-  el.innerHTML='<b>'+escapeHtml(s.name||'GGUF-модель')+'</b>'+size+'<br>Движок: <b>llama.cpp</b> · формат: <b>GGUF</b><br>Статус: <b>'+(s.available?'готова к локальной проверке':'не готова')+'</b>'+(s.error?'<br><span class="warn">'+escapeHtml(s.error)+'</span>':'');
-}
+window.onNativeSemanticModelInstalling=()=>toast('Копирую и проверяю смысловую модель…');
+window.onNativeSemanticModelChanged=statusText=>{invalidateSemanticCache();refreshSemanticStatus();let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'Смысловая модель установлена')};
+window.onNativeSemanticModelError=msg=>{refreshSemanticStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
+window.onNativeSemanticResult=function(requestId,payload){const pending=semanticPending;if(!pending||Number(requestId)!==Number(pending.id))return;semanticPending=null;semanticRunning=false;setCheckRunning(false);let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать результат классификатора'}}if(pending.stale||pending.text!==(editor.value||'')||pending.key!==semanticKey()){toast('Смысловая проверка завершилась, но текст или категории уже изменены — результат не применён');renderAnalysis();return}const error=String(result.error||'');semanticCache={text:pending.text,key:pending.key,issues:Array.isArray(result.issues)?result.issues:[],meta:result,error};analyzeText();if(!result.available&&error)toast('Смысловая модель: '+error);else toast('Смысловая проверка: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с')};
+window.onNativeSemanticAnalysisError=function(requestId,msg){if(semanticPending&&Number(requestId)===Number(semanticPending.id))semanticPending=null;semanticRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'))};
 
-window.installLocalLlmModel=function(){
-  if(!localLlmManageAvailable()){toast('Установка GGUF-модели доступна в Android-приложении');return}
-  try{AndroidLocalLlm.pickModel();toast('Выберите GGUF-модель на телефоне')}catch(e){toast('Не удалось открыть выбор модели')}
-};
-window.removeLocalLlmModel=async function(){
-  if(!localLlmManageAvailable())return;
-  const ok=typeof appConfirm==='function'?await appConfirm('Удалить локальную модель?','Внутренняя копия GGUF-модели будет удалена из приложения. Редакторские проверки и контрольные списки останутся.','Удалить',true):true;
-  if(!ok)return;
-  let removed=false;try{removed=!!AndroidLocalLlm.clearModel()}catch(e){}
-  invalidateLocalLlmCache();refreshLocalLlmStatus();try{analyzeText()}catch(e){}
-  toast(removed?'Локальная модель удалена':'Не удалось удалить модель — возможно, сейчас идёт проверка');
-};
-window.resetLocalLlmPrompt=async function(){
-  const ok=typeof appConfirm==='function'?await appConfirm('Вернуть рекомендуемые критерии?','Ваши изменения полей «Что искать» и «Что не считать проблемой» будут заменены стандартными.','Вернуть',false):true;
-  if(!ok)return;
-  try{localStorage.setItem(LOCAL_LLM_CRITERIA_KEY,DEFAULT_LOCAL_LLM_CRITERIA);localStorage.setItem(LOCAL_LLM_EXCLUSIONS_KEY,DEFAULT_LOCAL_LLM_EXCLUSIONS)}catch(e){}
-  const c=document.getElementById('localLlmCriteria'),x=document.getElementById('localLlmExclusions');if(c)c.value=DEFAULT_LOCAL_LLM_CRITERIA;if(x)x.value=DEFAULT_LOCAL_LLM_EXCLUSIONS;invalidateLocalLlmCache();if(localLlmPending)localLlmPending.stale=true;toast('Рекомендуемые критерии восстановлены');
-};
-
-function appendLocalLlmIssues(src,result){
-  if(!result||!Array.isArray(result.issues)||!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;
-  for(const raw of result.issues){
-    const start=Math.max(0,Math.min(src.length,Number(raw.start)||0));
-    const end=Math.max(start,Math.min(src.length,Number(raw.end)||start));
-    const category=String(raw.category||'').trim();
-    let detail=String(raw.message||'Проверьте смысл и контекст этого фрагмента.').trim();
-    if(category)detail+=' · '+category;
-    const issue=addIssue(currentAnalysis.issues,'semantic',String(raw.title||'Смысловой сигнал'),detail,start,end,'warning');
-    if(issue){issue.llmCategory=category;issue.llmModel=String(result.modelName||'')}
-  }
-}
-function recountLocalAnalysis(){
-  if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;
-  const issues=currentAnalysis.issues,overflow={...(issues._overflow||{})};
-  const overflowTotal=Object.values(overflow).reduce((a,b)=>a+(Number(b)||0),0);
-  const countType=t=>issues.filter(x=>x.type===t).length+(Number(overflow[t])||0);
-  const warningCount=issues.length+overflowTotal,semanticCount=countType('semantic');
-  currentAnalysis.issueOverflow=overflow;currentAnalysis.overflowTotal=overflowTotal;currentAnalysis.warningCount=warningCount;currentAnalysis.semanticCount=semanticCount;currentAnalysis.rulesCount=0;currentAnalysis.editorCount=Math.max(0,warningCount-semanticCount);
-}
-function patchLocalAnalysisSummary(){
-  const a=currentAnalysis||{},sum=document.getElementById('analysisSummary');if(!sum)return;
-  const total=Number(a.warningCount)||0,semantic=Number(a.semanticCount)||0,editor=Math.max(0,total-semantic);
-  if(total)sum.innerHTML='Редакторских замечаний: <b>'+editor+'</b> · смысловых: <b>'+semantic+'</b> · всего: <b>'+total+'</b>.'+(localLlmRunning?' <span class="semanticRunning">Модель проверяет текст…</span>':'');
-  else sum.innerHTML='<b>По локальным проверкам замечаний нет.</b>'+(localLlmRunning?' <span class="semanticRunning">Смысловая модель ещё проверяет текст…</span>':' Финальная вычитка всё равно нужна.');
-}
-
-function installLocalLlmIntegration(){
-  removeLegacyRulePackUi();
-  try{
-    const priorGroups=issueGroups;
-    issueGroups=function(){
-      const groups=priorGroups().filter(x=>x.id!=='rules');
-      if(!groups.some(x=>x.id==='semantic'))groups.splice(2,0,{id:'semantic',name:'Локальный смысловой анализ'});
-      return groups;
-    };
-  }catch(e){}
-
-  const priorRender=renderAnalysis;
-  renderAnalysis=function(){priorRender();document.querySelectorAll('.analysisFilter[data-mode="rules"]').forEach(x=>x.remove());patchLocalAnalysisSummary()};
-
-  const priorAnalyze=analyzeText;
-  analyzeText=function(){
-    const result=priorAnalyze(),src=editor.value||'',key=localLlmPromptKey();
-    if(localLlmCache.text===src&&localLlmCache.promptKey===key&&Array.isArray(localLlmCache.issues))appendLocalLlmIssues(src,{issues:localLlmCache.issues,modelName:localLlmCache.meta&&localLlmCache.meta.modelName});
-    recountLocalAnalysis();renderAnalysis();updateAnalysisDot();return currentAnalysis;
-  };
-  window.analyzeText=analyzeText;
-
-  const priorOpenSettings=openSettings;
-  openSettings=function(){removeLegacyRulePackUi();priorOpenSettings();ensureLocalLlmSettings();refreshLocalLlmStatus()};
-  window.openSettings=openSettings;
-
-  buildAnalysisReport=function(){
-    analyzeText();const src=editor.value||'',a=currentAnalysis||{},lines=[];
-    const semantic=Number(a.semanticCount)||0,editorCount=Math.max(0,(Number(a.warningCount)||0)-semantic);
-    lines.push('ОТЧЁТ РЕДАКТОРА ПО ЛОКАЛЬНОЙ ПРОВЕРКЕ');
-    lines.push('Создан: '+new Date().toLocaleString('ru-RU'));
-    lines.push('Всего замечаний: '+(a.warningCount||0)+'; редакторских: '+editorCount+'; смысловых: '+semantic+'.');
-    const st=localLlmStatus();
-    if(st.installed)lines.push('Смысловая модель: '+String(st.name||'GGUF-модель')+' · локально через llama.cpp.');
-    else lines.push('Смысловая модель: не установлена.');
-    if(localLlmCache.meta&&localLlmCache.text===src){
-      const m=localLlmCache.meta;lines.push('Обработано смысловой моделью: '+Number(m.segments||0)+' фрагментов'+(m.chunks?' · '+Number(m.chunks)+' блоков':'')+(m.elapsedMs?' · '+(Number(m.elapsedMs)/1000).toFixed(1)+' с':'')+'.');
-    }
-    if(localLlmCache.error&&localLlmCache.text===src)lines.push('Предупреждение смысловой модели: '+cleanReportText(localLlmCache.error));
-    if(a.overflowTotal)lines.push('В интерфейсе сохранено '+a.issues.length+' из '+a.warningCount+' замечаний; '+a.overflowTotal+' однотипных срабатываний скрыто.');
-    lines.push('');
-    if(!a.issues||!a.issues.length){lines.push('Замечаний не найдено.');return lines.join('\n')}
-    a.issues.forEach((i,n)=>{
-      const start=Number.isFinite(i.start)?i.start:0,end=Number.isFinite(i.end)?i.end:start;let marker=cleanReportText(src.slice(start,end));if(!marker)marker=cleanReportText(i.word||i.title);
-      lines.push((n+1)+'. ['+reportTypeName(i.type)+'] '+cleanReportText(i.title));
-      lines.push('Метка поиска: «'+marker+'»');const context=shortContext(src,start,end);if(context)lines.push('Контекст: '+context);
-      lines.push('Позиция: символы '+(start+1)+'–'+Math.max(start+1,end));if(i.detail)lines.push('Комментарий: '+cleanReportText(i.detail));lines.push('');
-    });
-    return lines.join('\n');
-  };
-  window.buildAnalysisReport=buildAnalysisReport;
-
-  const priorRun=typeof runFullCheck==='function'?runFullCheck:null;
-  if(priorRun){
-    runFullCheck=function(){
-      const alreadyRunning=localLlmRunning||!!localLlmPending;
-      if(!alreadyRunning)invalidateLocalLlmCache();
-      priorRun();
-      const src=editor.value||'',status=localLlmStatus();
-      if(!src.trim()||!localLlmBridgeAvailable()||!status.installed||!status.available)return;
-      if(alreadyRunning){toast('Смысловая модель уже проверяет текст. Дождитесь завершения.');return}
-      const criteria=localLlmCriteria(),exclusions=localLlmExclusions(),key=criteria+'\u0000'+exclusions;
-      let id=-1;
-      try{id=Number(AndroidLocalLlm.analyzeAsync(src,criteria,exclusions))||-1}catch(e){id=-1}
-      if(id<1){toast('Не удалось запустить смысловую проверку');return}
-      localLlmPending={id,text:src,promptKey:key};localLlmRunning=true;setCheckRunning(true);renderAnalysis();toast('Смысловая модель проверяет текст локально…');
-    };
-    window.runFullCheck=runFullCheck;
-  }
-
-  editor.addEventListener('input',()=>{invalidateLocalLlmCache();if(localLlmPending)localLlmPending.stale=true});
-  ensureLocalLlmSettings();
-}
-
-window.onNativeLocalLlmInstalling=function(){toast('Копирую и проверяю GGUF-модель…')};
-window.onNativeLocalLlmChanged=function(statusText){
-  invalidateLocalLlmCache();refreshLocalLlmStatus();try{analyzeText()}catch(e){}let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'GGUF-модель установлена');
-};
-window.onNativeLocalLlmError=function(msg){refreshLocalLlmStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
-window.onNativeLocalLlmResult=function(requestId,payload){
-  const pending=localLlmPending;if(!pending||Number(requestId)!==Number(pending.id))return;
-  localLlmPending=null;localLlmRunning=false;setCheckRunning(false);
-  let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать ответ движка'}}
-  if(pending.stale||pending.text!==(editor.value||'')||pending.promptKey!==localLlmPromptKey()){toast('Смысловая проверка завершилась, но текст или критерии уже изменены — результат не применён');renderAnalysis();return}
-  const errs=Array.isArray(result.errors)?result.errors:[];
-  const error=String(result.error||'')+(errs.length?(result.error?' · ':'')+errs.slice(0,2).join('; '):'');
-  localLlmCache={text:pending.text,promptKey:pending.promptKey,issues:Array.isArray(result.issues)?result.issues:[],meta:result,error};
-  analyzeText();
-  if(!result.available&&error)toast('Смысловая модель: '+error);else toast('Смысловая проверка завершена: '+localLlmCache.issues.length+' замечаний');
-};
-window.onNativeLocalLlmAnalysisError=function(requestId,msg){
-  if(!localLlmPending||Number(requestId)!==Number(localLlmPending.id))return;
-  localLlmPending=null;localLlmRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'));
-};
-
-setTimeout(function(){try{installLocalLlmIntegration()}catch(e){console.error('Local GGUF integration failed',e)}},0);
-
+setTimeout(function(){try{installSemanticIntegration()}catch(e){console.error('Semantic classifier integration failed',e)}},0);
 })();
