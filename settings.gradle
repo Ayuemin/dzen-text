@@ -3,3 +3,4 @@ dependencyResolutionManagement { repositoriesMode.set(RepositoriesMode.FAIL_ON_P
 rootProject.name = 'DzenText'
 include ':app'
 include ':spellprobe-morfologik'
+include ':spellprobe-hunspell'
