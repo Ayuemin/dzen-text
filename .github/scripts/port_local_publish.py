@@ -9,7 +9,7 @@ def read(p): return (ROOT/p).read_text(encoding='utf-8')
 def write(p,s): (ROOT/p).write_text(s,encoding='utf-8')
 def tag(path): return subprocess.check_output(['git','show',f'v1.10.8:{path}'],cwd=ROOT,text=True)
 def sub1(s,pat,repl,label,flags=0):
-    out,n=re.subn(pat,repl,s,count=1,flags=flags)
+    out,n=re.subn(pat,lambda _m: repl,s,count=1,flags=flags)
     if n!=1: raise SystemExit(f'{label}: expected 1 match, got {n}')
     return out
 
@@ -93,7 +93,6 @@ write(p,cur)
 # Strengthen local-first guard around the port.
 p='tools/check_local_first.py'; cur=read(p)
 anchor="require('ta.value=payload.plain' in bootstrap.replace(' ', ''), 'Publication fallback must use rendered plain text')\n"
-# Bootstrap no longer owns publication fallback, so replace old shim assertions with subsystem assertions.
 cur=cur.replace("require('ta.value=editor.value' not in bootstrap.replace(' ', ''), 'Publication fallback must never copy raw Markdown')\n",'')
 cur=cur.replace(anchor,"require((js_dir / '12-publish.js').exists(), 'Publication preflight module must exist')\nrequire('AndroidPublish' in main_activity and 'ClipData.Item(plainValue, htmlValue)' in main_activity, 'Native publication clipboard bridge must stay present')\nrequire('buildPublishHtml' in (js_dir / '02-text-tools.js').read_text(encoding='utf-8'), 'Publication must derive payload from rendered Markdown')\n")
 cur += "\nrequire('clearOnlineSpelling' not in all_js, 'Legacy spelling compatibility calls must stay removed')\nrequire('OpenRouter receives only' not in all_js, 'Built-in local rule pack must not retain remote-generator provenance')\n"
