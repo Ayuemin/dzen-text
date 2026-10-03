@@ -3,34 +3,18 @@ function runFullCheck(){
  if(!src.trim()){toast('Нет текста для проверки');return}
  editor.blur();
  clearOnlineSpelling();
+ spellStatus='off';
  setCheckRunning(true);
- toast(src.length>150000?'Проверяю большой текст…':'Проверяю текст…');
+ toast(src.length>150000?'Обновляю локальную проверку большого текста…':'Обновляю локальную проверку…');
  setTimeout(()=>{
    try{
      analyzeText();
      analysisMode='problems';
      document.getElementById('analysisBackdrop').classList.add('open');
      setAnalysisMode('problems');
-
-     if(!settings.onlineSpelling){
-       spellStatus='off';
-       renderAnalysis();
-       setCheckRunning(false);
-       toast('Полная локальная проверка выполнена');
-       return;
-     }
-     if(!(window.AndroidSpell&&typeof AndroidSpell.check==='function')){
-       spellStatus='error';
-       renderAnalysis();
-       setCheckRunning(false);
-       toast('Онлайн-проверка доступна только в установленном приложении');
-       return;
-     }
-     spellStatus='checking';
-     spellRequestSource=src;
-     spellRequestId=String(Date.now())+'_'+Math.random().toString(36).slice(2);
      renderAnalysis();
-     AndroidSpell.check(src,spellRequestId);
+     setCheckRunning(false);
+     toast('Локальная проверка обновлена');
    }catch(e){
      setCheckRunning(false);
      toast('Не удалось завершить проверку');
