@@ -69,29 +69,54 @@ def softmax(x):
     return e / e.sum(axis=-1, keepdims=True)
 
 
-def score_pairs(session, tokenizer, entailment_index, pairs):
+def encode_pairs(tokenizer, pairs, tensor_type):
     premises = [p for p, _ in pairs]
     hypotheses = [h for _, h in pairs]
-    enc = tokenizer(
+    return tokenizer(
         premises,
         hypotheses,
         padding=True,
         truncation=True,
         max_length=MAX_LEN,
-        return_tensors="np",
+        return_tensors=tensor_type,
     )
-    feeds = {
+
+
+def score_onnx(session, tokenizer, entailment_index, pairs):
+    enc = encode_pairs(tokenizer, pairs, "np")
+    logits = session.run(["logits"], {
         "input_ids": enc["input_ids"].astype(np.int64),
         "attention_mask": enc["attention_mask"].astype(np.int64),
         "token_type_ids": enc["token_type_ids"].astype(np.int64),
-    }
-    logits = session.run(["logits"], feeds)[0]
-    return softmax(logits)[:, entailment_index]
+    })[0]
+    return softmax(logits), softmax(logits)[:, entailment_index]
+
+
+def score_torch(model, tokenizer, entailment_index, pairs):
+    enc = encode_pairs(tokenizer, pairs, "pt")
+    with torch.no_grad():
+        logits = model(**enc).logits.cpu().numpy()
+    return softmax(logits), softmax(logits)[:, entailment_index]
 
 
 def label_index(model, name, fallback):
     labels = {str(k).lower(): int(v) for k, v in model.config.label2id.items()}
     return labels.get(name.lower(), fallback)
+
+
+def summarize(scores):
+    p_signal, p_safe, n_signal, n_safe = [float(x) for x in scores]
+    p_contrast = p_signal - p_safe
+    n_contrast = n_signal - n_safe
+    return {
+        "positive_signal": p_signal,
+        "positive_safe": p_safe,
+        "positive_contrast": p_contrast,
+        "negative_signal": n_signal,
+        "negative_safe": n_safe,
+        "negative_contrast": n_contrast,
+        "separation": p_contrast - n_contrast,
+    }
 
 
 def main():
@@ -105,11 +130,13 @@ def main():
     entailment_index = label_index(model, "entailment", 0)
     contradiction_index = label_index(model, "contradiction", 1)
     neutral_index = label_index(model, "neutral", 2)
+    print("label2id=", model.config.label2id)
+    print("id2label=", model.config.id2label)
 
     dummy = tokenizer("Кошка сидит на ковре.", "кошка на ковре", return_tensors="pt")
     wrapper = Wrapper(model)
     fp32_path = OUT / "model-fp32.onnx"
-    model_path = OUT / "model.onnx"
+    int8_path = OUT / "model.onnx"
     torch.onnx.export(
         wrapper,
         (dummy["input_ids"], dummy["attention_mask"], dummy["token_type_ids"]),
@@ -129,7 +156,7 @@ def main():
 
     quantize_dynamic(
         model_input=str(fp32_path),
-        model_output=str(model_path),
+        model_output=str(int8_path),
         weight_type=QuantType.QInt8,
         per_channel=False,
         reduce_range=False,
@@ -148,7 +175,7 @@ def main():
     metadata = {
         "schema": "local-nli-model-v1",
         "name": "RuBERT-base NLI INT8",
-        "version": "1",
+        "version": "2",
         "source": MODEL_ID,
         "quantization": "dynamic-int8",
         "max_length": MAX_LEN,
@@ -162,7 +189,8 @@ def main():
         json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    fp32_session = ort.InferenceSession(str(fp32_path), providers=["CPUExecutionProvider"])
+    int8_session = ort.InferenceSession(str(int8_path), providers=["CPUExecutionProvider"])
     report = []
     for category, case in CASES.items():
         pairs = [
@@ -171,28 +199,31 @@ def main():
             (case["negative"], case["signal"]),
             (case["negative"], case["safe"]),
         ]
-        p_signal, p_safe, n_signal, n_safe = score_pairs(
-            session, tokenizer, entailment_index, pairs
-        )
-        p_contrast = float(p_signal - p_safe)
-        n_contrast = float(n_signal - n_safe)
-        separation = float(p_contrast - n_contrast)
+        torch_probs, torch_scores = score_torch(model, tokenizer, entailment_index, pairs)
+        fp32_probs, fp32_scores = score_onnx(fp32_session, tokenizer, entailment_index, pairs)
+        int8_probs, int8_scores = score_onnx(int8_session, tokenizer, entailment_index, pairs)
+        torch_summary = summarize(torch_scores)
+        fp32_summary = summarize(fp32_scores)
+        int8_summary = summarize(int8_scores)
         row = {
             "category": category,
             "signal": case["signal"],
             "safe": case["safe"],
-            "positive_signal": float(p_signal),
-            "positive_safe": float(p_safe),
-            "positive_contrast": p_contrast,
-            "negative_signal": float(n_signal),
-            "negative_safe": float(n_safe),
-            "negative_contrast": n_contrast,
-            "separation": separation,
+            "torch": torch_summary,
+            "onnx_fp32": fp32_summary,
+            "onnx_int8": int8_summary,
+            "torch_probs": torch_probs.tolist(),
+            "fp32_probs": fp32_probs.tolist(),
+            "int8_probs": int8_probs.tolist(),
         }
         report.append(row)
         print(
-            f"{category:10s} pos={p_contrast:+.4f} ({p_signal:.3f}-{p_safe:.3f}) "
-            f"neg={n_contrast:+.4f} ({n_signal:.3f}-{n_safe:.3f}) sep={separation:+.4f}"
+            f"{category:10s} "
+            f"torch sep={torch_summary['separation']:+.4f} "
+            f"fp32 sep={fp32_summary['separation']:+.4f} "
+            f"int8 sep={int8_summary['separation']:+.4f} | "
+            f"int8 pos={int8_summary['positive_contrast']:+.4f} "
+            f"neg={int8_summary['negative_contrast']:+.4f}"
         )
 
     (OUT / "smoke_scores.json").write_text(
@@ -200,7 +231,7 @@ def main():
     )
 
     fp32_size = fp32_path.stat().st_size
-    int8_size = model_path.stat().st_size
+    int8_size = int8_path.stat().st_size
     fp32_path.unlink()
 
     with zipfile.ZipFile(PKG, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
