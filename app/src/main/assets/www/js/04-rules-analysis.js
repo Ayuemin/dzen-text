@@ -74,7 +74,7 @@ function activeAutoRules(){return activeRulePack?activeRulePack.rules.filter(r=>
 function updateRulePackStatus(){
   const el=document.getElementById('rulePackStatus');if(!el)return;
   const actions=el.parentElement&&el.parentElement.querySelector('.rulePackActions');
-  let removeBtn=document.getElementById('rulePackRemoveBtn');
+  let removeBtn=document.querySelector('#rulePackRemoveBtn');
   if(actions&&!removeBtn){removeBtn=document.createElement('button');removeBtn.id='rulePackRemoveBtn';removeBtn.className='nativeBtn';removeBtn.type='button';removeBtn.textContent='Удалить пакет';removeBtn.onclick=removeRulePack;actions.appendChild(removeBtn)}
   const importBtn=actions&&Array.from(actions.querySelectorAll('button')).find(b=>String(b.getAttribute('onclick')||'').includes('openRulePackImport'));
   if(!activeRulePack){el.innerHTML='<b>Пакет не установлен.</b><br>Проверяется локально по загруженному JSON.';if(removeBtn)removeBtn.hidden=true;if(importBtn)importBtn.textContent='Загрузить JSON';return}
