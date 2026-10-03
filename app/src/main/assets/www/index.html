@@ -70,24 +70,24 @@
       <button id="issueNavContext" class="issueNavContext" type="button" onclick="jumpIssueNavigator()"></button>
       <div class="repeatNavMeta">Листайте однотипные замечания стрелками. Фрагмент в редакторе выделяется автоматически.</div>
     </div>
-
+  </main>
   <footer class="bottom">
     <button class="bottomBtn iconOnly" id="speakBtn" onclick="toggleSpeak()" aria-label="Озвучить" title="Озвучить"><span id="speakIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11"/></svg></span><span id="speakText" class="srOnly">Озвучить</span></button>
     <div class="stats"><b id="words">0</b> слов · <b id="readTime">0 мин</b> · <b id="chars">0</b> знаков</div>
     <button class="gear checkAction" id="checkBtn" onclick="runFullCheck()" aria-label="Обновить локальную проверку" title="Обновить локальную проверку"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M4 12h5M4 18h7"/><path d="m14 15 2.5 2.5L21 12"/></svg></button>
     <button class="analysisDot" id="analysisDot" onclick="openAnalysis()" aria-label="Редакторский анализ"><span></span></button>
-    <button class="gear" onclick="openSettings()" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
+    <button class="gear" onclick="openSettings()" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15 1.7 1.7 0 0 0 3.04 14H3v-4h.04A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.04V3h4v.04a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06A1.7 1.7 0 0 0 19.4 9c.23.63.83 1.04 1.5 1.04H21v4h-.1c-.67 0-1.27.41-1.5 1.04Z"/></svg></button>
   </footer>
 </div>
 
-<div class="sideBackdrop" id="sideBackdrop" onclick="sideBackdropClick(event)">
-  <aside class="sideDrawer" id="sideDrawer" aria-label="Навигация">
+<div class="sideDrawerBackdrop" id="sideDrawerBackdrop" onclick="sideDrawerBackdropClick(event)">
+  <aside class="sideDrawer" id="sideDrawer" aria-label="Панель приложения">
     <div class="drawerHead">
-      <div>
-        <div class="drawerTitle">Дзен Текст</div>
-        <div class="drawerSub" id="currentArticleLabel">Без названия</div>
+      <div class="drawerCurrentInfo">
+        <div class="drawerCurrentTitle" id="drawerCurrentTitle">Новая статья</div>
+        <div class="drawerCurrentMeta" id="drawerCurrentMeta">0 слов · сохранено локально</div>
       </div>
-      <button class="drawerClose" type="button" onclick="closeSideDrawer()" aria-label="Закрыть">×</button>
+      <button class="drawerClose" type="button" onclick="closeSideDrawer()" aria-label="Закрыть панель">×</button>
     </div>
 
     <section class="drawerCurrentBlock">
@@ -198,6 +198,7 @@
         <div class="smallNote">Акцент меняет только управляющие элементы. Цвет текста задаётся отдельно от него.</div>
       </div>
     </details>
+
 
     <details class="settingsGroup">
       <summary><span>Чтение и озвучка</span><small>Скорость чтения и голос</small></summary>
@@ -332,7 +333,6 @@
 <script src="js/12-dialogs.js"></script>
 <script src="js/12-articles.js"></script>
 <script src="js/12-history.js"></script>
-<script src="js/12-markdown-toolbar.js"></script>
 <script src="js/12-publish.js"></script>
 <script src="js/12-bootstrap.js"></script>
 </body></html>
