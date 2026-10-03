@@ -11,7 +11,7 @@ context.toast=()=>{};
 context.localStorage={getItem:k=>storage.has(k)?storage.get(k):null,setItem:(k,v)=>storage.set(k,String(v)),removeItem:k=>storage.delete(k)};
 context.addSimpleIssue=(issues,type,title,detail,start,end,severity='warning')=>{const issue={type,title,detail,start,end,severity};issues.push(issue);return issue};
 context.addIssue=context.addSimpleIssue;
-context.document={getElementById:()=>null,createElement:()=>({}),body:{appendChild:()=>{}}};
+context.document={getElementById:()=>null,querySelector:()=>null,createElement:()=>({}),body:{appendChild:()=>{}}};
 context.window={};
 vm.createContext(context);
 vm.runInContext(source,context,{filename:'04-rules-analysis.js'});
@@ -27,8 +27,12 @@ const base=(id,type,extra={})=>({id,title:id,type,scope:'all',severity:'warning'
 
 const template=JSON.parse(context.rulePackTemplate());
 const templateValidated=context.validateRulePackObject(template);
-assert(templateValidated.ok,'template must be valid: '+templateValidated.errors.join('; '));
-console.log('ok - template valid');
+assert(templateValidated.ok,'download template must be valid: '+templateValidated.errors.join('; '));
+const fileTemplate=JSON.parse(fs.readFileSync(path.join(root,'rules/editorial-rule-pack-example.json'),'utf8'));
+const fileTemplateValidated=context.validateRulePackObject(fileTemplate);
+assert(fileTemplateValidated.ok,'rules template file must be valid: '+fileTemplateValidated.errors.join('; '));
+assert(JSON.stringify(fileTemplateValidated.pack)===JSON.stringify(templateValidated.pack),'rules template file must match downloaded template');
+console.log('ok - template valid and synchronized');
 
 check('word fires with boundaries',oneRule(base('word','word',{values:['запрещено']})),'Это ЗАПРЕЩЕНО правилами.',['word']);
 check('word does not fire inside another word',oneRule(base('word','word',{values:['запрещено']})),'Это незапрещено. ',[],['word']);
@@ -57,6 +61,7 @@ check('scope title plain first line',titlePhrase,'\nВы не поверите �
 
 const bodyWord=oneRule(base('body-word','word',{scope:'body',values:['банан']}));
 check('scope body ignores plain title',bodyWord,'Банан в заголовке\nВ теле яблоко.',[],['body-word']);
+check('scope body ignores markdown H1',bodyWord,'# Банан в заголовке\nВ теле яблоко.',[],['body-word']);
 const bodyHit=check('scope body finds body with original offsets',bodyWord,'Банан в заголовке\nВ теле есть банан.',['body-word']);
 const bodyIssue=bodyHit.issues.find(x=>x.ruleId==='body-word');assert('Банан в заголовке\nВ теле есть банан.'.slice(bodyIssue.start,bodyIssue.end).toLowerCase()==='банан','body start/end must map to original textarea');
 
