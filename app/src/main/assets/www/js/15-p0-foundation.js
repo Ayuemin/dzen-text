@@ -167,7 +167,7 @@ window.applyDocumentEdits=applyDocumentEdits;
 
 function installFoundation(){
   if(window.__p0FoundationInstalled)return;
-  if(!window.P0Core||!window.editor)return;
+  if(!window.P0Core||typeof editor==='undefined'||!editor)return;
   window.__p0FoundationInstalled=true;
   p0RevisionStore=loadRevisionStore();
   syncDocumentRevision('install');
@@ -220,7 +220,6 @@ function installFoundation(){
       currentAnalysis.status=snapshotMatchesCurrent(snapshot)?'complete':'stale';
       currentAnalysis.documentId=snapshot.documentId;
       currentAnalysis.revision=snapshot.revision;
-      if(typeof recountSemantic==='function')try{recountSemantic()}catch(e){}
       if(typeof renderAnalysis==='function')renderAnalysis();
       if(typeof updateAnalysisDot==='function')updateAnalysisDot();
       return currentAnalysis;
@@ -259,19 +258,31 @@ function installFoundation(){
     window.applyReplacement=applyReplacement;
   }
 
-  // The old semantic NLI prototype remains available for diagnostics, but the
-  // primary P0/P1 full check must not depend on it or wait for it.
+  // Keep the old semantic prototype callable for diagnostics, but remove it from
+  // the primary acceptance path. The main check is deterministic and bounded.
   if(typeof runFullCheck==='function'){
-    const semanticAwareRun=runFullCheck;
-    window.runExperimentalSemanticCheck=semanticAwareRun;
+    window.runExperimentalSemanticCheck=runFullCheck;
     runFullCheck=function(){
-      const bridge=window.AndroidSemanticModel;
-      try{
-        if(bridge)window.AndroidSemanticModel=null;
-        return semanticAwareRun();
-      }finally{
-        if(bridge)window.AndroidSemanticModel=bridge;
-      }
+      const src=editor.value||'';
+      if(!src.trim()){toast('Нет текста для проверки');return}
+      editor.blur();
+      setCheckRunning(true);
+      toast(src.length>150000?'Обновляю доступные локальные проверки большого текста…':'Обновляю доступные локальные проверки…');
+      setTimeout(function(){
+        try{
+          analyzeText();
+          analysisMode='problems';
+          document.getElementById('analysisBackdrop').classList.add('open');
+          setAnalysisMode('problems');
+          renderAnalysis();
+          setCheckRunning(false);
+          toast('Проверено доступными локальными модулями');
+        }catch(e){
+          setCheckRunning(false);
+          toast('Не удалось завершить локальную проверку');
+          console.error(e);
+        }
+      },40);
     };
     window.runFullCheck=runFullCheck;
   }
