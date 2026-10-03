@@ -35,6 +35,7 @@ write(p,s)
 p='app/src/main/assets/www/css/editor-v2.css'; s=read(p)
 s=sub1(s,r'\n/\* Markdown bar: appears while editing and sits above the keyboard\. \*/[\s\S]*?(?=\n/\* Paper presets stay subtle enough for long reading sessions\. \*/)','\n','Markdown toolbar CSS')
 s=sub1(s,r'\n/\* Markdown controls are shown only while the IME is really visible\. \*/[\s\S]*?\.mdHistory\{[^}]*\}','\n','late Markdown toolbar CSS override')
+s=re.sub(r'body\.markdown-toolbar-visible[^\{]*\{[^}]*\}','',s)
 write(p,s)
 
 # Remove dead spelling-only CSS that survived the native/UI removal.
