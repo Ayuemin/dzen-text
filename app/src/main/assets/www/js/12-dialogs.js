@@ -26,3 +26,8 @@ function resolveAppConfirm(value){
 function confirmBackdropClick(event){
   if(event.target&&event.target.id==='confirmBackdrop')resolveAppConfirm(false);
 }
+
+// Keep 12-bootstrap.js the final explicit editor script for the invariant checks,
+// but load the GGUF integration immediately before it. The integration defers
+// its patches with setTimeout(0), so bootstrap can finish first.
+document.write('<script src="js/13-local-llm.js"><\/script>');
