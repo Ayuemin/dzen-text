@@ -80,6 +80,19 @@ jobs:
       - name: Build editor and spelling probes
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease :spellprobe-morfologik:assembleDebug :spellprobe-hunspell:assembleDebug
 
+      - name: Verify spelling probe payloads
+        shell: bash
+        run: |
+          MORF=spellprobe-morfologik/build/outputs/apk/debug/spellprobe-morfologik-debug.apk
+          HUN=spellprobe-hunspell/build/outputs/apk/debug/spellprobe-hunspell-debug.apk
+          unzip -l "$MORF" | grep -E 'org/languagetool/resource/ru/hunspell/ru_RU\.(dict|info)' >/dev/null
+          unzip -l "$HUN" | grep 'assets/hunspell/ru_RU.aff' >/dev/null
+          unzip -l "$HUN" | grep 'assets/hunspell/ru_RU.dic' >/dev/null
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            unzip -l "$HUN" | grep "lib/$abi/libhunspell-probe.so" >/dev/null
+          done
+          echo "Spelling probe resources and ABIs verified"
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
