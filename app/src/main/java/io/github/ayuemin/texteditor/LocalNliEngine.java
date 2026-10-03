@@ -34,12 +34,7 @@ import ai.onnxruntime.OrtSession;
 
 /**
  * Small local zero-shot classifier for semantic review.
- *
- * A model package contains model.onnx, vocab.txt and metadata.json. The package
- * is copied into app-private storage and the original downloaded ZIP is never
- * referenced again. Classification uses NLI: each article segment is compared
- * with short user-editable semantic category descriptions. No text generation
- * or model-authored JSON is involved.
+ * A model package contains model.onnx, vocab.txt and metadata.json.
  */
 final class LocalNliEngine implements AutoCloseable {
     private static final String SCHEMA = "local-nli-model-v1";
@@ -59,7 +54,6 @@ final class LocalNliEngine implements AutoCloseable {
     private static final int BATCH_SIZE = 24;
     private static final int MAX_ISSUES = 180;
 
-    private final Context appContext;
     private final File rootDir;
     private final File activeDir;
     private final File candidateDir;
@@ -72,7 +66,7 @@ final class LocalNliEngine implements AutoCloseable {
     private String lastError = "";
 
     LocalNliEngine(Context context) {
-        appContext = context.getApplicationContext();
+        Context appContext = context.getApplicationContext();
         rootDir = new File(appContext.getFilesDir(), DIR);
         activeDir = new File(rootDir, ACTIVE);
         candidateDir = new File(rootDir, CANDIDATE);
@@ -83,24 +77,24 @@ final class LocalNliEngine implements AutoCloseable {
     synchronized String statusJson() {
         JSONObject out = new JSONObject();
         boolean installed = packageLooksPresent(activeDir);
-        out.put("engine", "ONNX Runtime");
-        out.put("kind", "NLI zero-shot classifier");
-        out.put("installed", installed);
-        out.put("available", installed);
+        put(out, "engine", "ONNX Runtime");
+        put(out, "kind", "NLI zero-shot classifier");
+        put(out, "installed", installed);
+        put(out, "available", installed);
         if (installed) {
             try {
                 ModelMeta m = readMeta(new File(activeDir, META));
-                out.put("name", m.name);
-                out.put("version", m.version);
-                out.put("source", m.source);
-                out.put("sizeBytes", new File(activeDir, MODEL).length());
-                out.put("maxLength", m.maxLength);
+                put(out, "name", m.name);
+                put(out, "version", m.version);
+                put(out, "source", m.source);
+                put(out, "sizeBytes", new File(activeDir, MODEL).length());
+                put(out, "maxLength", m.maxLength);
             } catch (Exception e) {
-                out.put("available", false);
-                out.put("error", safeMessage(e));
+                put(out, "available", false);
+                put(out, "error", safeMessage(e));
             }
         }
-        if (!lastError.isEmpty() && !out.has("error")) out.put("error", lastError);
+        if (!lastError.isEmpty() && !out.has("error")) put(out, "error", lastError);
         return out.toString();
     }
 
@@ -227,10 +221,10 @@ final class LocalNliEngine implements AutoCloseable {
             return out.toString();
         } catch (Throwable t) {
             lastError = safeMessage(t);
-            out.put("available", false);
-            out.put("issues", issues);
-            out.put("error", lastError);
-            out.put("elapsedMs", System.currentTimeMillis() - started);
+            put(out, "available", false);
+            put(out, "issues", issues);
+            put(out, "error", lastError);
+            put(out, "elapsedMs", System.currentTimeMillis() - started);
             return out.toString();
         }
     }
@@ -257,7 +251,7 @@ final class LocalNliEngine implements AutoCloseable {
     private void validateModel(File model, ModelMeta candidateMeta, WordPieceTokenizer candidateTokenizer) throws Exception {
         try (OrtSession test = createSession(model)) {
             validateSessionContract(test, candidateMeta);
-            EncodedPair encoded = candidateTokenizer.encodePair("Кошка сидит на ковре.", "В тексте говорится о кошке.");
+            EncodedPair encoded = candidateTokenizer.encodePair("Кошка сидит на ковре.", "кошка на ковре");
             float[] score = runEncodedBatch(test, candidateMeta, Collections.singletonList(encoded));
             if (score.length != 1 || Float.isNaN(score[0])) throw new IllegalArgumentException("Модель не прошла тестовый запуск");
         }
@@ -332,11 +326,11 @@ final class LocalNliEngine implements AutoCloseable {
             JSONObject o = array.optJSONObject(i);
             if (o == null || !o.optBoolean("enabled", true)) continue;
             String name = clean(o.optString("name", ""), 80);
-            String description = clean(o.optString("description", ""), 420);
+            String description = clean(o.optString("description", ""), 220);
             if (name.isEmpty() || description.isEmpty()) continue;
             String id = slug(o.optString("id", name));
             if (id.isEmpty() || !ids.add(id)) continue;
-            double thresholdRaw = o.optDouble("threshold", 0.72);
+            double thresholdRaw = o.optDouble("threshold", 0.55);
             float threshold = (float) Math.max(0.05, Math.min(0.99, thresholdRaw));
             out.add(new Category(id, name, description, threshold));
         }
@@ -414,6 +408,10 @@ final class LocalNliEngine implements AutoCloseable {
             if (children != null) for (File child : children) deleteTree(child);
         }
         return !file.exists() || file.delete();
+    }
+
+    private static void put(JSONObject target, String key, Object value) {
+        try { target.put(key, value); } catch (Exception ignored) { }
     }
 
     private static String clean(String value, int max) {
