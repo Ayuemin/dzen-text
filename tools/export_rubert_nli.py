@@ -18,49 +18,32 @@ CASES = {
     "finance": {
         "positive": "Вложите средства сегодня — потерять их невозможно, прибыль вам обеспечена.",
         "negative": "Инвестиции могут привести к убыткам, гарантировать прибыль невозможно.",
-        "hypotheses": [
-            "обещание гарантированной прибыли без риска",
-            "автор обещает гарантированную прибыль без риска",
-            "гарантия, что вложенные деньги невозможно потерять",
-        ],
+        "signal": "автор обещает гарантированную прибыль без риска",
+        "safe": "автор предупреждает, что прибыль не гарантирована и возможны убытки",
     },
     "threat": {
         "positive": "Если ещё раз здесь появишься, пожалеешь об этом.",
         "negative": "В статье разбирается, почему угрозы человеку недопустимы.",
-        "hypotheses": [
-            "угроза человеку",
-            "автор угрожает человеку неприятными последствиями",
-            "обращённая к человеку угроза причинить вред",
-            "запугивание человека обещанием плохих последствий",
-            "говорящий угрожает адресату",
-        ],
+        "signal": "автор угрожает человеку неприятными последствиями",
+        "safe": "автор обсуждает угрозы и осуждает их",
     },
     "restricted": {
         "positive": "Могу достать ствол без оформления бумаг.",
         "negative": "Автор рассказывает о незаконной торговле оружием и её последствиях.",
-        "hypotheses": [
-            "предложение получить оружие без документов",
-            "автор предлагает достать оружие без документов",
-            "предложение незаконно получить оружие",
-        ],
+        "signal": "автор предлагает достать оружие без документов",
+        "safe": "автор обсуждает незаконную торговлю оружием и её последствия",
     },
     "medical": {
         "positive": "Если лекарство не помогает, просто примите в два раза больше.",
         "negative": "Дозировку препарата должен определять врач.",
-        "hypotheses": [
-            "опасное самостоятельное изменение дозировки лекарства",
-            "автор советует самостоятельно увеличить дозировку лекарства",
-            "опасный совет увеличить дозу лекарства без врача",
-        ],
+        "signal": "автор советует самостоятельно увеличить дозировку лекарства",
+        "safe": "автор советует определять дозировку лекарства с врачом",
     },
     "engagement": {
         "positive": "Оформи подписку прямо сейчас и получишь подарок.",
         "negative": "Подписка стоит 299 рублей в месяц и отключается в настройках.",
-        "hypotheses": [
-            "призыв подписаться ради подарка или выгоды",
-            "автор призывает подписаться ради подарка",
-            "обещание подарка за подписку",
-        ],
+        "signal": "автор призывает подписаться ради подарка",
+        "safe": "автор нейтрально сообщает цену и условия отключения подписки",
     },
 }
 
@@ -126,7 +109,7 @@ def main():
     metadata = {
         "schema": "local-nli-model-v1",
         "name": "RuBERT-tiny bilingual NLI",
-        "version": "2",
+        "version": "3",
         "source": MODEL_ID,
         "max_length": MAX_LEN,
         "entailment_index": entailment_index,
@@ -138,18 +121,32 @@ def main():
     session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
     report = []
     for category, case in CASES.items():
-        for hypothesis in case["hypotheses"]:
-            pairs = [(case["positive"], hypothesis), (case["negative"], hypothesis)]
-            pos, neg = score_pairs(session, tokenizer, entailment_index, pairs)
-            row = {
-                "category": category,
-                "hypothesis": hypothesis,
-                "positive": float(pos),
-                "negative": float(neg),
-                "margin": float(pos - neg),
-            }
-            report.append(row)
-            print(f"{category:10s} +{pos:.4f} -{neg:.4f} margin={pos-neg:+.4f} | {hypothesis}")
+        pairs = [
+            (case["positive"], case["signal"]),
+            (case["positive"], case["safe"]),
+            (case["negative"], case["signal"]),
+            (case["negative"], case["safe"]),
+        ]
+        p_signal, p_safe, n_signal, n_safe = score_pairs(session, tokenizer, entailment_index, pairs)
+        p_contrast = float(p_signal - p_safe)
+        n_contrast = float(n_signal - n_safe)
+        row = {
+            "category": category,
+            "signal": case["signal"],
+            "safe": case["safe"],
+            "positive_signal": float(p_signal),
+            "positive_safe": float(p_safe),
+            "positive_contrast": p_contrast,
+            "negative_signal": float(n_signal),
+            "negative_safe": float(n_safe),
+            "negative_contrast": n_contrast,
+            "separation": float(p_contrast - n_contrast),
+        }
+        report.append(row)
+        print(
+            f"{category:10s} pos={p_contrast:+.4f} ({p_signal:.3f}-{p_safe:.3f}) "
+            f"neg={n_contrast:+.4f} ({n_signal:.3f}-{n_safe:.3f}) sep={p_contrast-n_contrast:+.4f}"
+        )
     (OUT / "smoke_scores.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with zipfile.ZipFile(PKG, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
