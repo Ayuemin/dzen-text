@@ -174,8 +174,6 @@ function resetEditorPanels(){
   try{closeNearbyRepeat()}catch(e){}
   try{closeRepeatNavigator()}catch(e){}
   try{closeIssueNavigator()}catch(e){}
-  try{closeSpellPanel()}catch(e){}
-  try{clearOnlineSpelling()}catch(e){}
   if(typeof resetUndoHistory==='function')resetUndoHistory();
 }
 
