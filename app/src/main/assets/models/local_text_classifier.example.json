@@ -1,6 +1,6 @@
 {
   "schema": "local-text-classifier-v1",
-  "name": "Dzen Text local semantic classifier",
+  "name": "Local semantic classifier",
   "version": "1",
   "feature_kind": "char-ngram-hash-v1",
   "feature_count": 4096,
