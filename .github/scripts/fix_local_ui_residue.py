@@ -16,8 +16,19 @@ patch('app/src/main/assets/www/index.html',[
     ('id="sideDrawerBackdrop" onclick="sideDrawerBackdropClick(event)"','id="sideBackdrop" onclick="sideBackdropClick(event)"','side drawer backdrop handler'),
 ])
 
+patch('app/src/main/assets/www/js/08-navigation.js',[
+    ("function activeCorrectionPanel(){for(const id of ['replacePanel','nearbyPanel','repeatNavPanel','spellPanel','issueNavPanel'])", "function activeCorrectionPanel(){for(const id of ['replacePanel','nearbyPanel','repeatNavPanel','issueNavPanel'])", 'spell panel in active correction panels'),
+    ("  try{if(spellNavState)closeSpellPanel()}catch(e){}\n",'', 'spell panel close-all handler'),
+    ("  if(typeof spellNavState!=='undefined'&&spellNavState)closeSpellPanel();\n",'', 'spell panel issue-nav handler'),
+])
+
 patch('app/src/main/assets/www/js/11-ui.js',[
     ("  if(typeof spellNavState!=='undefined'&&spellNavState){closeSpellPanel();return true}\n",'', 'dead spelling back-handler'),
+])
+
+patch('app/src/main/assets/www/js/12-articles.js',[
+    ("  try{closeSpellPanel()}catch(e){}\n",'', 'article spell-panel reset'),
+    ("  try{clearOnlineSpelling()}catch(e){}\n",'', 'article online-spelling reset'),
 ])
 
 # Prevent the old spelling UI and mismatched drawer naming from returning.
@@ -25,7 +36,7 @@ p=ROOT/'tools/check_local_first.py'
 s=p.read_text(encoding='utf-8')
 needle="require('clearOnlineSpelling' not in all_js, 'Legacy spelling compatibility calls must stay removed')\n"
 extra=(
-    "require('spellNavState' not in all_js and 'closeSpellPanel' not in all_js, 'Legacy spelling panel navigation must stay removed')\n"
+    "require('spellNavState' not in all_js and 'closeSpellPanel' not in all_js and 'spellPanel' not in all_js, 'Legacy spelling panel navigation must stay removed')\n"
     "require('id=\"sideBackdrop\"' in html and 'sideBackdropClick(event)' in html, 'Side drawer backdrop must match the runtime handler')\n"
     "require('sideDrawerBackdropClick' not in html, 'Stale side drawer backdrop handler must stay removed')\n"
 )
