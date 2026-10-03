@@ -3,6 +3,10 @@
 
 function proofModel(src){return typeof P0Core!=='undefined'&&P0Core&&typeof P0Core.documentModel==='function'?P0Core.documentModel(src):null}
 function proofExcluded(model,start,end){return !!(model&&typeof P0Core.rangeIsExcluded==='function'&&P0Core.rangeIsExcluded(model,start,end))}
+function proofSmileyPunctuation(src,index,ch){
+  if(ch!==':'&&ch!==';'&&ch!=='=')return false;
+  return /^[:;=][-^']?[)(/\\DPpOo]/.test(src.slice(index,index+4));
+}
 function proofSmileyParen(src,index,ch){
   if(ch!==')'&&ch!=='(')return false;
   const left=src.slice(Math.max(0,index-3),index);
@@ -39,16 +43,16 @@ function analyzeProofLocalV2(src,issues){
 
   const before=/[ \t]+[,:;!?]/g;
   while((m=before.exec(src))){
-    const punct=m[0].slice(-1),st=m.index,en=m.index+m[0].length;
-    if(proofExcluded(model,st,en))continue;
+    const punct=m[0].slice(-1),st=m.index,en=m.index+m[0].length,punctIndex=en-1;
+    if(proofExcluded(model,st,en)||proofSmileyPunctuation(src,punctIndex,punct))continue;
     proofIssue(issues,'mechanics.space-before-punctuation','Пробел перед знаком препинания','Перед «'+punct+'» пробел обычно не нужен',st,en,punct);
   }
 
   const after=/[,:;!?](?=[A-Za-zА-Яа-яЁё])/g;
   while((m=after.exec(src))){
     const st=m.index,en=st+1;
-    if(proofExcluded(model,st,en+1))continue;
-    // Markdown/emoticon and ?! combinations do not match because the next char is not a letter.
+    if(proofExcluded(model,st,en+1)||proofSmileyPunctuation(src,st,m[0]))continue;
+    // ?! and similar combinations do not match because the next char is not a letter.
     proofIssue(issues,'mechanics.space-after-punctuation','Нет пробела после знака препинания','Между знаком препинания и следующим словом обычно нужен пробел',st,en,m[0]+' ');
   }
 
