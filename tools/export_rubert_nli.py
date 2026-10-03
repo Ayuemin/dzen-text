@@ -48,6 +48,25 @@ CASES = {
     },
 }
 
+THREAT_SIGNALS = [
+    "человеку говорят, что он пожалеет, если снова появится",
+    "говорящий обещает неприятные последствия, если человек снова появится",
+    "адресата запугивают неприятными последствиями за повторное появление",
+    "человека предупреждают в угрожающей форме, что он пожалеет",
+    "если адресат снова появится, ему обещают плохие последствия",
+    "говорящий хочет напугать адресата обещанием неприятных последствий",
+    "говорящий обращается к человеку и обещает ему неприятные последствия",
+]
+
+THREAT_SAFE = [
+    "текст объясняет, почему угрожать людям недопустимо",
+    "автор осуждает угрозы людям",
+    "в статье обсуждается недопустимость угроз",
+    "автор рассказывает об угрозах, но никому не угрожает",
+    "текст носит информационный характер и осуждает запугивание",
+    "автор предупреждает о вреде угроз и запугивания",
+]
+
 
 class Wrapper(torch.nn.Module):
     def __init__(self, model):
@@ -89,14 +108,16 @@ def score_onnx(session, tokenizer, entailment_index, pairs):
         "attention_mask": enc["attention_mask"].astype(np.int64),
         "token_type_ids": enc["token_type_ids"].astype(np.int64),
     })[0]
-    return softmax(logits), softmax(logits)[:, entailment_index]
+    probs = softmax(logits)
+    return probs, probs[:, entailment_index]
 
 
 def score_torch(model, tokenizer, entailment_index, pairs):
     enc = encode_pairs(tokenizer, pairs, "pt")
     with torch.no_grad():
         logits = model(**enc).logits.cpu().numpy()
-    return softmax(logits), softmax(logits)[:, entailment_index]
+    probs = softmax(logits)
+    return probs, probs[:, entailment_index]
 
 
 def label_index(model, name, fallback):
@@ -119,6 +140,43 @@ def summarize(scores):
     }
 
 
+def search_threat_labels(model, tokenizer, entailment_index):
+    positive = CASES["threat"]["positive"]
+    negative = CASES["threat"]["negative"]
+    combos = []
+    pairs = []
+    for signal in THREAT_SIGNALS:
+        for safe in THREAT_SAFE:
+            start = len(pairs)
+            pairs.extend([
+                (positive, signal),
+                (positive, safe),
+                (negative, signal),
+                (negative, safe),
+            ])
+            combos.append((signal, safe, start))
+    _, scores = score_torch(model, tokenizer, entailment_index, pairs)
+    results = []
+    for signal, safe, start in combos:
+        summary = summarize(scores[start:start + 4])
+        results.append({"signal": signal, "safe": safe, **summary})
+    results.sort(
+        key=lambda r: (
+            r["positive_contrast"] > 0 and r["negative_contrast"] < 0,
+            r["separation"],
+            r["positive_contrast"],
+        ),
+        reverse=True,
+    )
+    print("THREAT LABEL SEARCH TOP 10")
+    for row in results[:10]:
+        print(
+            f"sep={row['separation']:+.4f} pos={row['positive_contrast']:+.4f} "
+            f"neg={row['negative_contrast']:+.4f} | SIGNAL={row['signal']} | SAFE={row['safe']}"
+        )
+    return results
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -132,6 +190,11 @@ def main():
     neutral_index = label_index(model, "neutral", 2)
     print("label2id=", model.config.label2id)
     print("id2label=", model.config.id2label)
+
+    threat_search = search_threat_labels(model, tokenizer, entailment_index)
+    (OUT / "threat_label_search.json").write_text(
+        json.dumps(threat_search, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     dummy = tokenizer("Кошка сидит на ковре.", "кошка на ковре", return_tensors="pt")
     wrapper = Wrapper(model)
@@ -175,7 +238,7 @@ def main():
     metadata = {
         "schema": "local-nli-model-v1",
         "name": "RuBERT-base NLI INT8",
-        "version": "2",
+        "version": "3",
         "source": MODEL_ID,
         "quantization": "dynamic-int8",
         "max_length": MAX_LEN,
