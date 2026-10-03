@@ -106,5 +106,55 @@
     return {ok:true,text:result,count:prepared.length};
   }
 
-  return {textHash,words,findRepeatedWords,normalizeSnapshot,snapshotMatches,validateRange,applyEdits};
+  // One title model for P0 publication paths. Markdown uses the first H1.
+  // For ordinary text, the first non-empty line remains the compatible title.
+  // A line that clearly starts another Markdown block is not silently promoted.
+  function publicationParts(value){
+    const original=String(value==null?'':value).replace(/^\uFEFF/,'');
+    const src=original.replace(/\r\n?/g,'\n');
+    const lines=src.split('\n');
+    let title='',titleIndex=-1,titleMode='none';
+    for(let i=0;i<lines.length;i++){
+      const trimmed=lines[i].trim();
+      if(!trimmed)continue;
+      const h1=trimmed.match(/^#\s+(.+)$/);
+      if(h1){title=h1[1].trim();titleIndex=i;titleMode='h1';break}
+      if(/^(?:#{2,6}\s|>|```|~~~|[-*+]\s|\d+[.)]\s)/.test(trimmed))break;
+      title=trimmed;titleIndex=i;titleMode='plain';
+      break;
+    }
+    if(titleIndex<0)return {title:'',body:src,titleMode:'none'};
+    const bodyLines=lines.slice();
+    bodyLines.splice(titleIndex,1);
+    // Removing a title should not leave a growing run of blank lines at the top.
+    while(bodyLines.length&&bodyLines[0].trim()==='')bodyLines.shift();
+    return {title,body:bodyLines.join('\n'),titleMode};
+  }
+
+  function composePublication(title,bodyHtml,bodyPlain,mode){
+    const t=String(title||'').trim();
+    const html=String(bodyHtml||'').trim();
+    const plain=String(bodyPlain||'').trim();
+    const kind=mode==='title'||mode==='body'?mode:'all';
+    if(kind==='title')return {html:t?'<h1>'+escapeBasicHtml(t)+'</h1>':'',plain:t};
+    if(kind==='body')return {html,plain};
+    return {
+      html:(t?'<h1>'+escapeBasicHtml(t)+'</h1>\n':'')+html,
+      plain:(t?t+(plain?'\n\n':''):'')+plain
+    };
+  }
+
+  function escapeBasicHtml(value){
+    return String(value==null?'':value)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;')
+      .replace(/'/g,'&#39;');
+  }
+
+  return {
+    textHash,words,findRepeatedWords,normalizeSnapshot,snapshotMatches,
+    validateRange,applyEdits,publicationParts,composePublication,escapeBasicHtml
+  };
 });
