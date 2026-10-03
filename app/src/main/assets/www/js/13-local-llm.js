@@ -4,6 +4,7 @@
 const SEMANTIC_CATEGORIES_KEY='semanticCategoriesV2';
 const LEGACY_SEMANTIC_CATEGORIES_KEY='semanticCategoriesV1';
 const GENERIC_SAFE='Текст только нейтрально обсуждает эту тему, предупреждает о ней или осуждает её без предложения совершить действие.';
+const MIN_SEMANTIC_SIGNAL_SCORE=.50;
 const DEFAULT_SEMANTIC_CATEGORIES=[
   {id:'finance',name:'Финансовые обещания',signal:'автор обещает гарантированную прибыль без риска',safe:'автор предупреждает, что прибыль не гарантирована и возможны убытки',threshold:.60,enabled:true},
   {id:'threat',name:'Угрозы и запугивание',signal:'человеку говорят, что он пожалеет, если снова появится',safe:'текст объясняет, почему угрожать людям недопустимо',threshold:.64,enabled:true},
@@ -171,7 +172,15 @@ window.onNativeSemanticResult=function(requestId,payload){
   semanticPending=null;semanticRunning=false;setCheckRunning(false);
   let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать результат классификатора'}}
   if(pending.stale||pending.text!==(editor.value||'')||pending.key!==semanticKey()){toast('Смысловая проверка завершилась, но текст или категории уже изменены — результат не применён');renderAnalysis();return}
-  const error=String(result.error||'');semanticCache={text:pending.text,key:pending.key,issues:Array.isArray(result.issues)?result.issues:[],meta:result,error};analyzeText();
+  const error=String(result.error||'');
+  const rawIssues=Array.isArray(result.issues)?result.issues:[];
+  const filteredIssues=rawIssues.filter(issue=>{
+    const signal=Number(issue&&issue.signalScore);
+    return !Number.isFinite(signal)||signal>=MIN_SEMANTIC_SIGNAL_SCORE;
+  });
+  result.filteredLowSignal=Math.max(0,rawIssues.length-filteredIssues.length);
+  result.issues=filteredIssues;
+  semanticCache={text:pending.text,key:pending.key,issues:filteredIssues,meta:result,error};analyzeText();
   if(!result.available&&error)toast('Смысловая модель: '+error);else toast('Смысловая проверка: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
 };
 window.onNativeSemanticAnalysisError=function(requestId,msg){if(semanticPending&&Number(requestId)===Number(semanticPending.id))semanticPending=null;semanticRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'))};
