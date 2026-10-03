@@ -120,14 +120,19 @@ function normalizeIssueContract(issue,src,snapshot){
   issue.revision=snapshot.revision;
   return issue;
 }
+function removeLegacyRepeatedWordIssues(issues){
+  for(let i=issues.length-1;i>=0;i--){
+    const issue=issues[i];
+    if(!issue||issue.type!=='proof')continue;
+    const title=String(issue.title||'').toLocaleLowerCase('ru-RU');
+    if(/одинаков.*слов|повтор.*слов|слов.*подряд/.test(title))issues.splice(i,1);
+  }
+}
 function addRepeatedWordIssues(src,issues,snapshot){
   if(!settings||!settings.proofCheck)return;
+  removeLegacyRepeatedWordIssues(issues);
   const found=P0Core.findRepeatedWords(src);
   for(const hit of found){
-    const duplicate=issues.some(function(x){
-      return Number(x.start)===hit.start&&Number(x.end)===hit.end&&String(x.ruleId||'')==='style.repeated-word';
-    });
-    if(duplicate)continue;
     const issue=addIssue(issues,'proof','Повтор слова подряд','Одинаковое слово идёт два раза подряд. Проверьте, нужен ли повтор.',hit.start,hit.end,'warning');
     if(issue){
       issue.ruleId='style.repeated-word';
@@ -140,6 +145,21 @@ function addRepeatedWordIssues(src,issues,snapshot){
       normalizeIssueContract(issue,src,snapshot);
     }
   }
+}
+function recountP0Analysis(){
+  if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;
+  const overflow={...(currentAnalysis.issues._overflow||currentAnalysis.issueOverflow||{})};
+  const overflowTotal=Object.values(overflow).reduce((a,b)=>a+(Number(b)||0),0);
+  const countType=function(type){return currentAnalysis.issues.filter(x=>x.type===type).length+(Number(overflow[type])||0)};
+  const warningCount=currentAnalysis.issues.length+overflowTotal;
+  const rulesCount=countType('rules');
+  const semanticCount=countType('semantic');
+  currentAnalysis.issueOverflow=overflow;
+  currentAnalysis.overflowTotal=overflowTotal;
+  currentAnalysis.warningCount=warningCount;
+  currentAnalysis.rulesCount=rulesCount;
+  currentAnalysis.semanticCount=semanticCount;
+  currentAnalysis.editorCount=Math.max(0,warningCount-rulesCount-semanticCount);
 }
 
 function applyDocumentEdits(edits,snapshot,label){
@@ -164,6 +184,44 @@ function applyDocumentEdits(edits,snapshot,label){
 window.currentDocumentSnapshot=currentDocumentSnapshot;
 window.snapshotMatchesCurrent=snapshotMatchesCurrent;
 window.applyDocumentEdits=applyDocumentEdits;
+
+function patchAnalysisStateLabel(){
+  const summary=document.getElementById('analysisSummary');
+  if(!summary||!currentAnalysis)return;
+  const snap=currentAnalysis.analysisSnapshot;
+  if(currentAnalysis.status==='stale'){
+    summary.insertAdjacentHTML('beforeend',' <span class="semanticRunning">Текст изменён — результаты устарели.</span>');
+  }else if(snap&&currentAnalysis.status==='complete'){
+    summary.insertAdjacentHTML('beforeend',' <span class="smallNote">Проверено доступными модулями · ревизия '+Number(snap.revision||0)+'.</span>');
+  }
+}
+function markSemanticExperimental(){
+  const group=document.getElementById('semanticClassifierSettings');
+  if(!group)return;
+  const summary=group.querySelector('summary');
+  if(summary){
+    const title=summary.querySelector('span');
+    const small=summary.querySelector('small');
+    if(title)title.textContent='Смысловая проверка · эксперимент';
+    if(small)small.textContent='Не входит в основную проверку по ТЗ';
+  }
+  const body=group.querySelector('.settingsGroupBody');
+  if(body&&!body.querySelector('[data-run-experimental-semantic]')){
+    const row=document.createElement('div');
+    row.className='settingActions';
+    row.innerHTML='<button class="nativeBtn" data-run-experimental-semantic type="button">Запустить экспериментальную проверку</button>';
+    const button=row.querySelector('button');
+    button.onclick=function(){
+      if(typeof window.runExperimentalSemanticCheck==='function')window.runExperimentalSemanticCheck();
+      else toast('Экспериментальная смысловая проверка недоступна');
+    };
+    body.insertBefore(row,body.firstChild);
+    const note=document.createElement('div');
+    note.className='smallNote';
+    note.textContent='Основная кнопка «Проверить» запускает только принимаемые локальные модули. Этот ONNX-модуль оставлен временно для экспериментов и диагностики.';
+    body.insertBefore(note,row.nextSibling);
+  }
+}
 
 function installFoundation(){
   if(window.__p0FoundationInstalled)return;
@@ -211,11 +269,7 @@ function installFoundation(){
       if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return result;
       addRepeatedWordIssues(src,currentAnalysis.issues,snapshot);
       for(const issue of currentAnalysis.issues)normalizeIssueContract(issue,src,snapshot);
-      const overflow={...(currentAnalysis.issues._overflow||currentAnalysis.issueOverflow||{})};
-      const overflowTotal=Object.values(overflow).reduce((a,b)=>a+(Number(b)||0),0);
-      currentAnalysis.issueOverflow=overflow;
-      currentAnalysis.overflowTotal=overflowTotal;
-      currentAnalysis.warningCount=currentAnalysis.issues.length+overflowTotal;
+      recountP0Analysis();
       currentAnalysis.analysisSnapshot=snapshot;
       currentAnalysis.status=snapshotMatchesCurrent(snapshot)?'complete':'stale';
       currentAnalysis.documentId=snapshot.documentId;
@@ -225,6 +279,12 @@ function installFoundation(){
       return currentAnalysis;
     };
     window.analyzeText=analyzeText;
+  }
+
+  if(typeof renderAnalysis==='function'){
+    const priorRenderAnalysis=renderAnalysis;
+    renderAnalysis=function(){const out=priorRenderAnalysis();patchAnalysisStateLabel();return out};
+    window.renderAnalysis=renderAnalysis;
   }
 
   if(typeof renderReplacement==='function'){
@@ -286,6 +346,13 @@ function installFoundation(){
     };
     window.runFullCheck=runFullCheck;
   }
+
+  if(typeof openSettings==='function'){
+    const priorOpenSettings=openSettings;
+    openSettings=function(){const out=priorOpenSettings();setTimeout(markSemanticExperimental,0);return out};
+    window.openSettings=openSettings;
+  }
+  setTimeout(markSemanticExperimental,80);
 
   try{
     if(window.AndroidDevLog&&typeof AndroidDevLog.log==='function')AndroidDevLog.log('P0','foundation installed');
