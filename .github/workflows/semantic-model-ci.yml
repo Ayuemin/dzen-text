@@ -25,11 +25,13 @@ jobs:
           python -m pip install 'transformers==4.46.3' 'onnx==1.17.0' 'onnxruntime==1.20.1' 'numpy<2.1'
       - name: Export, quantize and smoke-test NLI model
         run: python tools/export_rubert_nli.py
-      - name: Upload Android model package
+      - name: Upload installable Android model package
         uses: actions/upload-artifact@v4
         with:
-          name: RuBERT-base-NLI-INT8-Android
+          name: RuBERT-base-NLI-INT8-v5-installable
           path: |
-            build/rubert-base-nli-int8-android.zip
+            build/local-nli/model.onnx
+            build/local-nli/vocab.txt
+            build/local-nli/metadata.json
             build/local-nli/smoke_scores.json
           if-no-files-found: error
