@@ -53,6 +53,7 @@ function saveLocalLlmPrompt(){
     if(x)localStorage.setItem(LOCAL_LLM_EXCLUSIONS_KEY,x.value.trim()||DEFAULT_LOCAL_LLM_EXCLUSIONS);
   }catch(e){}
   invalidateLocalLlmCache();
+  if(localLlmPending)localLlmPending.stale=true;
 }
 function invalidateLocalLlmCache(){localLlmCache={text:null,promptKey:'',issues:[],meta:null,error:''}}
 function formatLocalLlmSize(bytes){
@@ -127,7 +128,7 @@ window.resetLocalLlmPrompt=async function(){
   const ok=typeof appConfirm==='function'?await appConfirm('Вернуть рекомендуемые критерии?','Ваши изменения полей «Что искать» и «Что не считать проблемой» будут заменены стандартными.','Вернуть',false):true;
   if(!ok)return;
   try{localStorage.setItem(LOCAL_LLM_CRITERIA_KEY,DEFAULT_LOCAL_LLM_CRITERIA);localStorage.setItem(LOCAL_LLM_EXCLUSIONS_KEY,DEFAULT_LOCAL_LLM_EXCLUSIONS)}catch(e){}
-  const c=document.getElementById('localLlmCriteria'),x=document.getElementById('localLlmExclusions');if(c)c.value=DEFAULT_LOCAL_LLM_CRITERIA;if(x)x.value=DEFAULT_LOCAL_LLM_EXCLUSIONS;invalidateLocalLlmCache();toast('Рекомендуемые критерии восстановлены');
+  const c=document.getElementById('localLlmCriteria'),x=document.getElementById('localLlmExclusions');if(c)c.value=DEFAULT_LOCAL_LLM_CRITERIA;if(x)x.value=DEFAULT_LOCAL_LLM_EXCLUSIONS;invalidateLocalLlmCache();if(localLlmPending)localLlmPending.stale=true;toast('Рекомендуемые критерии восстановлены');
 };
 
 function appendLocalLlmIssues(src,result){
@@ -212,10 +213,12 @@ function installLocalLlmIntegration(){
   const priorRun=typeof runFullCheck==='function'?runFullCheck:null;
   if(priorRun){
     runFullCheck=function(){
-      invalidateLocalLlmCache();localLlmPending=null;localLlmRunning=false;
+      const alreadyRunning=localLlmRunning||!!localLlmPending;
+      if(!alreadyRunning)invalidateLocalLlmCache();
       priorRun();
       const src=editor.value||'',status=localLlmStatus();
       if(!src.trim()||!localLlmBridgeAvailable()||!status.installed||!status.available)return;
+      if(alreadyRunning){toast('Смысловая модель уже проверяет текст. Дождитесь завершения.');return}
       const criteria=localLlmCriteria(),exclusions=localLlmExclusions(),key=criteria+'\u0000'+exclusions;
       let id=-1;
       try{id=Number(AndroidLocalLlm.analyzeAsync(src,criteria,exclusions))||-1}catch(e){id=-1}
@@ -231,14 +234,14 @@ function installLocalLlmIntegration(){
 
 window.onNativeLocalLlmInstalling=function(){toast('Копирую и проверяю GGUF-модель…')};
 window.onNativeLocalLlmChanged=function(statusText){
-  invalidateLocalLlmCache();refreshLocalLlmStatus();let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'GGUF-модель установлена');
+  invalidateLocalLlmCache();refreshLocalLlmStatus();try{analyzeText()}catch(e){}let name='';try{name=JSON.parse(statusText||'{}').name||''}catch(e){}toast(name?'Модель установлена: '+name:'GGUF-модель установлена');
 };
 window.onNativeLocalLlmError=function(msg){refreshLocalLlmStatus();toast('Модель не установлена: '+String(msg||'неизвестная ошибка'))};
 window.onNativeLocalLlmResult=function(requestId,payload){
   const pending=localLlmPending;if(!pending||Number(requestId)!==Number(pending.id))return;
   localLlmPending=null;localLlmRunning=false;setCheckRunning(false);
   let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать ответ движка'}}
-  if(pending.stale||pending.text!==(editor.value||'')){toast('Смысловая проверка завершилась, но текст уже изменён — результат не применён');renderAnalysis();return}
+  if(pending.stale||pending.text!==(editor.value||'')||pending.promptKey!==localLlmPromptKey()){toast('Смысловая проверка завершилась, но текст или критерии уже изменены — результат не применён');renderAnalysis();return}
   const errs=Array.isArray(result.errors)?result.errors:[];
   const error=String(result.error||'')+(errs.length?(result.error?' · ':'')+errs.slice(0,2).join('; '):'');
   localLlmCache={text:pending.text,promptKey:pending.promptKey,issues:Array.isArray(result.issues)?result.issues:[],meta:result,error};
@@ -246,8 +249,8 @@ window.onNativeLocalLlmResult=function(requestId,payload){
   if(!result.available&&error)toast('Смысловая модель: '+error);else toast('Смысловая проверка завершена: '+localLlmCache.issues.length+' замечаний');
 };
 window.onNativeLocalLlmAnalysisError=function(requestId,msg){
-  if(localLlmPending&&Number(requestId)===Number(localLlmPending.id))localLlmPending=null;
-  localLlmRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'));
+  if(!localLlmPending||Number(requestId)!==Number(localLlmPending.id))return;
+  localLlmPending=null;localLlmRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'));
 };
 
 setTimeout(function(){try{installLocalLlmIntegration()}catch(e){console.error('Local GGUF integration failed',e)}},0);
