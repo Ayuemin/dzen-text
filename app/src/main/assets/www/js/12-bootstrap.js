@@ -1,3 +1,133 @@
+let localClassifierCache={text:null,issues:[],error:'',segments:0};
+
+function localClassifierBridgeAvailable(){
+  return !!(window.AndroidLocalClassifier&&typeof AndroidLocalClassifier.status==='function'&&typeof AndroidLocalClassifier.analyze==='function');
+}
+
+function localClassifierStatus(){
+  if(!localClassifierBridgeAvailable())return {installed:false,available:false,browser:true};
+  try{return JSON.parse(AndroidLocalClassifier.status()||'{}')}catch(e){return {installed:false,available:false,error:String(e&&e.message||e)}}
+}
+
+function ensureLocalClassifierSettings(){
+  const wrap=document.querySelector('#settingsBackdrop .settingsGroupWrap');
+  if(!wrap||document.querySelector('#localClassifierSettingsGroup'))return;
+  const group=document.createElement('details');
+  group.className='settingsGroup';
+  group.id='localClassifierSettingsGroup';
+  group.innerHTML='<summary><span>Локальная смысловая модель</span><small>ONNX-классификатор предложений на устройстве</small></summary><div class="settingsGroupBody"><div class="ruleStatus" data-local-classifier-status></div><div class="smallNote">Модель не использует интернет. Если её нет или она не загрузилась, остальные проверки продолжают работать как обычно.</div></div>';
+  const rulePack=document.querySelector('#rulePackStatus');
+  const before=rulePack&&rulePack.closest?rulePack.closest('.settingsGroup'):null;
+  if(before&&before.parentNode===wrap)wrap.insertBefore(group,before);else wrap.appendChild(group);
+}
+
+function refreshLocalClassifierStatus(){
+  ensureLocalClassifierSettings();
+  const el=document.querySelector('[data-local-classifier-status]');
+  if(!el)return;
+  const status=localClassifierStatus();
+  if(status.browser){
+    el.innerHTML='<b>Доступно только в Android-приложении.</b>';
+    return;
+  }
+  if(!status.installed){
+    el.innerHTML='<b>Модель не установлена.</b><br>Обычные локальные проверки работают без неё.';
+    return;
+  }
+  if(!status.available){
+    el.innerHTML='<b>Модель найдена, но не загрузилась.</b>'+(status.error?'<br>'+escapeHtml(status.error):'');
+    return;
+  }
+  el.innerHTML='<b>'+escapeHtml(status.name||'Локальная смысловая модель')+'</b>'+(status.version?' · '+escapeHtml(status.version):'')+'<br>Категорий: <b>'+Number(status.labels||0)+'</b><br>Статус: <b>применяется локально</b>';
+}
+
+function runLocalClassifier(src){
+  if(!localClassifierBridgeAvailable())return {available:false,issues:[]};
+  try{
+    const result=JSON.parse(AndroidLocalClassifier.analyze(String(src||''))||'{}');
+    return result&&typeof result==='object'?result:{available:false,issues:[]};
+  }catch(e){
+    return {available:false,issues:[],error:String(e&&e.message||e)};
+  }
+}
+
+function appendLocalClassifierIssues(src,result){
+  if(!result||!Array.isArray(result.issues))return;
+  const issues=currentAnalysis&&Array.isArray(currentAnalysis.issues)?currentAnalysis.issues:null;
+  if(!issues)return;
+  for(const raw of result.issues){
+    const start=Math.max(0,Math.min(src.length,Number(raw.start)||0));
+    const end=Math.max(start,Math.min(src.length,Number(raw.end)||start));
+    const score=Number(raw.score);
+    const confidence=Number.isFinite(score)?' · уверенность '+Math.round(score*100)+'%':'';
+    const issue=addIssue(
+      issues,
+      'semantic',
+      String(raw.title||'Смысловой сигнал'),
+      String(raw.message||'Проверьте смысл и контекст предложения.')+confidence,
+      start,
+      end,
+      raw.severity==='critical'?'critical':'warning'
+    );
+    if(issue){
+      issue.classifierId=String(raw.id||'');
+      issue.score=score;
+    }
+  }
+  const issueOverflow={...(issues._overflow||{})};
+  const overflowTotal=Object.values(issueOverflow).reduce((a,b)=>a+(Number(b)||0),0);
+  const warningCount=issues.length+overflowTotal;
+  const rulesCount=issues.filter(x=>x.type==='rules').length+(issueOverflow.rules||0);
+  currentAnalysis.issueOverflow=issueOverflow;
+  currentAnalysis.overflowTotal=overflowTotal;
+  currentAnalysis.warningCount=warningCount;
+  currentAnalysis.rulesCount=rulesCount;
+  currentAnalysis.editorCount=warningCount-rulesCount;
+}
+
+function installLocalClassifierIntegration(){
+  if(window.__localClassifierIntegrationInstalled)return;
+  window.__localClassifierIntegrationInstalled=true;
+
+  const baseAnalyze=analyzeText;
+  analyzeText=function(){
+    const result=baseAnalyze();
+    const src=editor.value||'';
+    let semantic=null;
+    if(window.__runLocalSemantic){
+      semantic=runLocalClassifier(src);
+      localClassifierCache={
+        text:src,
+        issues:Array.isArray(semantic.issues)?semantic.issues:[],
+        error:String(semantic.error||''),
+        segments:Number(semantic.segments||0)
+      };
+    }else if(localClassifierCache.text===src){
+      semantic={available:true,issues:localClassifierCache.issues,error:localClassifierCache.error,segments:localClassifierCache.segments};
+    }
+    if(semantic)appendLocalClassifierIssues(src,semantic);
+    renderAnalysis();
+    updateAnalysisDot();
+    return currentAnalysis;
+  };
+
+  const baseIssueGroups=issueGroups;
+  issueGroups=function(){
+    const groups=baseIssueGroups();
+    if(!groups.some(x=>x.id==='semantic'))groups.splice(2,0,{id:'semantic',name:'Локальный смысловой анализ'});
+    return groups;
+  };
+
+  const baseOpenSettings=openSettings;
+  openSettings=function(){
+    ensureLocalClassifierSettings();
+    baseOpenSettings();
+    refreshLocalClassifierStatus();
+  };
+}
+
+installLocalClassifierIntegration();
+
 let localAnalysisTimer=null;
 function scheduleLocalAnalysis(){
   clearTimeout(localAnalysisTimer);
@@ -86,6 +216,8 @@ function bootstrapEditor(){
   syncSettingsUI();
   updateUserSynonymStatus();
   updateRulePackStatus();
+  ensureLocalClassifierSettings();
+  refreshLocalClassifierStatus();
   render(false);
   scheduleLocalAnalysis();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
