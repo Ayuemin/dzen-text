@@ -13,8 +13,10 @@ def require(cond, message):
 
 spelling = (js_dir / '07-spelling.js').read_text(encoding='utf-8')
 bootstrap = (js_dir / '12-bootstrap.js').read_text(encoding='utf-8')
+manifest = (root / 'app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
 all_js = '\n'.join(p.read_text(encoding='utf-8') for p in sorted(js_dir.glob('*.js')))
 
+require('android.permission.INTERNET' not in manifest, 'Local-first app must not request Android INTERNET permission')
 require('AndroidSpell.check(' not in all_js, 'Runtime JS must not call Yandex.Speller')
 require('AndroidDzenAI' not in all_js, 'Runtime JS must not contain the external AI article bridge')
 require(not (js_dir / '10-ai-dzen.js').exists(), 'External AI article checker must stay absent')
