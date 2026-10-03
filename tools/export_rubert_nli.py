@@ -21,30 +21,35 @@ CASES = {
         "negative": "Инвестиции могут привести к убыткам, гарантировать прибыль невозможно.",
         "signal": "автор обещает гарантированную прибыль без риска",
         "safe": "автор предупреждает, что прибыль не гарантирована и возможны убытки",
+        "threshold": 0.60,
     },
     "threat": {
         "positive": "Если ещё раз здесь появишься, пожалеешь об этом.",
         "negative": "В статье разбирается, почему угрозы человеку недопустимы.",
         "signal": "человеку говорят, что он пожалеет, если снова появится",
         "safe": "текст объясняет, почему угрожать людям недопустимо",
+        "threshold": 0.64,
     },
     "restricted": {
         "positive": "Могу достать ствол без оформления бумаг.",
         "negative": "Автор рассказывает о незаконной торговле оружием и её последствиях.",
         "signal": "автор предлагает достать оружие без документов",
         "safe": "автор обсуждает незаконную торговлю оружием и её последствия",
+        "threshold": 0.62,
     },
     "medical": {
         "positive": "Если лекарство не помогает, просто примите в два раза больше.",
         "negative": "Дозировку препарата должен определять врач.",
         "signal": "автор советует самостоятельно увеличить дозировку лекарства",
         "safe": "автор советует определять дозировку лекарства с врачом",
+        "threshold": 0.55,
     },
     "engagement": {
         "positive": "Оформи подписку прямо сейчас и получишь подарок.",
         "negative": "Подписка стоит 299 рублей в месяц и отключается в настройках.",
         "signal": "автор призывает подписаться ради подарка",
         "safe": "автор нейтрально сообщает цену и условия отключения подписки",
+        "threshold": 0.60,
     },
 }
 
@@ -85,14 +90,18 @@ def score_torch(model, tokenizer, entailment_index, pairs):
 
 def summarize(scores):
     p_signal, p_safe, n_signal, n_safe = [float(x) for x in scores]
+    p_contrast = p_signal - p_safe
+    n_contrast = n_signal - n_safe
     return {
         "positive_signal": p_signal,
         "positive_safe": p_safe,
-        "positive_contrast": p_signal - p_safe,
+        "positive_contrast": p_contrast,
+        "positive_normalized": 0.5 + 0.5 * p_contrast,
         "negative_signal": n_signal,
         "negative_safe": n_safe,
-        "negative_contrast": n_signal - n_safe,
-        "separation": (p_signal - p_safe) - (n_signal - n_safe),
+        "negative_contrast": n_contrast,
+        "negative_normalized": 0.5 + 0.5 * n_contrast,
+        "separation": p_contrast - n_contrast,
     }
 
 def main():
@@ -137,7 +146,7 @@ def main():
     metadata = {
         "schema": "local-nli-model-v1",
         "name": "RuBERT-base NLI INT8",
-        "version": "4",
+        "version": "5",
         "source": MODEL_ID,
         "quantization": "dynamic-int8",
         "max_length": MAX_LEN,
@@ -152,7 +161,7 @@ def main():
     fp32 = ort.InferenceSession(str(fp32_path), providers=["CPUExecutionProvider"])
     int8 = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
     report = []
-    all_pass = True
+    failed = []
     for category, case in CASES.items():
         pairs = [
             (case["positive"], case["signal"]),
@@ -163,17 +172,31 @@ def main():
         torch_s = summarize(score_torch(model, tokenizer, entailment_index, pairs))
         fp32_s = summarize(score_onnx(fp32, tokenizer, entailment_index, pairs))
         int8_s = summarize(score_onnx(int8, tokenizer, entailment_index, pairs))
-        passed = int8_s["positive_contrast"] > 0.10 and int8_s["negative_contrast"] < 0.10
-        all_pass = all_pass and passed
-        report.append({"category": category, "signal": case["signal"], "safe": case["safe"], "torch": torch_s, "onnx_fp32": fp32_s, "onnx_int8": int8_s, "pass": passed})
+        threshold = float(case["threshold"])
+        passed = (
+            int8_s["positive_normalized"] >= threshold
+            and int8_s["negative_normalized"] < threshold
+            and int8_s["separation"] > 0.15
+        )
+        if not passed: failed.append(category)
+        report.append({
+            "category": category,
+            "signal": case["signal"],
+            "safe": case["safe"],
+            "threshold": threshold,
+            "torch": torch_s,
+            "onnx_fp32": fp32_s,
+            "onnx_int8": int8_s,
+            "pass": passed,
+        })
         print(
-            f"{category:10s} pass={passed} "
-            f"int8 pos={int8_s['positive_contrast']:+.4f} neg={int8_s['negative_contrast']:+.4f} sep={int8_s['separation']:+.4f} "
-            f"| fp32 pos={fp32_s['positive_contrast']:+.4f} neg={fp32_s['negative_contrast']:+.4f}"
+            f"{category:10s} threshold={threshold:.2f} pass={passed} "
+            f"int8 pos={int8_s['positive_normalized']:.3f} neg={int8_s['negative_normalized']:.3f} "
+            f"sep={int8_s['separation']:+.4f}"
         )
     (OUT / "smoke_scores.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    if not all_pass:
-        raise SystemExit("Final INT8 semantic smoke test did not separate all five pairs")
+    if failed:
+        raise SystemExit("Final INT8 semantic smoke gate failed: " + ", ".join(failed))
 
     fp32_size = fp32_path.stat().st_size
     int8_size = model_path.stat().st_size
