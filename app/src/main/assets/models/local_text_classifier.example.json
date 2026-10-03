@@ -1,0 +1,57 @@
+{
+  "schema": "local-text-classifier-v1",
+  "name": "Dzen Text local semantic classifier",
+  "version": "1",
+  "feature_kind": "char-ngram-hash-v1",
+  "feature_count": 4096,
+  "ngram_min": 3,
+  "ngram_max": 5,
+  "activation": "sigmoid",
+  "input_name": "features",
+  "output_name": "logits",
+  "labels": [
+    {
+      "id": "financial-promise",
+      "title": "Возможное финансовое обещание",
+      "message": "Проверьте, не обещает ли предложение гарантированный, лёгкий или безрисковый доход.",
+      "severity": "warning",
+      "threshold": 0.72
+    },
+    {
+      "id": "aggression-violence",
+      "title": "Возможная агрессия или насилие",
+      "message": "Проверьте смысл предложения: модель увидела признаки агрессии, угрозы или одобрения насилия.",
+      "severity": "warning",
+      "threshold": 0.74
+    },
+    {
+      "id": "restricted-sale",
+      "title": "Возможная продажа ограниченного товара",
+      "message": "Проверьте, не предлагает ли предложение купить, продать или заказать ограниченный товар или услугу.",
+      "severity": "warning",
+      "threshold": 0.74
+    },
+    {
+      "id": "medical-advice",
+      "title": "Возможная медицинская рекомендация",
+      "message": "Проверьте, не содержит ли предложение категоричной медицинской рекомендации или обещания результата.",
+      "severity": "warning",
+      "threshold": 0.74
+    },
+    {
+      "id": "spam-promotion",
+      "title": "Возможный навязчивый призыв",
+      "message": "Проверьте, не является ли предложение навязчивым рекламным призывом или искусственным стимулированием активности.",
+      "severity": "warning",
+      "threshold": 0.72
+    },
+    {
+      "id": "neutral",
+      "title": "Нейтральный контекст",
+      "message": "",
+      "severity": "warning",
+      "threshold": 0.5,
+      "emit": false
+    }
+  ]
+}
