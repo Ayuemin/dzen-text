@@ -29,6 +29,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
+          git add -A -- ':!.github/workflows/android-ci.yml'
           git commit -m "prototype: neutral editor with local rule packs" || exit 0
           git push origin HEAD:prototype/editorial-rule-packs
