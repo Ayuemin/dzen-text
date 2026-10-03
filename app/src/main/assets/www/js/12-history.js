@@ -1,4 +1,4 @@
-const LEGACY_VERSIONS_KEY='dzenTextVersionsV1';
+const LEGACY_VERSIONS_KEY='platformTextVersionsV1';
 let undoStack=[];
 let redoStack=[];
 let beforeInputSnapshot=null;

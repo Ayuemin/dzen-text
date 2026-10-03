@@ -9,14 +9,14 @@ function scheduleLocalAnalysis(){
   },delay);
 }
 
-function bootstrapDzenText(){
-  if(window.__dzenTextBootstrapped)return;
-  window.__dzenTextBootstrapped=true;
+function bootstrapEditor(){
+  if(window.__platformTextBootstrapped)return;
+  window.__platformTextBootstrapped=true;
 
-  document.title='Дзен Текст 1.11.0';
+  document.title='Редактор текста · прототип';
   settings=loadSettings();
   userSynonyms=loadUserSynonyms();
-  dzenRules=loadDzenRules();
+  activeRulePack=loadRulePack();
 
   editor.addEventListener('paste',()=>{inputWasPaste=true});
   editor.addEventListener('input',()=>{
@@ -60,6 +60,10 @@ function bootstrapDzenText(){
     r.readAsText(f,'UTF-8');
   });
 
+  document.getElementById('rulePackFileInput').addEventListener('change',e=>{
+    const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;const r=new FileReader();r.onload=()=>window.onNativeRulePackLoaded(String(r.result||''),f.name);r.onerror=()=>toast('Не удалось прочитать JSON');r.readAsText(f,'UTF-8');
+  });
+
   document.getElementById('manualReplacement').addEventListener('keydown',e=>{
     if(e.key==='Enter'){
       e.preventDefault();
@@ -75,13 +79,13 @@ function bootstrapDzenText(){
   let managed=false;
   if(typeof initArticleWorkspace==='function')managed=initArticleWorkspace();
   if(!managed&&settings.autosave){
-    const draft=localStorage.getItem('dzenDraft');
+    const draft=localStorage.getItem('editorDraft');
     if(draft)editor.value=draft;
   }
   if(typeof migrateLegacyVersions==='function')migrateLegacyVersions();
   syncSettingsUI();
   updateUserSynonymStatus();
-  updateDzenRulesStatus();
+  updateRulePackStatus();
   render(false);
   scheduleLocalAnalysis();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
@@ -91,9 +95,9 @@ function bootstrapDzenText(){
 }
 
 try{
-  bootstrapDzenText();
+  bootstrapEditor();
 }catch(error){
-  console.error('Dzen Text bootstrap failed',error);
+  console.error('Editor bootstrap failed',error);
   const t=document.getElementById('toast');
   if(t){
     t.textContent='Ошибка запуска редактора. Перезапустите приложение.';

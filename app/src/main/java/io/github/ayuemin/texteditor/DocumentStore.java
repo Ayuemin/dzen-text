@@ -1,4 +1,4 @@
-package ru.dzenprep.texteditor;
+package io.github.ayuemin.texteditor;
 
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -21,7 +21,7 @@ import java.util.UUID;
 
 public final class DocumentStore {
     private static final long VERSION_LIMIT_BYTES = 100L * 1024L * 1024L;
-    private static final String PREFS = "dzen_documents";
+    private static final String PREFS = "editor_documents";
     private static final String ACTIVE_KEY = "active_article_id";
 
     private final File articlesDir;

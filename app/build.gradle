@@ -6,15 +6,15 @@ def keystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
 
 android {
-    namespace 'ru.dzenprep.texteditor'
+    namespace 'io.github.ayuemin.texteditor'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'ru.dzenprep.texteditor'
+        applicationId 'io.github.ayuemin.texteditor'
         minSdk 24
         targetSdk 35
-        versionCode 48
-        versionName '1.11.0'
+        versionCode 1
+        versionName '0.1.0-prototype'
     }
 
     signingConfigs {

@@ -1,14 +1,14 @@
 // Publication preflight.
 //
-// The whole point of this app is that the pasted result is accepted by the Dzen
+// The whole point of this app is that the pasted result is accepted by the platform
 // editor. Copying therefore runs a preflight: the rendered HTML is normalised
-// into the subset Dzen can represent, and anything the author should know is
+// into the subset platform can represent, and anything the author should know is
 // reported before the text leaves the app. Errors block the copy instead of
 // failing silently with a toast.
 
 const PUBLISH_MAX_HEADING = 3;
 
-// The Dzen editor offers controls for H1-H3, bold, italic, links, quotes and
+// The platform editor offers controls for H1-H3, bold, italic, links, quotes and
 // lists. Deeper headings, strikethrough, inline code and horizontal rules have
 // no control, so pasting them produces unpredictable results. Keep the words,
 // drop the markup.
@@ -34,7 +34,7 @@ function stripHtmlTags(html) {
     .trim();
 }
 
-// A Dzen article has one title in its own form field, so the "# " line is the
+// A platform article has one title in its own form field, so the "# " line is the
 // title and everything after it is the body. Articles written without such a
 // line simply have no title.
 function publishTitleFrom(markdown) {
@@ -61,7 +61,7 @@ function publishHeadings(html) {
 
 /**
  * Runs the preflight and returns {errors, warnings, html, plain}.
- * errors   - block publication; the Dzen editor could not represent the article
+ * errors   - block publication; the platform editor could not represent the article
  * warnings - the author may still publish, but should look first
  */
 function publishPreflight(markdown) {
@@ -75,15 +75,15 @@ function publishPreflight(markdown) {
 
   const title = publishTitleFrom(src);
   if (!title) {
-    warnings.push('Нет строки «# Заголовок». В Дзене заголовок — отдельное поле, добавьте его первой строкой.');
+    warnings.push('Нет строки «# Заголовок». В площадкае заголовок — отдельное поле, добавьте его первой строкой.');
   } else if (title.length > 200) {
-    warnings.push('Заголовок очень длинный (' + title.length + ' символов). Проверьте, как он выглядит в Дзене.');
+    warnings.push('Заголовок очень длинный (' + title.length + ' символов). Проверьте, как он выглядит в площадкае.');
   }
 
   // H1 inside the body renders as a second title next to the form field.
   const extraTitles = publishHeadings(html).filter(h => h.level === 1);
   if (extraTitles.length) {
-    errors.push('В теле статьи остался заголовок «# …»: в Дзене заголовок задаётся отдельным полем, а не в тексте.');
+    errors.push('В теле статьи остался заголовок «# …»: в площадкае заголовок задаётся отдельным полем, а не в тексте.');
   }
 
   const plainWords = plain.trim() ? plain.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -91,16 +91,16 @@ function publishPreflight(markdown) {
     warnings.push('Текст очень короткий (' + plainWords + ' слов). Короткие статьи плохо ранжируются.');
   }
 
-  // Markup with no Dzen control. The text survives sanitisation, so these are
+  // Markup with no platform control. The text survives sanitisation, so these are
   // advisory rather than blocking.
   if (/^#{4,6}\s/m.test(src)) {
-    warnings.push('Заголовки H4–H6 понижены до H3: в Дзене глубже трёх уровней нет.');
+    warnings.push('Заголовки H4–H6 понижены до H3: в площадкае глубже трёх уровней нет.');
   }
   if (/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/m.test(src)) {
-    warnings.push('Разделители «---» убраны из публикации: в Дзене для этого есть отдельный элемент.');
+    warnings.push('Разделители «---» убраны из публикации: в площадкае для этого есть отдельный элемент.');
   }
   if (/~~[^~]+~~/.test(src)) {
-    warnings.push('Зачёркнутый текст публикуется обычным текстом: в Дзене зачёркивания нет.');
+    warnings.push('Зачёркнутый текст публикуется обычным текстом: в площадкае зачёркивания нет.');
   }
 
   return { errors, warnings, html, plain };

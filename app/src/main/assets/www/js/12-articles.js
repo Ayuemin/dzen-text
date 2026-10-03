@@ -38,7 +38,7 @@ function articleFileName(){
 
 function initArticleWorkspace(){
   if(!documentsAvailable()){
-    const draft=settings.autosave?localStorage.getItem('dzenDraft'):'';
+    const draft=settings.autosave?localStorage.getItem('editorDraft'):'';
     if(draft)editor.value=draft;
     return false;
   }
@@ -50,14 +50,14 @@ function initArticleWorkspace(){
   }
   let text=String(AndroidDocuments.loadArticle(activeArticleId)||'');
   let legacy='';
-  try{legacy=localStorage.getItem('dzenDraft')||''}catch(e){}
+  try{legacy=localStorage.getItem('editorDraft')||''}catch(e){}
   let legacyNeedsRetry=false;
   if(!text&&legacy){
     text=legacy;
     let migrated=false;
     try{migrated=!!AndroidDocuments.saveArticle(activeArticleId,text)}catch(e){migrated=false}
     if(migrated){
-      try{localStorage.removeItem('dzenDraft')}catch(e){}
+      try{localStorage.removeItem('editorDraft')}catch(e){}
     }else{
       // Не удаляем единственную старую копию, пока нативное хранилище
       // не подтвердило запись. Фоновое автосохранение попробует ещё раз.
@@ -154,8 +154,8 @@ function preserveCurrentArticleBeforeSwitch(reason){
     }
   }else{
     try{
-      if(text)localStorage.setItem('dzenDraft',text);
-      else localStorage.removeItem('dzenDraft');
+      if(text)localStorage.setItem('editorDraft',text);
+      else localStorage.removeItem('editorDraft');
     }catch(e){
       toast('Не удалось сохранить текущую статью. Переход отменён');
       return false;
@@ -208,7 +208,7 @@ function createNewArticle(){
   }
 
   setEditorTextForArticle('',true);
-  try{localStorage.removeItem('dzenDraft')}catch(e){}
+  try{localStorage.removeItem('editorDraft')}catch(e){}
   closeSideDrawer();
   updateCurrentArticleUi();
   renderSavedArticles();

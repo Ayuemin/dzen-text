@@ -7,7 +7,7 @@
     </queries>
     <application
         android:allowBackup="true"
-        android:label="Дзен Текст"
+        android:label="Редактор текста"
         android:icon="@drawable/ic_launcher"
         android:theme="@style/AppTheme"
         android:usesCleartextTraffic="false">

@@ -23,7 +23,7 @@ async function clearEditor(){
   closeRepeatNavigator();
   if(typeof closeIssueNavigator==='function')closeIssueNavigator();
   editor.value='';
-  localStorage.removeItem('dzenDraft');
+  localStorage.removeItem('editorDraft');
   markAnalysisStale();
   render(false);
   if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();
@@ -115,7 +115,7 @@ function render(runAnalysis=true,forcePreview=false){
   if(runAnalysis)analyzeText();
   if(!(typeof documentsAvailable==='function'&&documentsAvailable())&&settings.autosave){
     clearTimeout(saveTimer);
-    saveTimer=setTimeout(()=>localStorage.setItem('dzenDraft',editor.value),500);
+    saveTimer=setTimeout(()=>localStorage.setItem('editorDraft',editor.value),500);
   }
 }
 
