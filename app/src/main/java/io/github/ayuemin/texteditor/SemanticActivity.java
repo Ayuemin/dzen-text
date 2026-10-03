@@ -10,15 +10,21 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.WebView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
 /** MainActivity plus a fast fully-local ONNX NLI semantic classifier. */
 public class SemanticActivity extends MainActivity {
     private static final int REQUEST_OPEN_LOCAL_NLI = 2916;
+    private static final String EDITOR_URL = "file:///android_asset/www/index.html";
 
     private LocalNliEngine localNli;
     private WebView semanticWebView;
@@ -31,10 +37,13 @@ public class SemanticActivity extends MainActivity {
         localNli = new LocalNliEngine(this);
         semanticWebView = findWebView(findViewById(android.R.id.content));
         if (semanticWebView != null) {
+            // MainActivity starts the first asset load before this subclass can attach
+            // AndroidSemanticModel. Stop that pending load while we are still inside
+            // onCreate, attach the bridge, then perform one clean load. This avoids the
+            // transient first bootstrap that used to show "Ошибка запуска редактора".
+            semanticWebView.stopLoading();
             semanticWebView.addJavascriptInterface(new LocalNliBridge(this, localNli), "AndroidSemanticModel");
-            // MainActivity starts loading before the subclass can attach its bridge.
-            // Reload once so the stable editor page always sees AndroidSemanticModel.
-            semanticWebView.reload();
+            semanticWebView.loadUrl(EDITOR_URL);
         }
     }
 
@@ -71,7 +80,7 @@ public class SemanticActivity extends MainActivity {
         new Thread(() -> {
             try {
                 String result = localNli.analyzeJson(text, categoriesJson);
-                notifyAnalysisResult(requestId, result);
+                notifyAnalysisResult(requestId, postProcessSemanticResult(result));
             } catch (Exception e) {
                 String message = e.getMessage();
                 if (message == null || message.trim().isEmpty()) message = e.getClass().getSimpleName();
@@ -81,6 +90,56 @@ public class SemanticActivity extends MainActivity {
             }
         }, "local-nli-analysis").start();
         return requestId;
+    }
+
+    /**
+     * A broad fallback category is useful when nothing more specific matches, but it
+     * should not duplicate a precise result for the same sentence. Likewise a medical
+     * hit wins over the broad bypass category if both happen to fire on one segment.
+     */
+    private String postProcessSemanticResult(String resultJson) {
+        if (resultJson == null || resultJson.trim().isEmpty()) return resultJson;
+        try {
+            JSONObject root = new JSONObject(resultJson);
+            JSONArray issues = root.optJSONArray("issues");
+            if (issues == null || issues.length() < 2) return resultJson;
+
+            Map<String, Set<String>> categoriesBySegment = new HashMap<>();
+            for (int i = 0; i < issues.length(); i++) {
+                JSONObject issue = issues.optJSONObject(i);
+                if (issue == null) continue;
+                String key = issue.optInt("start", -1) + ":" + issue.optInt("end", -1);
+                Set<String> names = categoriesBySegment.get(key);
+                if (names == null) {
+                    names = new HashSet<>();
+                    categoriesBySegment.put(key, names);
+                }
+                names.add(issue.optString("category", ""));
+            }
+
+            JSONArray filtered = new JSONArray();
+            for (int i = 0; i < issues.length(); i++) {
+                JSONObject issue = issues.optJSONObject(i);
+                if (issue == null) continue;
+                String category = issue.optString("category", "");
+                String key = issue.optInt("start", -1) + ":" + issue.optInt("end", -1);
+                Set<String> names = categoriesBySegment.get(key);
+
+                if ("Опасные или незаконные действия".equals(category)
+                        && names != null && names.size() > 1) {
+                    continue;
+                }
+                if ("Обход ограничений".equals(category)
+                        && names != null && names.contains("Опасные медицинские советы")) {
+                    continue;
+                }
+                filtered.put(issue);
+            }
+            root.put("issues", filtered);
+            return root.toString();
+        } catch (Exception ignored) {
+            return resultJson;
+        }
     }
 
     @Override
