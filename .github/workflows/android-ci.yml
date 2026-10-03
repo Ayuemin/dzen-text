@@ -6,6 +6,7 @@ on:
       - main
       - local-first-v1.9
       - prototype/editorial-rule-packs
+      - prototype/editorial-rule-packs-full-tz
   pull_request:
     branches:
       - main
@@ -62,6 +63,7 @@ jobs:
           python3 tools/check_p0_storage.py
           node tools/test_p0_foundation.js
           node tools/test_p0_import.js
+          node tools/test_document_model.js
           node tools/test_rule_pack.js
           node tools/test_publish_export.js
           node tools/test_publish_copy.js
