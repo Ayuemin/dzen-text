@@ -42,7 +42,7 @@ import ai.onnxruntime.OrtSession;
  * or model-authored JSON is involved.
  */
 final class LocalNliEngine implements AutoCloseable {
-    private static final String SCHEMA = "dzen-nli-model-v1";
+    private static final String SCHEMA = "local-nli-model-v1";
     private static final String DIR = "local_nli";
     private static final String ACTIVE = "active";
     private static final String CANDIDATE = "candidate";
