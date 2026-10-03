@@ -1,11 +1,15 @@
 package ru.dzenprep.texteditor;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipDescription;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Build;
+import android.os.Looper;
 import android.provider.OpenableColumns;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
@@ -43,6 +47,9 @@ import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.CountDownLatch;
 
 public class MainActivity extends Activity implements TextToSpeech.OnInitListener {
     private static final int REQUEST_OPEN_TEXT = 1907;
@@ -93,6 +100,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         web.setWebChromeClient(new WebChromeClient());
         web.addJavascriptInterface(new TtsBridge(), "AndroidTTS");
         web.addJavascriptInterface(new FileBridge(), "AndroidFile");
+        web.addJavascriptInterface(new PublishBridge(), "AndroidPublish");
         web.addJavascriptInterface(new DictionaryBridge(), "AndroidDictionary");
         web.addJavascriptInterface(new DocumentsBridge(), "AndroidDocuments");
         installKeyboardObserver();
@@ -329,6 +337,57 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         }
     }
 
+
+    /** Copies the rendered article to the system clipboard for the Dzen editor. */
+    public class PublishBridge {
+        /**
+         * Writes both clipboard flavours explicitly: rendered HTML and its
+         * plain-text rendering. This removes the dependency on what WebView puts
+         * on the clipboard for a selection, which is how raw Markdown previously
+         * leaked into published articles.
+         */
+        @JavascriptInterface
+        public boolean copyForPublication(final String html, final String plain) {
+            final String htmlValue = html == null ? "" : html;
+            final String plainValue = plain == null ? "" : plain;
+            if (htmlValue.trim().isEmpty() && plainValue.trim().isEmpty()) return false;
+
+            if (Looper.myLooper() == Looper.getMainLooper()) {
+                return writePublicationClipboard(htmlValue, plainValue);
+            }
+
+            final AtomicBoolean copied = new AtomicBoolean(false);
+            final CountDownLatch done = new CountDownLatch(1);
+            runOnUiThread(() -> {
+                try {
+                    copied.set(writePublicationClipboard(htmlValue, plainValue));
+                } finally {
+                    done.countDown();
+                }
+            });
+            try {
+                return done.await(2500, TimeUnit.MILLISECONDS) && copied.get();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+
+        private boolean writePublicationClipboard(String htmlValue, String plainValue) {
+            try {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (clipboard == null) return false;
+                ClipDescription description = new ClipDescription("Дзен Текст",
+                        new String[] { ClipDescription.MIMETYPE_TEXT_PLAIN, ClipDescription.MIMETYPE_TEXT_HTML });
+                ClipData clip = new ClipData(description, new ClipData.Item(plainValue, htmlValue));
+                clip.addItem(new ClipData.Item(plainValue));
+                clipboard.setPrimaryClip(clip);
+                return true;
+            } catch (Exception e) {
+                return false;
+            }
+        }
+    }
 
     public class DocumentsBridge {
         @JavascriptInterface public String ensureActiveArticle() { return documentStore.ensureActiveArticle(); }

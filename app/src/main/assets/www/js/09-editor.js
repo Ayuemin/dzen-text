@@ -131,29 +131,68 @@ function showPane(name){
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
 }
 
-function copyRichHtml(){
-  const html=markdownToHtml(editor.value);
-  if(!html){toast('Текущая статья пустая');return}
-  const stage=document.getElementById('copyStage');
-  stage.innerHTML=html;
-  const sel=window.getSelection(),range=document.createRange();
-  range.selectNodeContents(stage);
-  sel.removeAllRanges();
-  sel.addRange(range);
-  let ok=false;
-  try{ok=document.execCommand('copy')}catch(e){}
-  sel.removeAllRanges();
-  if(ok){
-    toast('Скопировано для публикации');
-  }else{
-    const ta=document.createElement('textarea');
-    ta.value=editor.value;
-    document.body.appendChild(ta);
-    ta.select();
-    try{ok=document.execCommand('copy')}catch(e){}
-    ta.remove();
-    toast(ok?'Текст скопирован для публикации':'Не удалось скопировать');
+function publishPayload(){
+  return publishPreflight(editor.value);
+}
+async function copyRichHtml(){
+  const result=publishPayload();
+  if(result.errors.length){
+    await appConfirm('Нельзя скопировать для публикации',result.errors.join('\n\n'),'Понятно',true);
+    return;
   }
+  if(result.warnings.length){
+    const ok=await appConfirm('Проверьте перед публикацией',result.warnings.join('\n\n')+'\n\nВсё равно скопировать?','Скопировать',false);
+    if(!ok)return;
+  }
+  copyRichPayload(result);
+}
+function copyRichPayload(result){
+  const payload={html:result.html,plain:result.plain};
+  if(!payload.html){toast('Текущая статья пустая');return}
+  if(window.AndroidPublish&&typeof AndroidPublish.copyForPublication==='function'){
+    let ok=false;
+    try{
+      ok=!!AndroidPublish.copyForPublication(payload.html,payload.plain);
+    }catch(e){ok=false}
+    if(ok){toast('Скопировано для публикации');return}
+  }
+  copyPayloadToWebClipboard(payload);
+}
+// Browser-only fallback. Still a single flavour decision: the selection copy
+// carries the rendered HTML, and a plain-text fallback never ships raw Markdown.
+function copyPayloadToWebClipboard(payload){
+  const stage=document.getElementById('copyStage');
+  const sel=window.getSelection();
+  const savedRanges=[];
+  try{
+    if(sel&&sel.rangeCount)for(let i=0;i<sel.rangeCount;i++)savedRanges.push(sel.getRangeAt(i));
+  }catch(e){}
+  let ok=false;
+  try{
+    stage.innerHTML=payload.html;
+    const range=document.createRange();
+    range.selectNodeContents(stage);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    try{ok=document.execCommand('copy')}catch(e){}
+  }catch(e){}
+  finally{
+    try{stage.innerHTML=''}catch(e){}
+    try{
+      sel.removeAllRanges();
+      for(const r of savedRanges)sel.addRange(r);
+    }catch(e){}
+  }
+  if(ok){toast('Скопировано для публикации');return}
+  const ta=document.createElement('textarea');
+  ta.value=payload.plain;
+  ta.setAttribute('readonly','');
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0,ta.value.length);
+  try{ok=document.execCommand('copy')}catch(e){}
+  ta.remove();
+  toast(ok?'Скопировано для публикации':'Не удалось скопировать');
 }
 
 function cleanSpeechText(){

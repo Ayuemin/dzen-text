@@ -20,7 +20,6 @@ function runFullCheck(){
    }
  },60);
 }
-function closeSpellPanel(){}
 function closeAnalysis(){document.getElementById('analysisBackdrop').classList.remove('open')}
 function openAnalysis(){editor.blur();setCheckRunning(true);setTimeout(()=>{try{analyzeText();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}finally{setCheckRunning(false)}},40)}
 function analysisBackdropClick(e){if(e.target.id==='analysisBackdrop')closeAnalysis()}
