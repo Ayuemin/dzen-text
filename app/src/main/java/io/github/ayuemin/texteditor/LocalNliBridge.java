@@ -39,6 +39,11 @@ final class LocalNliBridge {
         return activity.startLocalNliAnalysis(text, tuneDefaultCategories(categoriesJson));
     }
 
+    @JavascriptInterface
+    public boolean cancelAnalysis() {
+        return activity.cancelLocalNliAnalysis();
+    }
+
     /**
      * Compatibility migration for the prototype defaults already stored in localStorage.
      * User-written hypotheses are left untouched: a category is changed only when its
