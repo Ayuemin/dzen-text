@@ -35,3 +35,10 @@ android {
         }
     }
 }
+
+dependencies {
+    // Optional on-device semantic classifier. The app still works when the
+    // model assets are absent; the runtime is wired now so a model can be
+    // dropped into app/src/main/assets/models later without changing UI code.
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.30.0'
+}
