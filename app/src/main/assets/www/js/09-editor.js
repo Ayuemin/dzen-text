@@ -1,6 +1,4 @@
 function afterProgrammaticEdit(runAnalysis=false,options={}){
-  const keepOnlineSpelling=!!options.keepOnlineSpelling;
-  if(!keepOnlineSpelling&&typeof clearOnlineSpelling==='function')clearOnlineSpelling();
   markAnalysisStale();
   render(!!runAnalysis);
   if(typeof scheduleArticleSave==='function')scheduleArticleSave();
@@ -24,8 +22,6 @@ async function clearEditor(){
   closeNearbyRepeat();
   closeRepeatNavigator();
   if(typeof closeIssueNavigator==='function')closeIssueNavigator();
-  closeSpellPanel();
-  clearOnlineSpelling();
   editor.value='';
   localStorage.removeItem('dzenDraft');
   markAnalysisStale();
@@ -54,7 +50,6 @@ async function loadFileText(text,name=''){
   closeNearbyRepeat();
   closeRepeatNavigator();
   if(typeof closeIssueNavigator==='function')closeIssueNavigator();
-  clearOnlineSpelling();
   render(false);
   markAnalysisStale();
   if(typeof persistCurrentArticleNow==='function')persistCurrentArticleNow();

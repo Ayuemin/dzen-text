@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Дзен Текст 1.9.0</title>
+<title>Дзен Текст 1.11.0</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
@@ -70,14 +70,6 @@
       <button id="issueNavContext" class="issueNavContext" type="button" onclick="jumpIssueNavigator()"></button>
       <div class="repeatNavMeta">Листайте однотипные замечания стрелками. Фрагмент в редакторе выделяется автоматически.</div>
     </div>
-    <div id="spellPanel" class="replacePanel" aria-live="polite">
-      <div class="replaceHead"><div class="replaceTitle">Орфография: <b id="spellWord">—</b><div id="spellCount"></div></div><button id="spellPrev" class="miniIcon" onclick="navigateSpellIssue(-1)" aria-label="Предыдущая ошибка">‹</button><button id="spellNext" class="miniIcon" onclick="navigateSpellIssue(1)" aria-label="Следующая ошибка">›</button><button class="miniIcon" onclick="closeSpellPanel()" aria-label="Закрыть">×</button></div>
-      <div id="spellSuggestions" class="replaceChips"></div>
-      <div class="settingActions spellActions"><button class="nativeBtn" type="button" onclick="ignoreCurrentSpellWord()">Не ошибка · запомнить</button></div>
-      <div class="replaceNote">Нажмите на вариант, чтобы заменить выделенное слово. Если слово правильное, «Не ошибка» добавит его в локальные исключения на этом устройстве.</div>
-      <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
-    </div>
-  </main>
   <div class="markdownToolbar" id="markdownToolbar" aria-label="Панель Markdown">
     <div class="markdownToolbarScroll">
       <button type="button" class="mdBtn mdHistory" id="undoBtn" onclick="undoEdit()" aria-label="Отменить" title="Отменить">↶</button>
@@ -103,7 +95,7 @@
   <footer class="bottom">
     <button class="bottomBtn iconOnly" id="speakBtn" onclick="toggleSpeak()" aria-label="Озвучить" title="Озвучить"><span id="speakIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11"/></svg></span><span id="speakText" class="srOnly">Озвучить</span></button>
     <div class="stats"><b id="words">0</b> слов · <b id="readTime">0 мин</b> · <b id="chars">0</b> знаков</div>
-    <button class="gear checkAction" id="checkBtn" onclick="runFullCheck()" aria-label="Проверить текст" title="Проверить текст"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M4 12h5M4 18h7"/><path d="m14 15 2.5 2.5L21 12"/></svg></button>
+    <button class="gear checkAction" id="checkBtn" onclick="runFullCheck()" aria-label="Обновить локальную проверку" title="Обновить локальную проверку"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h8M4 12h5M4 18h7"/><path d="m14 15 2.5 2.5L21 12"/></svg></button>
     <button class="analysisDot" id="analysisDot" onclick="openAnalysis()" aria-label="Редакторский анализ"><span></span></button>
     <button class="gear" onclick="openSettings()" aria-label="Настройки" title="Настройки"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.97 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.97a1.7 1.7 0 0 0-.34-1.88l-.06-.06L7.03 4.2l.06.06A1.7 1.7 0 0 0 8.97 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.52 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg></button>
   </footer>
@@ -123,7 +115,7 @@
       <div class="drawerSectionLabel">Текущая статья</div>
       <nav class="drawerNav drawerActions">
         <button type="button" id="drawerViewToggle" onclick="toggleEditorPreview()">Предпросмотр</button>
-        <button type="button" onclick="drawerCheck()">Проверить текст</button>
+        <button type="button" onclick="drawerCheck()">Проверить локально</button>
         <button type="button" id="drawerSpeakBtn" onclick="drawerSpeak()">Озвучить</button>
         <button type="button" onclick="drawerCopyForPublication()">Скопировать для публикации</button>
         <button type="button" onclick="saveCurrentArticleToFile()">Сохранить в файл</button>
@@ -271,31 +263,25 @@
         <div class="switchRow" style="margin-top:13px"><span>Одинаковые начала предложений и абзацев</span><input id="openingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Структура H1–H3</span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Ошибки Markdown</span><input id="markdownCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Признаки ИИ-стиля</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Локальный фильтр отмечает типографические признаки, характерные для машинного текста. Смысловые шаблоны автоматически не оцениваются.</div>
+        <div class="switchRow" style="margin-top:13px"><span>Типографические сигналы</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="smallNote">Локальная механическая проверка типографических признаков. Она не определяет авторство текста и не оценивает смысл.</div>
       </div>
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Проверка текста</span><small>Опечатки и Яндекс.Спеллер</small></summary>
+      <summary><span>Локальная проверка</span><small>Опечатки, пунктуация и механические ошибки</small></summary>
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Онлайн-проверка орфографии</span><input id="onlineSpelling" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Онлайн-проверка выполняется только после нажатия кнопки проверки. При наборе текст наружу не отправляется.</div>
-        <div id="spellIgnoreStatus" class="dictStatus">Мои правильные слова: 0</div>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="clearSpellIgnoreWords()">Очистить исключения</button></div>
-        <div class="spellAttribution"><a href="https://yandex.ru/dev/speller/">Проверка правописания: Яндекс.Спеллер</a></div>
+        <div class="smallNote">Проверка выполняется только на устройстве. Текст статьи никуда не отправляется.</div>
       </div>
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Правила Дзена</span><small>Локальная проверка возможных рисков</small></summary>
+      <summary><span>Правила Дзена</span><small>Встроенные локальные эвристики</small></summary>
       <div class="settingsGroupBody">
         <div class="switchRow"><span>Проверять возможные риски</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Использовать обновляемую ИИ-базу</span><input id="dzenSmartRules" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Текст статьи в OpenRouter не отправляется. Приложение получает с GitHub только компактную базу правил.</div>
+        <div class="smallNote">Используется встроенный набор эвристик. Совпадение означает повод проверить формулировку вручную, а не установленное нарушение.</div>
         <div id="dzenRulesStatus" class="ruleStatus"></div>
-        <div class="settingActions"><button class="nativeBtn" type="button" onclick="updateDzenRulesFromGitHub()">Обновить умную базу</button><button class="nativeBtn" type="button" onclick="resetDzenRules()">Вернуть встроенные</button></div>
       </div>
     </details>
 
@@ -357,7 +343,7 @@
   <div class="handle"></div><div class="sheetHeader"><h2>Редакторский анализ</h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
   <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
-  <div class="analysisExport"><div class="analysisExportTitle">Выгрузить замечания</div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — удобно передать его модели, которая будет править исходную статью.</div></div>
+  <div class="analysisExport"><div class="analysisExportTitle">Выгрузить замечания</div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — его можно сохранить или скопировать для ручной работы.</div></div>
 </div></div>
 <div id="highlightHint" class="highlightHint">Фрагмент выделен</div>
 <div id="toast" class="toast"></div><div id="copyStage" class="copyStage" aria-hidden="true"></div>

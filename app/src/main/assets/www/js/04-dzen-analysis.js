@@ -13,7 +13,7 @@ function analyzeDzenRules(src,headings,issues){const r=activeDzenRules(),titleOb
 function addAIStyleAggregate(issues,title,detail,occurrences){if(!occurrences||!occurrences.length)return;const first=occurrences[0];const it=addSimpleIssue(issues,'aiStyle',title,detail,first.start,first.end,'warning');if(it&&occurrences.length>1){it.occurrences=occurrences.slice(0,80);it.navTitle=title}}
 function analyzeAIStyle(src,headings,paragraphs,issues){
  const dashOcc=Array.from(src.matchAll(/—/g)).map(m=>({start:m.index,end:m.index+1}));
- if(dashOcc.length)addAIStyleAggregate(issues,`Длинное тире — ${dashOcc.length} раз`,'Найден символ «—». В нашем редакционном фильтре он считается типографическим маркером машинного текста. Нажмите, чтобы просмотреть все места. Сам по себе символ не доказывает авторство ИИ.',dashOcc);
+ if(dashOcc.length)addAIStyleAggregate(issues,`Длинное тире — ${dashOcc.length} раз`,'Найден символ «—». Это типографический сигнал для проверки единообразия. Нажмите, чтобы просмотреть все места. Сам по себе символ не является ошибкой и ничего не говорит об авторстве текста.',dashOcc);
 }
 function analyzeProofLocal(src,issues){
  const add=(title,detail,start,end,replacement='')=>{const issue=addIssue(issues,'proof',title,detail,start,end);if(issue&&replacement)issue.replacement=replacement;return !!issue};

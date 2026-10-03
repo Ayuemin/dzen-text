@@ -103,109 +103,14 @@ function installLocalPublicationSafety(){
   };
 }
 
-function installTypographyReview(){
-  analyzeAIStyle=function(src,headings,paragraphs,issues){
-    const occurrences=Array.from(String(src||'').matchAll(/—/g)).map(m=>({start:m.index,end:m.index+1}));
-    if(occurrences.length)addAIStyleAggregate(issues,'Длинное тире — '+occurrences.length+' раз','Проверьте единообразие типографики. Само по себе длинное тире не является ошибкой и ничего не говорит об авторстве текста.',occurrences);
-  };
-  const baseIssueGroups=issueGroups;
-  issueGroups=function(){
-    return baseIssueGroups().map(group=>group.id==='aiStyle'?{...group,name:'Типографические сигналы'}:group);
-  };
-}
-
-function enforceLocalFirstSettings(){
-  settings.onlineSpelling=false;
-  settings.dzenSmartRules=false;
-  try{if(typeof DZEN_RULES_KEY!=='undefined')localStorage.removeItem(DZEN_RULES_KEY)}catch(e){}
-  try{if(typeof persistSettings==='function')persistSettings(false)}catch(e){}
-
-  markAnalysisStale=function(){
-    const dot=document.getElementById('analysisDot');
-    if(!dot)return;
-    dot.classList.remove('bad');
-    dot.classList.add('stale');
-    dot.setAttribute('aria-label','Локальная проверка обновляется');
-    dot.title='Локальная проверка обновляется автоматически';
-  };
-
-  updateDzenRulesFromGitHub=function(){toast('В этой версии используется только встроенная локальная база правил Дзена')};
-  updateDzenRulesStatus=function(){
-    const el=document.getElementById('dzenRulesStatus');
-    if(!el)return;
-    const r=typeof DEFAULT_DZEN_RULES!=='undefined'?DEFAULT_DZEN_RULES:{};
-    el.innerHTML='Локальная база: <b>встроенная</b><br>Версия: <b>'+escapeHtml(String(r.version||'встроенная'))+'</b><br>Статья проверяется только на устройстве.';
-  };
-}
-
-function applyLocalFirstUi(){
-  const online=document.getElementById('onlineSpelling');
-  if(online){
-    online.checked=false;
-    const row=online.closest('.switchRow');
-    if(row){row.hidden=true;const note=row.nextElementSibling;if(note&&note.classList.contains('smallNote'))note.hidden=true}
-  }
-  const spellStatus=document.getElementById('spellIgnoreStatus');
-  if(spellStatus){
-    spellStatus.hidden=true;
-    const actions=spellStatus.nextElementSibling;
-    if(actions&&actions.classList.contains('settingActions'))actions.hidden=true;
-  }
-  document.querySelectorAll('.spellAttribution').forEach(x=>x.hidden=true);
-  const spellPanel=document.getElementById('spellPanel');if(spellPanel)spellPanel.hidden=true;
-  const proof=document.getElementById('proofCheck');
-  const proofGroup=proof&&proof.closest('details.settingsGroup');
-  if(proofGroup){
-    const summary=proofGroup.querySelector('summary');
-    if(summary)summary.innerHTML='<span>Локальная проверка</span><small>Опечатки, пунктуация и механические ошибки</small>';
-  }
-
-  const smart=document.getElementById('dzenSmartRules');
-  if(smart){
-    smart.checked=false;
-    const row=smart.closest('.switchRow');
-    if(row){row.hidden=true;const note=row.nextElementSibling;if(note&&note.classList.contains('smallNote'))note.hidden=true}
-  }
-  const dzenStatus=document.getElementById('dzenRulesStatus');
-  if(dzenStatus){
-    const actions=dzenStatus.nextElementSibling;
-    if(actions&&actions.classList.contains('settingActions'))actions.hidden=true;
-  }
-  const dzenCheck=document.getElementById('dzenCheck');
-  const dzenGroup=dzenCheck&&dzenCheck.closest('details.settingsGroup');
-  if(dzenGroup){
-    const summary=dzenGroup.querySelector('summary');
-    if(summary)summary.innerHTML='<span>Правила Дзена</span><small>Встроенные локальные эвристики</small>';
-  }
-
-  const aiStyle=document.getElementById('aiStyleCheck');
-  if(aiStyle){
-    const row=aiStyle.closest('.switchRow');
-    const label=row&&row.querySelector('span');
-    if(label)label.textContent='Типографические сигналы';
-    const note=row&&row.nextElementSibling;
-    if(note&&note.classList.contains('smallNote'))note.textContent='Локальная механическая проверка типографических признаков. Она не определяет авторство текста и не оценивает смысл.';
-  }
-  const exportNote=document.querySelector('.analysisExport .smallNote');
-  if(exportNote)exportNote.textContent='Отчёт содержит метки поиска, контекст и позиции замечаний. Его можно сохранить или скопировать для ручной работы.';
-
-  const check=document.getElementById('checkBtn');
-  if(check){check.setAttribute('aria-label','Обновить локальную проверку');check.title='Обновить локальную проверку'}
-  const drawerCheck=document.querySelector('button[onclick="drawerCheck()"]');
-  if(drawerCheck)drawerCheck.textContent='Проверить локально';
-}
-
 function bootstrapDzenText(){
   if(window.__dzenTextBootstrapped)return;
   window.__dzenTextBootstrapped=true;
 
   document.title='Дзен Текст 1.11.0';
   settings=loadSettings();
-  enforceLocalFirstSettings();
   installLocalPublicationSafety();
-  installTypographyReview();
   userSynonyms=loadUserSynonyms();
-  spellIgnoreWords=loadSpellIgnoreWords();
   dzenRules=loadDzenRules();
 
   editor.addEventListener('paste',()=>{inputWasPaste=true});
@@ -214,9 +119,7 @@ function bootstrapDzenText(){
     if(nearbyState)closeNearbyRepeat();
     if(repeatNavState&&typeof scheduleRepeatNavigatorRefresh==='function')scheduleRepeatNavigatorRefresh();
     if(typeof issueNavState!=='undefined'&&issueNavState&&typeof scheduleIssueNavigatorRefresh==='function')scheduleIssueNavigatorRefresh();
-    if(spellNavState)closeSpellPanel();
     inputWasPaste=false;
-    clearOnlineSpelling();
     render(false);
     markAnalysisStale();
     scheduleLocalAnalysis();
@@ -272,10 +175,8 @@ function bootstrapDzenText(){
   }
   if(typeof migrateLegacyVersions==='function')migrateLegacyVersions();
   syncSettingsUI();
-  applyLocalFirstUi();
   updateUserSynonymStatus();
   updateDzenRulesStatus();
-  updateSpellIgnoreStatus();
   render(false);
   scheduleLocalAnalysis();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
