@@ -6,16 +6,43 @@ let p0RevisionStore={};
 let p0State={documentId:'',revision:0,textHash:'',settingsVersion:'',rulesVersion:''};
 let p0PersistTimer=null;
 
+function nativeRevisionAvailable(){
+  return !!(window.AndroidDocumentRevision
+    &&typeof AndroidDocumentRevision.read==='function'
+    &&typeof AndroidDocumentRevision.persist==='function');
+}
 function loadRevisionStore(){
   try{
     const parsed=JSON.parse(localStorage.getItem(REVISION_KEY)||'{}');
     return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
   }catch(e){return {}}
 }
+function nativeRevisionFor(id){
+  if(!nativeRevisionAvailable())return null;
+  try{
+    const value=JSON.parse(AndroidDocumentRevision.read(String(id))||'{}');
+    const revision=Math.max(0,Number(value.revision)||0);
+    const textHash=String(value.textHash||'');
+    return revision?{revision,textHash}:null;
+  }catch(e){return null}
+}
 function saveRevisionStoreSoon(){
   clearTimeout(p0PersistTimer);
   p0PersistTimer=setTimeout(function(){
     try{localStorage.setItem(REVISION_KEY,JSON.stringify(p0RevisionStore))}catch(e){}
+    if(nativeRevisionAvailable()){
+      for(const [id,state] of Object.entries(p0RevisionStore)){
+        if(!state||!state.textHash)continue;
+        try{
+          const persisted=JSON.parse(AndroidDocumentRevision.persist(id,Math.max(0,Number(state.revision)||0),String(state.textHash))||'{}');
+          const revision=Math.max(0,Number(persisted.revision)||0);
+          if(revision>Number(state.revision||0)){
+            state.revision=revision;
+            if(p0State.documentId===id)p0State.revision=revision;
+          }
+        }catch(e){}
+      }
+    }
   },350);
 }
 function currentDocumentId(){
@@ -32,11 +59,19 @@ function rulesVersion(){
     return P0Core.textHash(JSON.stringify({pack:pack||null,lists:lists||null}));
   }catch(e){return 'rules:unknown'}
 }
+function storedRevisionFor(id){
+  const local=p0RevisionStore[id]||{};
+  const native=nativeRevisionFor(id)||{};
+  if(Number(native.revision||0)>Number(local.revision||0)){
+    return {revision:Number(native.revision)||0,textHash:String(native.textHash||'')};
+  }
+  return {revision:Number(local.revision)||0,textHash:String(local.textHash||'')};
+}
 function syncDocumentRevision(reason){
   const id=currentDocumentId();
   const hash=P0Core.textHash(editor&&editor.value||'');
   if(p0State.documentId!==id){
-    const saved=p0RevisionStore[id]||{};
+    const saved=storedRevisionFor(id);
     let revision=Math.max(0,Number(saved.revision)||0);
     if(saved.textHash!==hash)revision++;
     if(revision<1)revision=1;
@@ -318,8 +353,6 @@ function installFoundation(){
     window.applyReplacement=applyReplacement;
   }
 
-  // Keep the old semantic prototype callable for diagnostics, but remove it from
-  // the primary acceptance path. The main check is deterministic and bounded.
   if(typeof runFullCheck==='function'){
     window.runExperimentalSemanticCheck=runFullCheck;
     runFullCheck=function(){
@@ -355,7 +388,7 @@ function installFoundation(){
   setTimeout(markSemanticExperimental,80);
 
   try{
-    if(window.AndroidDevLog&&typeof AndroidDevLog.log==='function')AndroidDevLog.log('P0','foundation installed');
+    if(window.AndroidDevLog&&typeof AndroidDevLog.log==='function')AndroidDevLog.log('P0','foundation installed; nativeRevision='+nativeRevisionAvailable());
   }catch(e){}
 }
 
