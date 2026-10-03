@@ -28,6 +28,10 @@ final class LocalLlmBridge {
 
     @JavascriptInterface
     public long analyzeAsync(String text, String criteria, String exclusions) {
-        return activity.startLocalLlmAnalysis(text, criteria, exclusions);
+        // Qwen3 supports /no_think as a soft switch in user/system messages.
+        // Keep it native so users can freely edit their visible criteria without
+        // accidentally turning long chain-of-thought generation back on.
+        String fixedExclusions = (exclusions == null ? "" : exclusions) + "\n/no_think";
+        return activity.startLocalLlmAnalysis(text, criteria, fixedExclusions);
     }
 }
