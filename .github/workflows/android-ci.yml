@@ -30,7 +30,10 @@ jobs:
       - name: Prepare Android SDK
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"             "platform-tools"             "platforms;android-35"             "build-tools;35.0.0"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            "platform-tools" \
+            "platforms;android-35" \
+            "build-tools;35.0.0"
 
       - name: Check editor JavaScript
         run: |
@@ -53,6 +56,7 @@ jobs:
           PY
           python3 tools/check_editor_invariants.py
           python3 tools/check_app_logic.py
+          python3 tools/check_local_first.py
 
       - uses: gradle/actions/setup-gradle@v4
         with:
