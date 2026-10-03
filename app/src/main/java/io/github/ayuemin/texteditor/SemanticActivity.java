@@ -21,7 +21,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** MainActivity plus a fast fully-local ONNX NLI semantic classifier. */
+/** MainActivity plus optional experimental local semantic analysis. */
 public class SemanticActivity extends MainActivity {
     private static final int REQUEST_OPEN_LOCAL_NLI = 2916;
     private static final String EDITOR_URL = "file:///android_asset/www/index.html";
@@ -39,9 +39,10 @@ public class SemanticActivity extends MainActivity {
         localNli = new LocalNliEngine(this);
         semanticWebView = findWebView(findViewById(android.R.id.content));
         if (semanticWebView != null) {
-            DevLog.i("WEB", "WebView found; stopping initial asset load and attaching AndroidSemanticModel");
+            DevLog.i("WEB", "WebView found; stopping initial asset load and attaching native bridges");
             semanticWebView.stopLoading();
             semanticWebView.addJavascriptInterface(new LocalNliBridge(this, localNli), "AndroidSemanticModel");
+            semanticWebView.addJavascriptInterface(new DocumentRevisionBridge(this), "AndroidDocumentRevision");
             semanticWebView.loadUrl(EDITOR_URL);
             DevLog.i("WEB", "editor asset load requested: " + EDITOR_URL);
         } else {
