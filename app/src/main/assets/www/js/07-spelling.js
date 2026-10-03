@@ -1,3 +1,7 @@
+function runAnalysisWithSemanticModel(){
+ window.__runLocalSemantic=true;
+ try{return analyzeText()}finally{window.__runLocalSemantic=false}
+}
 function runFullCheck(){
  const src=editor.value||'';
  if(!src.trim()){toast('Нет текста для проверки');return}
@@ -6,7 +10,7 @@ function runFullCheck(){
  toast(src.length>150000?'Обновляю локальную проверку большого текста…':'Обновляю локальную проверку…');
  setTimeout(()=>{
    try{
-     analyzeText();
+     runAnalysisWithSemanticModel();
      analysisMode='problems';
      document.getElementById('analysisBackdrop').classList.add('open');
      setAnalysisMode('problems');
@@ -21,5 +25,5 @@ function runFullCheck(){
  },60);
 }
 function closeAnalysis(){document.getElementById('analysisBackdrop').classList.remove('open')}
-function openAnalysis(){editor.blur();setCheckRunning(true);setTimeout(()=>{try{analyzeText();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}finally{setCheckRunning(false)}},40)}
+function openAnalysis(){editor.blur();setCheckRunning(true);setTimeout(()=>{try{runAnalysisWithSemanticModel();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}finally{setCheckRunning(false)}},40)}
 function analysisBackdropClick(e){if(e.target.id==='analysisBackdrop')closeAnalysis()}
