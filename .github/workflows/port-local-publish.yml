@@ -24,7 +24,9 @@ jobs:
           python-version: '3.12'
 
       - name: Apply publication port
-        run: python3 .github/scripts/port_local_publish.py
+        run: |
+          python3 .github/scripts/port_local_publish.py
+          git checkout -- .github/workflows/android-ci.yml
 
       - name: Validate publication behaviour
         run: |
@@ -53,7 +55,6 @@ jobs:
                   app/src/main/assets/www/js/12-bootstrap.js \
                   app/src/main/assets/www/js/12-history.js \
                   app/src/main/assets/www/js/12-publish.js \
-                  .github/workflows/android-ci.yml \
                   tools/check_local_first.py \
                   tools/test_publish_export.js \
                   tools/test_publish_copy.js
