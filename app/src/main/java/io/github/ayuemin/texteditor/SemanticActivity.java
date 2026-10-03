@@ -41,7 +41,7 @@ public class SemanticActivity extends MainActivity {
     void pickLocalLlmModel() {
         runOnUiThread(() -> {
             if (llmBusy.get()) {
-                notifyLlmError("Дождитесь окончания текущей смысловой проверки");
+                notifyLlmError("Дождитесь окончания текущей операции с локальной моделью");
                 return;
             }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
@@ -92,8 +92,8 @@ public class SemanticActivity extends MainActivity {
             return;
         }
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) return;
-        if (llmBusy.get()) {
-            notifyLlmError("Дождитесь окончания текущей смысловой проверки");
+        if (!llmBusy.compareAndSet(false, true)) {
+            notifyLlmError("Дождитесь окончания текущей операции с локальной моделью");
             return;
         }
         final Uri uri = data.getData();
@@ -109,6 +109,8 @@ public class SemanticActivity extends MainActivity {
                 String message = e.getMessage();
                 if (message == null || message.trim().isEmpty()) message = e.getClass().getSimpleName();
                 notifyLlmError(message);
+            } finally {
+                llmBusy.set(false);
             }
         }, "local-gguf-install").start();
     }
