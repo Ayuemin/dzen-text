@@ -16,6 +16,10 @@ public class SemanticActivity extends MainActivity {
         WebView webView = findWebView(findViewById(android.R.id.content));
         if (webView != null) {
             webView.addJavascriptInterface(new LocalClassifierBridge(localClassifier), "AndroidLocalClassifier");
+            // addJavascriptInterface is guaranteed for the next page load. MainActivity
+            // starts loading immediately, so reload once after registration to avoid a
+            // race where the first page would not see AndroidLocalClassifier.
+            webView.reload();
         }
     }
 
