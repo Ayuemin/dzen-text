@@ -1,17 +1,12 @@
 // Publication preflight.
 //
-// The whole point of this app is that the pasted result is accepted by the platform
+// The whole point of this app is that the pasted result is accepted by the target
 // editor. Copying therefore runs a preflight: the rendered HTML is normalised
-// into the subset platform can represent, and anything the author should know is
-// reported before the text leaves the app. Errors block the copy instead of
-// failing silently with a toast.
+// into a conservative subset, and anything the author should know is reported
+// before the text leaves the app. Errors block the copy instead of failing silently.
 
 const PUBLISH_MAX_HEADING = 3;
 
-// The platform editor offers controls for H1-H3, bold, italic, links, quotes and
-// lists. Deeper headings, strikethrough, inline code and horizontal rules have
-// no control, so pasting them produces unpredictable results. Keep the words,
-// drop the markup.
 function sanitizePublishHtml(html) {
   let out = String(html == null ? '' : html);
   out = out.replace(/<h([4-6])(\s[^>]*)?>([\s\S]*?)<\/h\1>/gi, '<h3>$3</h3>');
@@ -34,9 +29,8 @@ function stripHtmlTags(html) {
     .trim();
 }
 
-// A platform article has one title in its own form field, so the "# " line is the
-// title and everything after it is the body. Articles written without such a
-// line simply have no title.
+// Legacy helper kept for compatibility. The P0 publication contract below uses
+// P0Core.publicationParts(), which also supports a plain-text first-line title.
 function publishTitleFrom(markdown) {
   const lines = String(markdown == null ? '' : markdown).split(/\r?\n/);
   for (const raw of lines) {
@@ -59,11 +53,6 @@ function publishHeadings(html) {
   return out;
 }
 
-/**
- * Runs the preflight and returns {errors, warnings, html, plain}.
- * errors   - block publication; the platform editor could not represent the article
- * warnings - the author may still publish, but should look first
- */
 function publishPreflight(markdown) {
   const src = String(markdown == null ? '' : markdown);
   const html = sanitizePublishHtml(buildPublishHtml(src));
@@ -75,33 +64,123 @@ function publishPreflight(markdown) {
 
   const title = publishTitleFrom(src);
   if (!title) {
-    warnings.push('Нет строки «# Заголовок». В площадкае заголовок — отдельное поле, добавьте его первой строкой.');
+    warnings.push('Не определён заголовок статьи. Проверьте первую строку перед публикацией.');
   } else if (title.length > 200) {
-    warnings.push('Заголовок очень длинный (' + title.length + ' символов). Проверьте, как он выглядит в площадкае.');
+    warnings.push('Заголовок очень длинный (' + title.length + ' символов). Проверьте, как он выглядит при публикации.');
   }
 
-  // H1 inside the body renders as a second title next to the form field.
   const extraTitles = publishHeadings(html).filter(h => h.level === 1);
   if (extraTitles.length) {
-    errors.push('В теле статьи остался заголовок «# …»: в площадкае заголовок задаётся отдельным полем, а не в тексте.');
+    errors.push('В теле статьи остался второй заголовок H1. Оставьте один заголовок статьи.');
   }
 
   const plainWords = plain.trim() ? plain.trim().split(/\s+/).filter(Boolean).length : 0;
   if (html && plainWords < 30) {
-    warnings.push('Текст очень короткий (' + plainWords + ' слов). Короткие статьи плохо ранжируются.');
+    warnings.push('Текст очень короткий (' + plainWords + ' слов). Проверьте, достаточно ли материала для публикации.');
   }
 
-  // Markup with no platform control. The text survives sanitisation, so these are
-  // advisory rather than blocking.
   if (/^#{4,6}\s/m.test(src)) {
-    warnings.push('Заголовки H4–H6 понижены до H3: в площадкае глубже трёх уровней нет.');
+    warnings.push('Заголовки H4–H6 при копировании понижаются до H3.');
   }
   if (/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/m.test(src)) {
-    warnings.push('Разделители «---» убраны из публикации: в площадкае для этого есть отдельный элемент.');
+    warnings.push('Горизонтальные разделители при копировании убираются.');
   }
   if (/~~[^~]+~~/.test(src)) {
-    warnings.push('Зачёркнутый текст публикуется обычным текстом: в площадкае зачёркивания нет.');
+    warnings.push('Зачёркнутый текст копируется обычным текстом.');
   }
 
   return { errors, warnings, html, plain };
 }
+
+// P0 / PUB 01: a single title model and three explicit clipboard payloads.
+// "all" contains the title exactly once; "body" never contains the title;
+// "title" can be pasted into a separate title field.
+function p0PublicationPayload(markdown, mode) {
+  const src = String(markdown == null ? '' : markdown);
+  const parts = (typeof P0Core !== 'undefined' && P0Core.publicationParts)
+    ? P0Core.publicationParts(src)
+    : { title: publishTitleFrom(src), body: src, titleMode: 'legacy' };
+
+  // Feed a canonical H1 to the existing preflight so plain-text titles receive
+  // the same validation as Markdown H1 and are not duplicated into the body.
+  const canonical = parts.title ? '# ' + parts.title + '\n\n' + parts.body : parts.body;
+  const checked = publishPreflight(canonical);
+  const composed = (typeof P0Core !== 'undefined' && P0Core.composePublication)
+    ? P0Core.composePublication(parts.title, checked.html, checked.plain, mode)
+    : { html: checked.html, plain: checked.plain };
+
+  return {
+    errors: checked.errors,
+    warnings: checked.warnings,
+    title: parts.title,
+    titleMode: parts.titleMode,
+    bodyHtml: checked.html,
+    bodyPlain: checked.plain,
+    html: composed.html,
+    plain: composed.plain,
+    mode: mode === 'title' || mode === 'body' ? mode : 'all'
+  };
+}
+
+async function copyPublicationMode(mode) {
+  const result = p0PublicationPayload(editor.value, mode);
+  if (mode === 'title' && !result.title) {
+    toast('Заголовок статьи не определён');
+    return;
+  }
+  if (mode !== 'title' && result.errors.length) {
+    await appConfirm('Нельзя скопировать для публикации', result.errors.join('\n\n'), 'Понятно', true);
+    return;
+  }
+  if (mode !== 'title' && result.warnings.length) {
+    const ok = await appConfirm(
+      'Проверьте перед публикацией',
+      result.warnings.join('\n\n') + '\n\nВсё равно скопировать?',
+      'Скопировать', false
+    );
+    if (!ok) return;
+  }
+  copyRichPayload(result);
+}
+
+function copyPublicationAll() { return copyPublicationMode('all'); }
+function copyPublicationBody() { return copyPublicationMode('body'); }
+function copyPublicationTitle() { return copyPublicationMode('title'); }
+
+window.copyPublicationAll = copyPublicationAll;
+window.copyPublicationBody = copyPublicationBody;
+window.copyPublicationTitle = copyPublicationTitle;
+// Existing buttons mean "copy for publication"; from P0 onward their explicit
+// default is "all". The drawer also exposes title/body separately.
+window.copyRichHtml = copyPublicationAll;
+
+function installPublicationCopyUi() {
+  const drawer = document.querySelector('.drawerActions');
+  if (drawer && !drawer.querySelector('[data-copy-title]')) {
+    const old = Array.from(drawer.querySelectorAll('button')).find(function(button) {
+      return /drawerCopyForPublication/.test(button.getAttribute('onclick') || '');
+    });
+    if (old) {
+      old.textContent = 'Скопировать всё';
+      old.setAttribute('onclick', 'copyPublicationAll()');
+      const title = document.createElement('button');
+      title.type = 'button';
+      title.dataset.copyTitle = '1';
+      title.textContent = 'Скопировать заголовок';
+      title.onclick = copyPublicationTitle;
+      const body = document.createElement('button');
+      body.type = 'button';
+      body.dataset.copyBody = '1';
+      body.textContent = 'Скопировать текст';
+      body.onclick = copyPublicationBody;
+      old.insertAdjacentElement('afterend', body);
+      old.insertAdjacentElement('afterend', title);
+    }
+  }
+  const topCopy = document.querySelector('.tab[onclick="copyRichHtml()"]');
+  if (topCopy) {
+    topCopy.title = 'Копировать всё';
+    topCopy.setAttribute('aria-label', 'Копировать заголовок и текст');
+  }
+}
+setTimeout(installPublicationCopyUi, 0);
