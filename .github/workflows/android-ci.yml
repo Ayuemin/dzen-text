@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - local-first-v1.9
+      - prototype/editorial-rule-packs
   pull_request:
     branches:
       - main
@@ -57,7 +58,11 @@ jobs:
           PY
           python3 tools/check_editor_invariants.py
           python3 tools/check_app_logic.py
-          python3 tools/check_local_first.py
+          python3 tools/check_offline_editor.py
+          python3 tools/check_p0_storage.py
+          node tools/test_p0_foundation.js
+          node tools/test_p0_import.js
+          node tools/test_rule_pack.js
           node tools/test_publish_export.js
           node tools/test_publish_copy.js
 
@@ -68,9 +73,16 @@ jobs:
       - name: Build debug and release
         run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
         with:
-          name: Dzen-Text-v${{ env.APP_VERSION }}-APKs
-          path: |
-            app/build/outputs/apk/debug/app-debug.apk
-            app/build/outputs/apk/release/app-release-unsigned.apk
+          name: Text-Editor-v${{ env.APP_VERSION }}-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Text-Editor-v${{ env.APP_VERSION }}-release-unsigned
+          path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error

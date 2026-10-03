@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>Дзен Текст 1.11.0</title>
+<title>Редактор текста</title>
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/editor-v2.css">
 </head>
@@ -12,7 +12,7 @@
 <div class="systemBarScrim" aria-hidden="true"></div>
 <div class="app">
   <header class="top">
-    <div class="brand"><span class="mark"></span><span>Дзен Текст</span></div>
+    <div class="brand"><span class="mark"></span><span>Редактор текста</span></div>
     <div class="tabs">
       <button class="tab iconTab active" id="editTab" onclick="showPane('edit')" aria-label="Редактор" title="Редактор"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span class="srOnly">Редактор</span></button>
       <button class="tab iconTab" id="previewTab" onclick="showPane('preview')" aria-label="Превью" title="Превью"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><circle cx="12" cy="12" r="2.5"/></svg><span class="srOnly">Превью</span></button>
@@ -22,7 +22,7 @@
 
   <div class="workspaceControls" aria-label="Управление рабочей областью">
     <button class="navFloat" type="button" onclick="openSideDrawer()" aria-label="Открыть панель" title="Панель">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18 9 12l6-6"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
     </button>
   </div>
   <main class="main">
@@ -34,6 +34,7 @@
       <textarea id="editor" class="editor" spellcheck="true" placeholder="Начните писать…"></textarea>
       <input id="fileInput" class="fileInput" type="file" accept=".txt,.md,.markdown,.html,.htm,text/plain,text/markdown,text/html">
       <input id="synonymFileInput" class="fileInput" type="file" accept=".json,.txt,application/json,text/plain">
+      <input id="rulePackFileInput" class="fileInput" type="file" accept=".json,application/json,text/plain">
     </div></section>
     <section class="pane" id="previewPane"><div class="previewWrap"><article id="preview" class="article"></article><pre id="htmlCode" class="htmlCode"></pre></div></section>
     <div id="replacePanel" class="replacePanel" aria-live="polite">
@@ -52,7 +53,7 @@
     <div id="repeatNavPanel" class="repeatNavPanel" aria-live="polite">
       <div class="repeatNavHead"><div class="repeatNavTitle"><b id="repeatNavTitle">Повтор</b><div id="repeatNavCount"></div></div><button id="repeatNavPrev" class="miniIcon" onclick="navigateRepeatOccurrence(-1)" aria-label="Предыдущее совпадение">‹</button><button id="repeatNavNext" class="miniIcon" onclick="navigateRepeatOccurrence(1)" aria-label="Следующее совпадение">›</button><button class="miniIcon" onclick="closeRepeatNavigator()" aria-label="Закрыть">×</button></div>
       <button id="repeatNavContext" class="repeatNavContext" type="button" onclick="jumpRepeatOccurrence()"></button>
-      <div class="repeatNavMeta">Листайте совпадения стрелками. Нажмите на фрагмент, чтобы перейти к нему в редакторе.</div>
+      <div class="repeatNavMeta">Листайте совпадения стрелками. Нажмите на фрагмент, чтобы перейти к соответствующему месту текста.</div>
     </div>
 
     <div id="issueNavPanel" class="issueNavPanel" aria-live="polite">
@@ -80,7 +81,7 @@
   </footer>
 </div>
 
-<div class="sideDrawerBackdrop" id="sideBackdrop" onclick="sideBackdropClick(event)">
+<div class="sideBackdrop" id="sideBackdrop" onclick="sideBackdropClick(event)">
   <aside class="sideDrawer" id="sideDrawer" aria-label="Панель приложения">
     <div class="drawerHead">
       <div class="drawerCurrentInfo">
@@ -235,25 +236,23 @@
         <div class="switchRow" style="margin-top:13px"><span>Одинаковые начала предложений и абзацев</span><input id="openingCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Структура H1–H3</span><input id="headingStructureCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="switchRow" style="margin-top:13px"><span>Ошибки Markdown</span><input id="markdownCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="switchRow" style="margin-top:13px"><span>Типографические сигналы</span><input id="aiStyleCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Локальная механическая проверка типографических признаков. Она не определяет авторство текста и не оценивает смысл.</div>
       </div>
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Локальная проверка</span><small>Опечатки, пунктуация и механические ошибки</small></summary>
+      <summary><span>Пробелы и пунктуация</span><small>Механические ошибки оформления</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Локальные опечатки и пунктуация</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
+        <div class="switchRow"><span>Проверять пробелы и пунктуацию</span><input id="proofCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
         <div class="smallNote">Проверка выполняется только на устройстве. Текст статьи никуда не отправляется.</div>
       </div>
     </details>
 
     <details class="settingsGroup">
-      <summary><span>Правила Дзена</span><small>Встроенные локальные эвристики</small></summary>
+      <summary><span>Пакет правил</span><small>Дополнительные требования выбранной площадки или редакции</small></summary>
       <div class="settingsGroupBody">
-        <div class="switchRow"><span>Проверять возможные риски</span><input id="dzenCheck" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Используется встроенный набор эвристик. Совпадение означает повод проверить формулировку вручную, а не установленное нарушение.</div>
-        <div id="dzenRulesStatus" class="ruleStatus"></div>
+        <div id="rulePackStatus" class="ruleStatus"></div>
+        <div class="smallNote">Встроенных правил площадок нет. JSON хранится и применяется только на устройстве.</div>
+        <div class="settingActions rulePackActions"><button class="nativeBtn" type="button" onclick="downloadRulePackTemplate()">Скачать образец JSON</button><button class="nativeBtn primarySettingBtn" type="button" onclick="openRulePackImport()">Загрузить JSON</button></div>
       </div>
     </details>
 
@@ -300,6 +299,16 @@
   </div>
 </div>
 
+<div class="sheetBackdrop" id="rulePackBackdrop" onclick="rulePackBackdropClick(event)"><div class="sheet rulePackSheet">
+  <div class="handle"></div><div class="sheetHeader"><h2>Загрузить пакет правил</h2><button class="sheetClose" type="button" onclick="closeRulePackImport()" aria-label="Закрыть">×</button></div>
+  <div class="smallNote">Поддерживается только строгий формат <b>editorial-rule-pack-v1</b>. Пакет не может выполнять код или сетевые запросы.</div>
+  <div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="chooseRulePackFile()">Выбрать JSON-файл</button></div>
+  <div class="subLabel"><span>Или вставьте JSON</span></div>
+  <textarea id="rulePackPaste" class="rulePackPaste" rows="10" spellcheck="false" placeholder="{ &quot;schema&quot;: &quot;editorial-rule-pack-v1&quot;, … }"></textarea>
+  <div class="settingActions"><button class="nativeBtn" type="button" onclick="validateRulePackPaste()">Проверить формат</button><button id="rulePackInstallBtn" class="nativeBtn primarySettingBtn" type="button" onclick="installPendingRulePack()" hidden>Установить пакет</button></div>
+  <div id="rulePackImportResult" class="rulePackImportResult"></div>
+</div></div>
+
 <div class="dialogBackdrop" id="confirmBackdrop" onclick="confirmBackdropClick(event)">
   <div class="appDialog" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
     <h3 id="confirmTitle">Подтвердите действие</h3>
@@ -313,7 +322,7 @@
 
 <div class="sheetBackdrop" id="analysisBackdrop" onclick="analysisBackdropClick(event)"><div class="sheet analysisSheet">
   <div class="handle"></div><div class="sheetHeader"><h2>Редакторский анализ</h2><button id="analysisCollapse" class="sheetClose" type="button" onclick="closeAnalysis()" aria-label="Закрыть анализ">×</button></div>
-  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="dzen" onclick="setAnalysisMode('dzen')">Правила Дзена</button></div>
+  <div class="analysisFilters"><button class="analysisFilter active" data-mode="problems" onclick="setAnalysisMode('problems')">Только проблемы</button><button class="analysisFilter" data-mode="all" onclick="setAnalysisMode('all')">Всё</button><button class="analysisFilter" data-mode="rules" onclick="setAnalysisMode('rules')">Пакет правил</button></div>
   <div id="analysisBody"><div id="analysisSummary" class="analysisSummary"></div><div id="analysisContent"></div></div>
   <div class="analysisExport"><div class="analysisExportTitle">Выгрузить замечания</div><div class="analysisExportActions"><button class="nativeBtn" type="button" onclick="copyAnalysisReport()" aria-label="Скопировать замечания">⧉ В буфер</button><button class="nativeBtn" type="button" onclick="saveAnalysisReport()" aria-label="Сохранить замечания в файл">⇩ В файл</button></div><div class="smallNote">Отчёт содержит метки поиска, контекст и позиции замечаний — его можно сохранить или скопировать для ручной работы.</div></div>
 </div></div>
@@ -322,7 +331,7 @@
 <script src="js/01-core.js"></script>
 <script src="js/02-text-tools.js"></script>
 <script src="js/03-analysis-core.js"></script>
-<script src="js/04-dzen-analysis.js"></script>
+<script src="js/04-rules-analysis.js"></script>
 <script src="js/05-analysis-state.js"></script>
 <script src="js/06-analysis-report.js"></script>
 <script src="js/07-spelling.js"></script>
@@ -334,5 +343,8 @@
 <script src="js/12-articles.js"></script>
 <script src="js/12-history.js"></script>
 <script src="js/12-publish.js"></script>
+<script src="js/13-local-llm.js"></script>
+<script src="js/14-p0-core.js"></script>
+<script src="js/15-p0-foundation.js"></script>
 <script src="js/12-bootstrap.js"></script>
 </body></html>

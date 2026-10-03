@@ -1,4 +1,4 @@
-package ru.dzenprep.texteditor;
+package io.github.ayuemin.texteditor;
 
 import android.app.Activity;
 import android.content.ClipData;
@@ -58,6 +58,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     private static final int REQUEST_OPEN_BACKGROUND = 1910;
     private static final int REQUEST_OPEN_FONT = 1911;
     private static final int REQUEST_SAVE_ARTICLE = 1912;
+    private static final int REQUEST_OPEN_RULE_PACK = 1913;
     private static final int MAX_FILE_BYTES = 4 * 1024 * 1024;
     private static final int MAX_DICTIONARY_BYTES = 16 * 1024 * 1024;
     private static final int MAX_FONT_BYTES = 6 * 1024 * 1024;
@@ -155,9 +156,9 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
                 List<String> chunks = splitForTts(clean);
                 if (chunks.isEmpty()) return;
-                finalUtteranceId = "dzen_" + System.currentTimeMillis() + "_" + (chunks.size() - 1);
+                finalUtteranceId = "editor_" + System.currentTimeMillis() + "_" + (chunks.size() - 1);
                 for (int i = 0; i < chunks.size(); i++) {
-                    String id = "dzen_" + System.currentTimeMillis() + "_" + i;
+                    String id = "editor_" + System.currentTimeMillis() + "_" + i;
                     if (i == chunks.size() - 1) id = finalUtteranceId;
                     tts.speak(chunks.get(i), i == 0 ? TextToSpeech.QUEUE_FLUSH : TextToSpeech.QUEUE_ADD, null, id);
                 }
@@ -185,6 +186,21 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     startActivityForResult(intent, REQUEST_OPEN_TEXT);
                 } catch (Exception e) {
                     runJs("window.onNativeFileError && window.onNativeFileError('Не удалось открыть выбор файла')");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void pickRulePack() {
+            runOnUiThread(() -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/json", "text/plain"});
+                try {
+                    startActivityForResult(intent, REQUEST_OPEN_RULE_PACK);
+                } catch (Exception e) {
+                    runJs("window.onNativeRulePackError && window.onNativeRulePackError('Не удалось открыть выбор JSON')");
                 }
             });
         }
@@ -240,7 +256,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             File file = backgroundFile(safe);
             boolean ok = !file.exists() || file.delete();
             if (!ok) return false;
-            getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("background_name_" + safe).apply();
+            getSharedPreferences("editor_text", MODE_PRIVATE).edit().remove("background_name_" + safe).apply();
             if (safe.equals(MainActivity.this.activeBackgroundId())) {
                 String next = newestBackgroundId();
                 setActiveBackgroundId(next);
@@ -276,7 +292,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
         @JavascriptInterface
         public String fontName() {
-            return getSharedPreferences("dzen_text", MODE_PRIVATE).getString("font_name", "");
+            return getSharedPreferences("editor_text", MODE_PRIVATE).getString("font_name", "");
         }
 
         @JavascriptInterface
@@ -299,7 +315,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         @JavascriptInterface
         public void clearFont() {
             try { new File(getFilesDir(), FONT_FILE).delete(); } catch (Exception ignored) { }
-            getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("font_name").apply();
+            getSharedPreferences("editor_text", MODE_PRIVATE).edit().remove("font_name").apply();
             runJs("window.onNativeFontChanged && window.onNativeFontChanged('')");
         }
 
@@ -310,7 +326,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
                 intent.addCategory(Intent.CATEGORY_OPENABLE);
                 intent.setType("text/plain");
-                intent.putExtra(Intent.EXTRA_TITLE, (fileName == null || fileName.trim().isEmpty()) ? "Dzen-Text-report.txt" : fileName);
+                intent.putExtra(Intent.EXTRA_TITLE, (fileName == null || fileName.trim().isEmpty()) ? "Text-Editor-report.txt" : fileName);
                 try {
                     startActivityForResult(intent, REQUEST_SAVE_REPORT);
                 } catch (Exception e) {
@@ -338,7 +354,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
     }
 
 
-    /** Copies the rendered article to the system clipboard for the Dzen editor. */
+    /** Copies the rendered article to the system clipboard for the publication editor. */
     public class PublishBridge {
         /**
          * Writes both clipboard flavours explicitly: rendered HTML and its
@@ -377,7 +393,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             try {
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 if (clipboard == null) return false;
-                ClipDescription description = new ClipDescription("Дзен Текст",
+                ClipDescription description = new ClipDescription("Редактор текста",
                         new String[] { ClipDescription.MIMETYPE_TEXT_PLAIN, ClipDescription.MIMETYPE_TEXT_HTML });
                 ClipData clip = new ClipData(description, new ClipData.Item(plainValue, htmlValue));
                 clip.addItem(new ClipData.Item(plainValue));
@@ -462,7 +478,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 synonymName = "";
             }
             try { new File(getFilesDir(), DICT_FILE).delete(); } catch (Exception ignored) { }
-            getSharedPreferences("dzen_text", MODE_PRIVATE).edit().remove("dict_name").apply();
+            getSharedPreferences("editor_text", MODE_PRIVATE).edit().remove("dict_name").apply();
         }
     }
 
@@ -519,7 +535,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         if (requestCode == REQUEST_OPEN_BACKGROUND) {
             try {
                 String id = saveEditorBackground(uri);
-                String name = getSharedPreferences("dzen_text", MODE_PRIVATE).getString("background_name_" + id, "Свой фон");
+                String name = getSharedPreferences("editor_text", MODE_PRIVATE).getString("background_name_" + id, "Свой фон");
                 runJs("window.onNativeBackgroundAdded && window.onNativeBackgroundAdded(" + JSONObject.quote(id) + "," + JSONObject.quote(name) + ")");
             } catch (Exception e) {
                 runJs("window.onNativeFileError && window.onNativeFileError('Не удалось использовать выбранное изображение')");
@@ -539,10 +555,22 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                 try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), FONT_FILE))) {
                     out.write(bytes);
                 }
-                getSharedPreferences("dzen_text", MODE_PRIVATE).edit().putString("font_name", name).apply();
+                getSharedPreferences("editor_text", MODE_PRIVATE).edit().putString("font_name", name).apply();
                 runJs("window.onNativeFontChanged && window.onNativeFontChanged(" + JSONObject.quote(name) + ")");
             } catch (Exception e) {
                 runJs("window.onNativeFontError && window.onNativeFontError('Не удалось подключить шрифт. Поддерживаются TTF, OTF, WOFF и WOFF2 до 6 МБ.')");
+            }
+            return;
+        }
+
+        if (requestCode == REQUEST_OPEN_RULE_PACK) {
+            try {
+                String name = readDisplayName(uri);
+                byte[] bytes = readLimited(uri, 1024 * 1024);
+                String text = decodeText(bytes);
+                runJs("window.onNativeRulePackLoaded && window.onNativeRulePackLoaded(" + JSONObject.quote(text) + "," + JSONObject.quote(name) + ")");
+            } catch (Exception e) {
+                runJs("window.onNativeRulePackError && window.onNativeRulePackError('Не удалось прочитать JSON до 1 МБ')");
             }
             return;
         }
@@ -572,7 +600,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
                     synonymName = name;
                 }
                 try (FileOutputStream out = new FileOutputStream(new File(getFilesDir(), DICT_FILE))) { out.write(bytes); }
-                getSharedPreferences("dzen_text", MODE_PRIVATE).edit().putString("dict_name", name).apply();
+                getSharedPreferences("editor_text", MODE_PRIVATE).edit().putString("dict_name", name).apply();
                 runJs("window.onNativeDictionaryLoaded && window.onNativeDictionaryLoaded(" + JSONObject.quote(name) + "," + synonymCount + ")");
             } catch (Exception e) {
                 runJs("window.onNativeDictionaryError && window.onNativeDictionaryError('Не удалось разобрать словарь. Нужен JSON/TXT до 16 МБ.')");
@@ -641,7 +669,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             if (moved) legacy.delete();
         }
         if (moved) {
-            getSharedPreferences("dzen_text", MODE_PRIVATE).edit()
+            getSharedPreferences("editor_text", MODE_PRIVATE).edit()
                     .putString(BACKGROUND_ACTIVE_KEY, id)
                     .putString("background_name_" + id, "Свой фон")
                     .apply();
@@ -660,7 +688,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private String activeBackgroundId() {
         backgroundDirectory();
-        String id = safeBackgroundId(getSharedPreferences("dzen_text", MODE_PRIVATE).getString(BACKGROUND_ACTIVE_KEY, ""));
+        String id = safeBackgroundId(getSharedPreferences("editor_text", MODE_PRIVATE).getString(BACKGROUND_ACTIVE_KEY, ""));
         if (!id.isEmpty() && backgroundFile(id).exists()) return id;
         String next = newestBackgroundId();
         if (!next.isEmpty()) setActiveBackgroundId(next);
@@ -669,7 +697,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
     private void setActiveBackgroundId(String id) {
         String safe = safeBackgroundId(id);
-        SharedPreferences.Editor editor = getSharedPreferences("dzen_text", MODE_PRIVATE).edit();
+        SharedPreferences.Editor editor = getSharedPreferences("editor_text", MODE_PRIVATE).edit();
         if (safe.isEmpty()) editor.remove(BACKGROUND_ACTIVE_KEY); else editor.putString(BACKGROUND_ACTIVE_KEY, safe);
         editor.apply();
     }
@@ -691,7 +719,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
         for (File file : files) list.add(file);
         list.sort((a, b) -> Long.compare(b.lastModified(), a.lastModified()));
         String active = activeBackgroundId();
-        SharedPreferences prefs = getSharedPreferences("dzen_text", MODE_PRIVATE);
+        SharedPreferences prefs = getSharedPreferences("editor_text", MODE_PRIVATE);
         for (File file : list) {
             try {
                 String name = file.getName();
@@ -765,7 +793,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
 
         String name = readDisplayName(uri);
         if (name == null || name.trim().isEmpty()) name = "Свой фон";
-        getSharedPreferences("dzen_text", MODE_PRIVATE).edit()
+        getSharedPreferences("editor_text", MODE_PRIVATE).edit()
                 .putString(BACKGROUND_ACTIVE_KEY, id)
                 .putString("background_name_" + id, name)
                 .apply();
@@ -785,7 +813,7 @@ public class MainActivity extends Activity implements TextToSpeech.OnInitListene
             Map<String, List<String>> parsed = parseDictionaryBytes(bytes);
             synchronized (synonymMap) {
                 synonymMap.clear(); synonymMap.putAll(parsed); synonymCount = synonymMap.size();
-                synonymName = getSharedPreferences("dzen_text", MODE_PRIVATE).getString("dict_name", "словарь");
+                synonymName = getSharedPreferences("editor_text", MODE_PRIVATE).getString("dict_name", "словарь");
             }
         } catch (Exception ignored) { }
     }

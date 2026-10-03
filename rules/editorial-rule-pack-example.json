@@ -1,0 +1,67 @@
+{
+  "schema": "editorial-rule-pack-v1",
+  "id": "example-platform",
+  "name": "Пример правил площадки",
+  "version": "1.1",
+  "description": "Самопроверяемый локальный пример пакета правил.",
+  "source": "https://example.com/rules",
+  "test_text": "Вы не поверите: банан и очень длинный тестовый заголовок\n\nДоход без риска гарантирован каждому.\nБанан упомянут ещё раз.\nhttps://example.com/one\nhttps://example.com/two",
+  "rules": [
+    {
+      "id": "forbidden-word",
+      "title": "Найдено контрольное слово",
+      "type": "word",
+      "scope": "all",
+      "severity": "warning",
+      "values": ["банан"],
+      "message": "Слово «банан» найдено тестовым пакетом."
+    },
+    {
+      "id": "title-clickbait",
+      "title": "Нежелательная фраза в заголовке",
+      "type": "phrase_any",
+      "scope": "title",
+      "severity": "warning",
+      "values": ["вы не поверите", "шокирующая правда"],
+      "message": "Проверьте формулировку заголовка."
+    },
+    {
+      "id": "finance-context",
+      "title": "Финансовое обещание — проверить контекст",
+      "type": "context",
+      "scope": "all",
+      "severity": "warning",
+      "stems": ["доход"],
+      "required_nearby": ["без риска", "гарантирован"],
+      "exclude_nearby": ["не гарантируется", "можно потерять"],
+      "window": 90,
+      "min_score": 2,
+      "message": "Проверьте, нет ли безусловного обещания результата."
+    },
+    {
+      "id": "title-too-long",
+      "title": "Слишком длинный заголовок",
+      "type": "title_length",
+      "scope": "title",
+      "severity": "warning",
+      "max": 35,
+      "message": "Сократите тестовый заголовок."
+    },
+    {
+      "id": "too-many-links",
+      "title": "Слишком много ссылок",
+      "type": "link_count",
+      "scope": "all",
+      "severity": "warning",
+      "max": 1,
+      "message": "В тестовом тексте больше одной ссылки."
+    },
+    {
+      "id": "manual-title",
+      "title": "Соответствие заголовка тексту",
+      "type": "manual",
+      "severity": "warning",
+      "message": "Перед публикацией вручную проверьте соответствие заголовка содержанию."
+    }
+  ]
+}

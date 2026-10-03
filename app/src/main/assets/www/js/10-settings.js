@@ -1,4 +1,4 @@
-function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateDzenRulesStatus();renderCustomBackgrounds();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
+function openSettings(){document.querySelectorAll('#settingsBackdrop details').forEach(d=>d.open=false);syncSettingsUI();updateDictStatus();updateRulePackStatus();renderCustomBackgrounds();document.getElementById('settingsBackdrop').classList.add('open');setTimeout(updateDictStatus,120)}
 function closeSettings(){
   const backdrop=document.getElementById('settingsBackdrop');
   const active=document.activeElement;
@@ -11,7 +11,7 @@ let cachedCustomBackgroundId='';
 function normalizeAccentHex(v){v=String(v||'').trim().toUpperCase();if(!v.startsWith('#'))v='#'+v;return /^#[0-9A-F]{6}$/.test(v)?v:'#D65C43'}
 function persistSettings(showError=true){
   try{
-    localStorage.setItem('dzenSettings',JSON.stringify(settings));
+    localStorage.setItem('editorSettings',JSON.stringify(settings));
     return true;
   }catch(e){
     if(showError)toast('Не удалось сохранить настройки');
@@ -180,7 +180,7 @@ function ensureCustomFontFace(){
     style.id='customEditorFontStyle';
     document.head.appendChild(style);
   }
-  style.textContent="@font-face{font-family:'DzenUserFont';src:url('"+data+"');font-display:swap}";
+  style.textContent="@font-face{font-family:'platformUserFont';src:url('"+data+"');font-display:swap}";
   return true;
 }
 function updateCustomFontStatus(){
@@ -201,7 +201,7 @@ function onFontSelectChanged(){
 function clearEditorFont(){try{if(window.AndroidFile&&typeof AndroidFile.clearFont==='function')AndroidFile.clearFont()}catch(e){}cachedCustomFontData='';cachedCustomFontName='';const style=document.getElementById('customEditorFontStyle');if(style)style.remove();if(settings.font==='custom')settings.font='serif';persistSettings();syncSettingsUI();applyVisualSettings();toast('Свой шрифт удалён')}
 window.onNativeFontChanged=(name)=>{cachedCustomFontData='';cachedCustomFontName=String(name||'');if(name){settings.font='custom';persistSettings();}else if(settings.font==='custom'){settings.font='serif';persistSettings();}syncSettingsUI();applyVisualSettings();updateCustomFontStatus();toast(name?'Шрифт подключён':'Свой шрифт удалён')};
 window.onNativeFontError=(msg)=>toast(msg||'Не удалось подключить шрифт');
-function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;proofCheck.checked=settings.proofCheck;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;aiStyleCheck.checked=settings.aiStyleCheck!==false;dzenCheck.checked=settings.dzenCheck;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateDzenRulesStatus();}
+function syncSettingsUI(){if(!settings.customBackgroundId){const id=currentBackgroundId();if(id)settings.customBackgroundId=id}paperSelect.value=settings.paper||'gray';backgroundVeil.value=Number(settings.backgroundVeil??0.6);backgroundTextSelect.value=settings.backgroundText||'dark';accentHex.value=normalizeAccentHex(settings.accent);fontSelect.value=settings.font;sizeRange.value=settings.size;lineRange.value=settings.line;themeSelect.value=settings.theme;wpmRange.value=settings.wpm;ttsRange.value=settings.tts;autosaveSwitch.checked=settings.autosave;codeSwitch.checked=settings.showCode;proofCheck.checked=settings.proofCheck;headingCheck.checked=settings.headingCheck;headingMin.value=settings.headingMin;headingMax.value=settings.headingMax;sentenceCheck.checked=settings.sentenceCheck;sentenceMax.value=settings.sentenceMax;paragraphCheck.checked=settings.paragraphCheck;paragraphMax.value=settings.paragraphMax;frequentCheck.checked=settings.frequentCheck;frequentMin.value=settings.frequentMin;nearbyCheck.checked=settings.nearbyCheck;structureCheck.checked=settings.structureCheck;structureMax.value=settings.structureMax;phraseCheck.checked=settings.phraseCheck;openingCheck.checked=settings.openingCheck;headingStructureCheck.checked=settings.headingStructureCheck;markdownCheck.checked=settings.markdownCheck;riskCheck.checked=settings.riskCheck;riskWords.value=settings.riskWords||'';updateCustomFontStatus();updateSettingLabels();updateRulePackStatus();}
 function applySettings(){
   settings={
     ...settings,
@@ -235,8 +235,6 @@ function applySettings(){
     openingCheck:openingCheck.checked,
     headingStructureCheck:headingStructureCheck.checked,
     markdownCheck:markdownCheck.checked,
-    aiStyleCheck:aiStyleCheck.checked,
-    dzenCheck:dzenCheck.checked,
     riskCheck:riskCheck.checked,
     riskWords:riskWords.value
   };
@@ -252,7 +250,7 @@ function updateSettingLabels(){backgroundVeilVal.textContent=Math.round(Number(s
 function resetRiskWords(){riskWords.value=exampleRiskWords;applySettings();toast('Пример списка восстановлен')}
 function clearRiskWords(){riskWords.value='';applySettings();toast('Список очищен')}
 function applyVisualSettings(){
- const fonts={system:'system-ui,-apple-system,"Segoe UI",sans-serif',serif:'"Noto Serif","Droid Serif",serif',classic:'Georgia,"Times New Roman",serif',sans:'Arial,"Segoe UI",sans-serif',mono:'ui-monospace,Consolas,monospace',custom:"'DzenUserFont',serif"};
+ const fonts={system:'system-ui,-apple-system,"Segoe UI",sans-serif',serif:'"Noto Serif","Droid Serif",serif',classic:'Georgia,"Times New Roman",serif',sans:'Arial,"Segoe UI",sans-serif',mono:'ui-monospace,Consolas,monospace',custom:"'platformUserFont',serif"};
  if(settings.font==='custom')ensureCustomFontFace();
  const root=document.documentElement,accent=normalizeAccentHex(settings.accent);
  root.dataset.theme=settings.theme;root.dataset.paper=settings.paper||'gray';

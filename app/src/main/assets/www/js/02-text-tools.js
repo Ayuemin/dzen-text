@@ -1,4 +1,4 @@
-function loadSettings(){try{const value={...defaultSettings,...JSON.parse(localStorage.getItem('dzenSettings')||'{}')};return value}catch(e){return {...defaultSettings}}}
+function loadSettings(){try{const value={...defaultSettings,...JSON.parse(localStorage.getItem('editorSettings')||'{}')};return value}catch(e){return {...defaultSettings}}}
 // Escapes every character that can change HTML parsing. Quotes matter here:
 // these strings are reused as attribute values in generated markup and are
 // later written into the system clipboard as text/html.
@@ -27,15 +27,15 @@ function inline(s){
   s=s.replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>');
   s=s.replace(/\u0000(\d+)\u0000/g,(m,i)=>links[Number(i)]||'');
   // A rejected link (bad scheme, quotes, whitespace in the URL) must never reach
-  // the Dzen editor as markdown syntax; it degrades to its visible label.
+  // the publication editor as markdown syntax; it degrades to its visible label.
   s=s.replace(/\[([^\]\n]+)\]\([^)\n]*\)/g,(m,label)=>escapeHtml(label));
   return s;
 }
 function markdownToHtml(src){src=(src||'').replace(/\r\n?/g,'\n').trim();if(!src)return '';const lines=src.split('\n');let out=[],para=[],listType=null,quote=[];const flushPara=()=>{if(para.length){out.push('<p>'+inline(para.join(' '))+'</p>');para=[]}};const closeList=()=>{if(listType){out.push('</'+listType+'>');listType=null}};const flushQuote=()=>{if(quote.length){out.push('<blockquote><p>'+inline(quote.join(' '))+'</p></blockquote>');quote=[]}};for(let i=0;i<lines.length;i++){const raw=lines[i],t=raw.trim();if(!t){flushPara();closeList();flushQuote();continue}let m=t.match(/^(#{1,6})\s+(.+)$/);if(m){flushPara();closeList();flushQuote();let n=m[1].length;out.push(`<h${n}>${inline(m[2])}</h${n}>`);continue}if(/^([-*_])(?:\s*\1){2,}$/.test(t)){flushPara();closeList();flushQuote();out.push('<hr>');continue}m=t.match(/^>\s?(.*)$/);if(m){flushPara();closeList();quote.push(m[1]);continue}else flushQuote();m=t.match(/^[-*+]\s+(.+)$/);if(m){flushPara();if(listType!=='ul'){closeList();out.push('<ul>');listType='ul'}out.push('<li>'+inline(m[1])+'</li>');continue}m=t.match(/^\d+[.)]\s+(.+)$/);if(m){flushPara();if(listType!=='ol'){closeList();out.push('<ol>');listType='ol'}out.push('<li>'+inline(m[1])+'</li>');continue}closeList();para.push(t)}flushPara();closeList();flushQuote();return out.join('\n')}
 function plainFromHtml(html){const d=document.createElement('div');d.innerHTML=html;return (d.innerText||d.textContent||'').replace(/\n{3,}/g,'\n\n').trim()}
 
-// The published body is the single source of truth for the Dzen editor. The
-// leading "# " heading is the article title, which Dzen expects in its own form
+// The published body is the single source of truth for the publication editor. The
+// leading "# " heading is the article title, which the target editor expects in its own form
 // field, so it must not be duplicated into the pasted body.
 function buildPublishHtml(markdown){
   const src=String(markdown||'').replace(/\r\n?/g,'\n').replace(/^\uFEFF/,'');

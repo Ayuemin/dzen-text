@@ -1,4 +1,4 @@
-const IDEAS_KEY='dzenQuickIdeasV1';
+const IDEAS_KEY='editorQuickIdeasV1';
 let sideTouch=null;
 
 function openSideDrawer(){
@@ -7,11 +7,11 @@ function openSideDrawer(){
   if(typeof renderSavedArticles==='function')renderSavedArticles();
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
   if(typeof updateDrawerSpeakLabel==='function')updateDrawerSpeakLabel();
-  document.getElementById('sideBackdrop').classList.add('open');
+  document.getElementById('sideBackdrop').classList.add('open');document.body.classList.add('drawer-open');
 }
 
 function closeSideDrawer(){
-  document.getElementById('sideBackdrop').classList.remove('open');
+  document.getElementById('sideBackdrop').classList.remove('open');document.body.classList.remove('drawer-open');
 }
 
 function sideBackdropClick(event){
@@ -189,6 +189,8 @@ function handleNativeBack(){
   if(side&&side.classList.contains('open')){closeSideDrawer();return true}
   const ideas=document.getElementById('ideasBackdrop');
   if(ideas&&ideas.classList.contains('open')){closeIdeas();return true}
+  const rulePack=document.getElementById('rulePackBackdrop');
+  if(rulePack&&rulePack.classList.contains('open')){closeRulePackImport();return true}
   const settingsSheet=document.getElementById('settingsBackdrop');
   if(settingsSheet&&settingsSheet.classList.contains('open')){closeSettings();return true}
   const analysis=document.getElementById('analysisBackdrop');

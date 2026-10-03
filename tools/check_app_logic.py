@@ -50,7 +50,13 @@ if dupe_callbacks:
 html_ids = set(ids)
 # These IDs are optional/dynamic. Undo/redo functions are retained as part of
 # history even though the retired keyboard toolbar no longer renders buttons.
-dynamic_ids = {"customEditorFontStyle", "analysisCollapsedSummary", "undoBtn", "redoBtn", "currentArticleLabel"}
+# Control-list and local-model settings are also created at runtime so the base
+# HTML remains compatible with older saved WebView state.
+dynamic_ids = {
+    "customEditorFontStyle", "analysisCollapsedSummary", "undoBtn", "redoBtn", "currentArticleLabel",
+    "controlListsSettingsGroup", "localClassifierSettingsGroup", "localLlmCriteria", "localLlmExclusions",
+    "localLlmRuntimeStyle", "localLlmSettingsGroup",
+}
 missing_refs = sorted(k for k in id_refs if k not in html_ids and k not in dynamic_ids)
 if missing_refs:
     errors.append("getElementById targets missing from HTML: " + ", ".join(missing_refs))

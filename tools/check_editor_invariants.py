@@ -16,7 +16,7 @@ manifest = (ROOT / "app/src/main/AndroidManifest.xml").read_text(encoding="utf-8
 if 'android:windowSoftInputMode="adjustResize"' not in manifest:
     errors.append("MainActivity must use adjustResize")
 
-main_activity = (ROOT / "app/src/main/java/ru/dzenprep/texteditor/MainActivity.java").read_text(encoding="utf-8")
+main_activity = (ROOT / "app/src/main/java/io/github/ayuemin/texteditor/MainActivity.java").read_text(encoding="utf-8")
 if "WindowInsets.Type.ime()" not in main_activity:
     errors.append("Android 11+ must detect the IME through WindowInsets.Type.ime()")
 

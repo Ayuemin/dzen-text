@@ -1,4 +1,6 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+}
 
 def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
 def keystoreAlias = System.getenv('ANDROID_KEY_ALIAS')
@@ -6,15 +8,15 @@ def keystorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def keyPasswordValue = System.getenv('ANDROID_KEY_PASSWORD')
 
 android {
-    namespace 'ru.dzenprep.texteditor'
+    namespace 'io.github.ayuemin.texteditor'
     compileSdk 35
 
     defaultConfig {
-        applicationId 'ru.dzenprep.texteditor'
+        applicationId 'io.github.ayuemin.texteditor'
         minSdk 24
         targetSdk 35
-        versionCode 48
-        versionName '1.11.0'
+        versionCode 1
+        versionName '0.1.0-prototype'
     }
 
     signingConfigs {
@@ -34,4 +36,15 @@ android {
             minifyEnabled false
         }
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+}
+
+dependencies {
+    // Fast fully-local semantic classification. The transformer package itself
+    // is installed by the user and stored in app-private storage.
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.30.0'
 }
