@@ -1,4 +1,7 @@
-plugins { id 'com.android.application' }
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
 
 def keystorePath = System.getenv('ANDROID_KEYSTORE_PATH')
 def keystoreAlias = System.getenv('ANDROID_KEY_ALIAS')
@@ -15,6 +18,7 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0-prototype'
+        ndk { abiFilters 'arm64-v8a' }
     }
 
     signingConfigs {
@@ -34,11 +38,18 @@ android {
             minifyEnabled false
         }
     }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
+    }
+
+    kotlinOptions { jvmTarget = '11' }
 }
 
 dependencies {
-    // Optional on-device semantic classifier. The app still works when the
-    // model assets are absent; the runtime is wired now so a model can be
-    // dropped into app/src/main/assets/models later without changing UI code.
-    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.30.0'
+    // On-device GGUF inference through llama.cpp. The model itself is selected
+    // by the user and stored in app-private storage; no model is bundled here.
+    implementation 'dev.ffmpegkit-maintained:llama-android:0.1.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0'
 }
