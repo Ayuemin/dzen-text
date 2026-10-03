@@ -31,6 +31,12 @@ patch('app/src/main/assets/www/js/12-articles.js',[
     ("  try{clearOnlineSpelling()}catch(e){}\n",'', 'article online-spelling reset'),
 ])
 
+patch('tools/check_app_logic.py',[
+    ('dynamic_ids = {"customEditorFontStyle", "analysisCollapsedSummary", "undoBtn", "redoBtn"}',
+     'dynamic_ids = {"customEditorFontStyle", "analysisCollapsedSummary", "undoBtn", "redoBtn", "currentArticleLabel"}',
+     'optional current article label'),
+])
+
 # Prevent the old spelling UI and mismatched drawer naming from returning.
 p=ROOT/'tools/check_local_first.py'
 s=p.read_text(encoding='utf-8')
