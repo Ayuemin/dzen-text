@@ -128,8 +128,9 @@ function recountSemantic(){
 function patchSemanticSummary(){
   const a=currentAnalysis||{},sum=document.querySelector('#analysisSummary');if(!sum)return;
   const total=Number(a.warningCount)||0,semantic=Number(a.semanticCount)||0,editor=Math.max(0,total-semantic);
-  if(total)sum.innerHTML='Редакторских замечаний: <b>'+editor+'</b> · смысловых: <b>'+semantic+'</b> · всего: <b>'+total+'</b>.'+(semanticRunning?' <span class="semanticRunning">Смысловая модель проверяет текст…</span>':'');
-  else sum.innerHTML='<b>По локальным проверкам замечаний нет.</b>'+(semanticRunning?' <span class="semanticRunning">Смысловая модель ещё проверяет текст…</span>':' Финальная вычитка всё равно нужна.');
+  const running=semanticRunning?' <span class="semanticRunning">Смысловая модель проверяет текст… Нажмите «Проверить» ещё раз, чтобы остановить.</span>':'';
+  if(total)sum.innerHTML='Редакторских замечаний: <b>'+editor+'</b> · смысловых: <b>'+semantic+'</b> · всего: <b>'+total+'</b>.'+running;
+  else sum.innerHTML='<b>По локальным проверкам замечаний нет.</b>'+(semanticRunning?running:' Финальная вычитка всё равно нужна.');
 }
 
 function installSemanticIntegration(){
@@ -143,7 +144,7 @@ function installSemanticIntegration(){
     analyzeText();const src=editor.value||'',a=currentAnalysis||{},lines=[],semantic=Number(a.semanticCount)||0,editorCount=Math.max(0,(Number(a.warningCount)||0)-semantic);
     lines.push('ОТЧЁТ РЕДАКТОРА ПО ЛОКАЛЬНОЙ ПРОВЕРКЕ');lines.push('Создан: '+new Date().toLocaleString('ru-RU'));lines.push('Всего замечаний: '+(a.warningCount||0)+'; редакторских: '+editorCount+'; смысловых: '+semantic+'.');
     const st=semanticStatus();lines.push(st.installed?'Смысловая модель: '+String(st.name||'NLI-модель')+' · локально через ONNX Runtime.':'Смысловая модель: не установлена.');
-    if(semanticCache.meta&&semanticCache.text===src){const m=semanticCache.meta;lines.push('Обработано смысловой моделью: '+Number(m.segments||0)+' фрагментов · '+Number(m.categories||0)+' категорий · '+Number(m.pairs||0)+' NLI-сравнений'+(m.elapsedMs?' · '+(Number(m.elapsedMs)/1000).toFixed(2)+' с':'')+'.')}
+    if(semanticCache.meta&&semanticCache.text===src){const m=semanticCache.meta;lines.push('Обработано смысловой моделью: '+Number(m.segments||0)+' фрагментов · '+Number(m.categories||0)+' категорий · '+Number(m.pairs||0)+' NLI-сравнений'+(m.screeningChunks?' · '+Number(m.screeningChunks)+' первичных блоков':'')+(m.elapsedMs?' · '+(Number(m.elapsedMs)/1000).toFixed(2)+' с':'')+'.');if(m.partial)lines.push('Смысловая проверка завершена частично'+(m.timedOut?' из-за лимита времени':'')+(m.cancelled?' по отмене пользователя':'')+'.')}
     if(semanticCache.error&&semanticCache.text===src)lines.push('Предупреждение смысловой модели: '+cleanReportText(semanticCache.error));
     if(a.overflowTotal)lines.push('В интерфейсе сохранено '+a.issues.length+' из '+a.warningCount+' замечаний; '+a.overflowTotal+' однотипных срабатываний скрыто.');
     lines.push('');if(!a.issues||!a.issues.length){lines.push('Замечаний не найдено.');return lines.join('\n')}
@@ -153,7 +154,10 @@ function installSemanticIntegration(){
   const priorRun=typeof runFullCheck==='function'?runFullCheck:null;
   if(priorRun){
     runFullCheck=function(){
-      if(semanticRunning){toast('Смысловая проверка уже выполняется');return}
+      if(semanticRunning){
+        let stopping=false;try{if(window.AndroidSemanticModel&&typeof AndroidSemanticModel.cancelAnalysis==='function')stopping=!!AndroidSemanticModel.cancelAnalysis()}catch(e){}
+        toast(stopping?'Останавливаю смысловую проверку…':'Смысловая проверка уже выполняется');return;
+      }
       invalidateSemanticCache();semanticPending=null;priorRun();
       const src=editor.value||'',status=semanticStatus();if(!src.trim()||!semanticBridgeAvailable()||!status.installed||!status.available)return;
       const key=semanticKey();let id=-1;try{id=Number(AndroidSemanticModel.analyzeAsync(src,key))||-1}catch(e){id=-1}
@@ -173,6 +177,7 @@ window.onNativeSemanticResult=function(requestId,payload){
   let result={available:false,issues:[]};try{result=JSON.parse(payload||'{}')}catch(e){result={available:false,issues:[],error:'Не удалось разобрать результат классификатора'}}
   if(pending.stale||pending.text!==(editor.value||'')||pending.key!==semanticKey()){toast('Смысловая проверка завершилась, но текст или категории уже изменены — результат не применён');renderAnalysis();return}
   const error=String(result.error||'');
+  if(result.cancelled){invalidateSemanticCache();analyzeText();toast('Смысловая проверка остановлена');return}
   const rawIssues=Array.isArray(result.issues)?result.issues:[];
   const filteredIssues=rawIssues.filter(issue=>{
     const signal=Number(issue&&issue.signalScore);
@@ -181,7 +186,9 @@ window.onNativeSemanticResult=function(requestId,payload){
   result.filteredLowSignal=Math.max(0,rawIssues.length-filteredIssues.length);
   result.issues=filteredIssues;
   semanticCache={text:pending.text,key:pending.key,issues:filteredIssues,meta:result,error};analyzeText();
-  if(!result.available&&error)toast('Смысловая модель: '+error);else toast('Смысловая проверка: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
+  if(!result.available&&error)toast('Смысловая модель: '+error);
+  else if(result.timedOut)toast('Смысловая проверка остановлена по лимиту времени: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
+  else toast('Смысловая проверка: '+semanticCache.issues.length+' замечаний за '+((Number(result.elapsedMs)||0)/1000).toFixed(2)+' с');
 };
 window.onNativeSemanticAnalysisError=function(requestId,msg){if(semanticPending&&Number(requestId)===Number(semanticPending.id))semanticPending=null;semanticRunning=false;setCheckRunning(false);renderAnalysis();toast('Ошибка смысловой проверки: '+String(msg||'неизвестная ошибка'))};
 
