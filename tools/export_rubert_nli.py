@@ -25,8 +25,8 @@ CASES = {
     "threat": {
         "positive": "Если ещё раз здесь появишься, пожалеешь об этом.",
         "negative": "В статье разбирается, почему угрозы человеку недопустимы.",
-        "signal": "автор угрожает человеку неприятными последствиями",
-        "safe": "автор обсуждает угрозы и осуждает их",
+        "signal": "человеку говорят, что он пожалеет, если снова появится",
+        "safe": "текст объясняет, почему угрожать людям недопустимо",
     },
     "restricted": {
         "positive": "Могу достать ствол без оформления бумаг.",
@@ -48,38 +48,12 @@ CASES = {
     },
 }
 
-THREAT_SIGNALS = [
-    "человеку говорят, что он пожалеет, если снова появится",
-    "говорящий обещает неприятные последствия, если человек снова появится",
-    "адресата запугивают неприятными последствиями за повторное появление",
-    "человека предупреждают в угрожающей форме, что он пожалеет",
-    "если адресат снова появится, ему обещают плохие последствия",
-    "говорящий хочет напугать адресата обещанием неприятных последствий",
-    "говорящий обращается к человеку и обещает ему неприятные последствия",
-]
-
-THREAT_SAFE = [
-    "текст объясняет, почему угрожать людям недопустимо",
-    "автор осуждает угрозы людям",
-    "в статье обсуждается недопустимость угроз",
-    "автор рассказывает об угрозах, но никому не угрожает",
-    "текст носит информационный характер и осуждает запугивание",
-    "автор предупреждает о вреде угроз и запугивания",
-]
-
-
 class Wrapper(torch.nn.Module):
     def __init__(self, model):
         super().__init__()
         self.model = model
-
     def forward(self, input_ids, attention_mask, token_type_ids):
-        return self.model(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            token_type_ids=token_type_ids,
-        ).logits
-
+        return self.model(input_ids=input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids).logits
 
 def softmax(x):
     x = np.asarray(x, dtype=np.float64)
@@ -87,19 +61,11 @@ def softmax(x):
     e = np.exp(x)
     return e / e.sum(axis=-1, keepdims=True)
 
-
 def encode_pairs(tokenizer, pairs, tensor_type):
-    premises = [p for p, _ in pairs]
-    hypotheses = [h for _, h in pairs]
     return tokenizer(
-        premises,
-        hypotheses,
-        padding=True,
-        truncation=True,
-        max_length=MAX_LEN,
-        return_tensors=tensor_type,
+        [p for p, _ in pairs], [h for _, h in pairs],
+        padding=True, truncation=True, max_length=MAX_LEN, return_tensors=tensor_type,
     )
-
 
 def score_onnx(session, tokenizer, entailment_index, pairs):
     enc = encode_pairs(tokenizer, pairs, "np")
@@ -109,99 +75,42 @@ def score_onnx(session, tokenizer, entailment_index, pairs):
         "token_type_ids": enc["token_type_ids"].astype(np.int64),
     })[0]
     probs = softmax(logits)
-    return probs, probs[:, entailment_index]
-
+    return probs[:, entailment_index]
 
 def score_torch(model, tokenizer, entailment_index, pairs):
     enc = encode_pairs(tokenizer, pairs, "pt")
     with torch.no_grad():
         logits = model(**enc).logits.cpu().numpy()
-    probs = softmax(logits)
-    return probs, probs[:, entailment_index]
-
-
-def label_index(model, name, fallback):
-    labels = {str(k).lower(): int(v) for k, v in model.config.label2id.items()}
-    return labels.get(name.lower(), fallback)
-
+    return softmax(logits)[:, entailment_index]
 
 def summarize(scores):
     p_signal, p_safe, n_signal, n_safe = [float(x) for x in scores]
-    p_contrast = p_signal - p_safe
-    n_contrast = n_signal - n_safe
     return {
         "positive_signal": p_signal,
         "positive_safe": p_safe,
-        "positive_contrast": p_contrast,
+        "positive_contrast": p_signal - p_safe,
         "negative_signal": n_signal,
         "negative_safe": n_safe,
-        "negative_contrast": n_contrast,
-        "separation": p_contrast - n_contrast,
+        "negative_contrast": n_signal - n_safe,
+        "separation": (p_signal - p_safe) - (n_signal - n_safe),
     }
 
-
-def search_threat_labels(model, tokenizer, entailment_index):
-    positive = CASES["threat"]["positive"]
-    negative = CASES["threat"]["negative"]
-    combos = []
-    pairs = []
-    for signal in THREAT_SIGNALS:
-        for safe in THREAT_SAFE:
-            start = len(pairs)
-            pairs.extend([
-                (positive, signal),
-                (positive, safe),
-                (negative, signal),
-                (negative, safe),
-            ])
-            combos.append((signal, safe, start))
-    _, scores = score_torch(model, tokenizer, entailment_index, pairs)
-    results = []
-    for signal, safe, start in combos:
-        summary = summarize(scores[start:start + 4])
-        results.append({"signal": signal, "safe": safe, **summary})
-    results.sort(
-        key=lambda r: (
-            r["positive_contrast"] > 0 and r["negative_contrast"] < 0,
-            r["separation"],
-            r["positive_contrast"],
-        ),
-        reverse=True,
-    )
-    print("THREAT LABEL SEARCH TOP 10")
-    for row in results[:10]:
-        print(
-            f"sep={row['separation']:+.4f} pos={row['positive_contrast']:+.4f} "
-            f"neg={row['negative_contrast']:+.4f} | SIGNAL={row['signal']} | SAFE={row['safe']}"
-        )
-    return results
-
-
 def main():
-    if OUT.exists():
-        shutil.rmtree(OUT)
+    if OUT.exists(): shutil.rmtree(OUT)
     OUT.mkdir(parents=True, exist_ok=True)
-
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
     model = AutoModelForSequenceClassification.from_pretrained(MODEL_ID)
     model.eval()
-    entailment_index = label_index(model, "entailment", 0)
-    contradiction_index = label_index(model, "contradiction", 1)
-    neutral_index = label_index(model, "neutral", 2)
-    print("label2id=", model.config.label2id)
-    print("id2label=", model.config.id2label)
-
-    threat_search = search_threat_labels(model, tokenizer, entailment_index)
-    (OUT / "threat_label_search.json").write_text(
-        json.dumps(threat_search, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    labels = {str(k).lower(): int(v) for k, v in model.config.label2id.items()}
+    entailment_index = labels.get("entailment", 0)
+    contradiction_index = labels.get("contradiction", 1)
+    neutral_index = labels.get("neutral", 2)
 
     dummy = tokenizer("Кошка сидит на ковре.", "кошка на ковре", return_tensors="pt")
-    wrapper = Wrapper(model)
     fp32_path = OUT / "model-fp32.onnx"
-    int8_path = OUT / "model.onnx"
+    model_path = OUT / "model.onnx"
     torch.onnx.export(
-        wrapper,
+        Wrapper(model),
         (dummy["input_ids"], dummy["attention_mask"], dummy["token_type_ids"]),
         fp32_path,
         input_names=["input_ids", "attention_mask", "token_type_ids"],
@@ -212,33 +121,23 @@ def main():
             "token_type_ids": {0: "batch", 1: "sequence"},
             "logits": {0: "batch"},
         },
-        opset_version=17,
-        do_constant_folding=True,
-        dynamo=False,
+        opset_version=17, do_constant_folding=True, dynamo=False,
     )
-
     quantize_dynamic(
-        model_input=str(fp32_path),
-        model_output=str(int8_path),
-        weight_type=QuantType.QInt8,
-        per_channel=False,
-        reduce_range=False,
-        op_types_to_quantize=["MatMul", "Gemm"],
-        extra_options={"DefaultTensorType": "float"},
+        model_input=str(fp32_path), model_output=str(model_path),
+        weight_type=QuantType.QInt8, per_channel=False, reduce_range=False,
+        op_types_to_quantize=["MatMul", "Gemm"], extra_options={"DefaultTensorType": "float"},
     )
 
     tok_dir = OUT / "tokenizer_tmp"
     tokenizer.save_pretrained(tok_dir)
-    vocab = tok_dir / "vocab.txt"
-    if not vocab.exists():
-        raise RuntimeError("Tokenizer did not produce vocab.txt")
-    shutil.copyfile(vocab, OUT / "vocab.txt")
+    shutil.copyfile(tok_dir / "vocab.txt", OUT / "vocab.txt")
     shutil.rmtree(tok_dir)
 
     metadata = {
         "schema": "local-nli-model-v1",
         "name": "RuBERT-base NLI INT8",
-        "version": "3",
+        "version": "4",
         "source": MODEL_ID,
         "quantization": "dynamic-int8",
         "max_length": MAX_LEN,
@@ -248,13 +147,12 @@ def main():
         "inputs": ["input_ids", "attention_mask", "token_type_ids"],
         "output": "logits",
     }
-    (OUT / "metadata.json").write_text(
-        json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    (OUT / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 
-    fp32_session = ort.InferenceSession(str(fp32_path), providers=["CPUExecutionProvider"])
-    int8_session = ort.InferenceSession(str(int8_path), providers=["CPUExecutionProvider"])
+    fp32 = ort.InferenceSession(str(fp32_path), providers=["CPUExecutionProvider"])
+    int8 = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
     report = []
+    all_pass = True
     for category, case in CASES.items():
         pairs = [
             (case["positive"], case["signal"]),
@@ -262,49 +160,30 @@ def main():
             (case["negative"], case["signal"]),
             (case["negative"], case["safe"]),
         ]
-        torch_probs, torch_scores = score_torch(model, tokenizer, entailment_index, pairs)
-        fp32_probs, fp32_scores = score_onnx(fp32_session, tokenizer, entailment_index, pairs)
-        int8_probs, int8_scores = score_onnx(int8_session, tokenizer, entailment_index, pairs)
-        torch_summary = summarize(torch_scores)
-        fp32_summary = summarize(fp32_scores)
-        int8_summary = summarize(int8_scores)
-        row = {
-            "category": category,
-            "signal": case["signal"],
-            "safe": case["safe"],
-            "torch": torch_summary,
-            "onnx_fp32": fp32_summary,
-            "onnx_int8": int8_summary,
-            "torch_probs": torch_probs.tolist(),
-            "fp32_probs": fp32_probs.tolist(),
-            "int8_probs": int8_probs.tolist(),
-        }
-        report.append(row)
+        torch_s = summarize(score_torch(model, tokenizer, entailment_index, pairs))
+        fp32_s = summarize(score_onnx(fp32, tokenizer, entailment_index, pairs))
+        int8_s = summarize(score_onnx(int8, tokenizer, entailment_index, pairs))
+        passed = int8_s["positive_contrast"] > 0.10 and int8_s["negative_contrast"] < 0.10
+        all_pass = all_pass and passed
+        report.append({"category": category, "signal": case["signal"], "safe": case["safe"], "torch": torch_s, "onnx_fp32": fp32_s, "onnx_int8": int8_s, "pass": passed})
         print(
-            f"{category:10s} "
-            f"torch sep={torch_summary['separation']:+.4f} "
-            f"fp32 sep={fp32_summary['separation']:+.4f} "
-            f"int8 sep={int8_summary['separation']:+.4f} | "
-            f"int8 pos={int8_summary['positive_contrast']:+.4f} "
-            f"neg={int8_summary['negative_contrast']:+.4f}"
+            f"{category:10s} pass={passed} "
+            f"int8 pos={int8_s['positive_contrast']:+.4f} neg={int8_s['negative_contrast']:+.4f} sep={int8_s['separation']:+.4f} "
+            f"| fp32 pos={fp32_s['positive_contrast']:+.4f} neg={fp32_s['negative_contrast']:+.4f}"
         )
-
-    (OUT / "smoke_scores.json").write_text(
-        json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    (OUT / "smoke_scores.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    if not all_pass:
+        raise SystemExit("Final INT8 semantic smoke test did not separate all five pairs")
 
     fp32_size = fp32_path.stat().st_size
-    int8_size = int8_path.stat().st_size
+    int8_size = model_path.stat().st_size
     fp32_path.unlink()
-
     with zipfile.ZipFile(PKG, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
         for name in ["model.onnx", "vocab.txt", "metadata.json"]:
             z.write(OUT / name, name)
-
     print(f"labels entailment={entailment_index} contradiction={contradiction_index} neutral={neutral_index}")
     print(f"fp32_size={fp32_size} int8_size={int8_size} ratio={int8_size/fp32_size:.3f}")
     print(f"package={PKG} size={PKG.stat().st_size}")
-
 
 if __name__ == "__main__":
     main()
