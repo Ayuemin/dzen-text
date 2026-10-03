@@ -29,8 +29,6 @@ function stripHtmlTags(html) {
     .trim();
 }
 
-// Legacy helper kept for compatibility. The P0 publication contract below uses
-// P0Core.publicationParts(), which also supports a plain-text first-line title.
 function publishTitleFrom(markdown) {
   const lines = String(markdown == null ? '' : markdown).split(/\r?\n/);
   for (const raw of lines) {
@@ -71,7 +69,7 @@ function publishPreflight(markdown) {
 
   const extraTitles = publishHeadings(html).filter(h => h.level === 1);
   if (extraTitles.length) {
-    errors.push('В теле статьи остался второй заголовок H1. Оставьте один заголовок статьи.');
+    errors.push('В теле статьи остался второй заголовок H1. Если заголовок публикуется отдельным полем, оставьте в статье только один заголовок.');
   }
 
   const plainWords = plain.trim() ? plain.trim().split(/\s+/).filter(Boolean).length : 0;
@@ -92,21 +90,16 @@ function publishPreflight(markdown) {
   return { errors, warnings, html, plain };
 }
 
-// P0 / PUB 01: a single title model and three explicit clipboard payloads.
-// "all" contains the title exactly once; "body" never contains the title;
-// "title" can be pasted into a separate title field.
 function p0PublicationPayload(markdown, mode) {
   const src = String(markdown == null ? '' : markdown);
   const parts = (typeof P0Core !== 'undefined' && P0Core.publicationParts)
     ? P0Core.publicationParts(src)
     : { title: publishTitleFrom(src), body: src, titleMode: 'legacy' };
-
   const canonical = parts.title ? '# ' + parts.title + '\n\n' + parts.body : parts.body;
   const checked = publishPreflight(canonical);
   const composed = (typeof P0Core !== 'undefined' && P0Core.composePublication)
     ? P0Core.composePublication(parts.title, checked.html, checked.plain, mode)
     : { html: checked.html, plain: checked.plain };
-
   return {
     errors: checked.errors,
     warnings: checked.warnings,
@@ -181,9 +174,6 @@ function installPublicationCopyUi() {
 }
 setTimeout(installPublicationCopyUi, 0);
 
-// P0 / PUB 03 + A12: strip active/resource-loading HTML before the detached DOM
-// parser in 09-editor.js sees it. This is defence in depth in addition to the app
-// having no INTERNET permission.
 function sanitizeImportedHtmlSource(html) {
   let src = String(html == null ? '' : html);
   src = src.replace(/<!--([\s\S]*?)-->/g, '');
