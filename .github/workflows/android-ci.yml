@@ -72,8 +72,8 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build debug and release
-        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease
+      - name: Build editor and spelling probe
+        run: gradle --no-daemon :app:assembleDebug :app:assembleRelease :spellprobe-morfologik:assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -87,4 +87,11 @@ jobs:
         with:
           name: Text-Editor-v${{ env.APP_VERSION }}-release-unsigned
           path: app/build/outputs/apk/release/app-release-unsigned.apk
+          if-no-files-found: error
+
+      - name: Upload Morfologik spelling probe APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Spelling-Probe-Morfologik-2.2.0
+          path: spellprobe-morfologik/build/outputs/apk/debug/spellprobe-morfologik-debug.apk
           if-no-files-found: error
