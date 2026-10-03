@@ -23,7 +23,9 @@ jobs:
           python-version: '3.12'
 
       - name: Apply deterministic cleanup
-        run: python3 .github/scripts/apply_local_first_cleanup.py
+        run: |
+          python3 .github/scripts/apply_local_first_cleanup.py
+          python3 .github/scripts/apply_local_first_cleanup_fix.py
 
       - name: Verify cleanup changed the intended sources
         run: |
