@@ -101,8 +101,6 @@ function p0PublicationPayload(markdown, mode) {
     ? P0Core.publicationParts(src)
     : { title: publishTitleFrom(src), body: src, titleMode: 'legacy' };
 
-  // Feed a canonical H1 to the existing preflight so plain-text titles receive
-  // the same validation as Markdown H1 and are not duplicated into the body.
   const canonical = parts.title ? '# ' + parts.title + '\n\n' + parts.body : parts.body;
   const checked = publishPreflight(canonical);
   const composed = (typeof P0Core !== 'undefined' && P0Core.composePublication)
@@ -150,8 +148,6 @@ function copyPublicationTitle() { return copyPublicationMode('title'); }
 window.copyPublicationAll = copyPublicationAll;
 window.copyPublicationBody = copyPublicationBody;
 window.copyPublicationTitle = copyPublicationTitle;
-// Existing buttons mean "copy for publication"; from P0 onward their explicit
-// default is "all". The drawer also exposes title/body separately.
 window.copyRichHtml = copyPublicationAll;
 
 function installPublicationCopyUi() {
@@ -184,3 +180,30 @@ function installPublicationCopyUi() {
   }
 }
 setTimeout(installPublicationCopyUi, 0);
+
+// P0 / PUB 03 + A12: strip active/resource-loading HTML before the detached DOM
+// parser in 09-editor.js sees it. This is defence in depth in addition to the app
+// having no INTERNET permission.
+function sanitizeImportedHtmlSource(html) {
+  let src = String(html == null ? '' : html);
+  src = src.replace(/<!--([\s\S]*?)-->/g, '');
+  src = src.replace(/<(script|style|iframe|object|embed|svg|math)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '');
+  src = src.replace(/<(script|style|iframe|object|embed|link|meta|base|source|video|audio)\b[^>]*\/?>/gi, '');
+  src = src.replace(/<img\b([^>]*)>/gi, function(_, attrs) {
+    const alt = String(attrs || '').match(/\balt\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    const text = alt ? (alt[1] || alt[2] || alt[3] || '') : '';
+    return text ? String(text).replace(/[<>]/g, '') : '';
+  });
+  src = src.replace(/\s(?:on[a-z]+|src|srcset|poster|background)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  src = src.replace(/\sstyle\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, '');
+  return src;
+}
+
+if (typeof htmlToEditableText === 'function') {
+  const unsafeHtmlToEditableText = htmlToEditableText;
+  htmlToEditableText = function(html) {
+    return unsafeHtmlToEditableText(sanitizeImportedHtmlSource(html));
+  };
+  window.htmlToEditableText = htmlToEditableText;
+}
+window.sanitizeImportedHtmlSource = sanitizeImportedHtmlSource;
