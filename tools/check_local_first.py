@@ -49,3 +49,10 @@ print('Local-first guard OK')
 
 require('clearOnlineSpelling' not in all_js, 'Legacy spelling compatibility calls must stay removed')
 require('OpenRouter receives only' not in all_js, 'Built-in local rule pack must not retain remote-generator provenance')
+
+require(not (js_dir / '12-markdown-toolbar.js').exists(), 'Retired Markdown toolbar module must stay removed')
+require('markdownToolbar' not in all_js and 'markdownToolbar' not in html, 'Retired Markdown toolbar state/UI must stay removed')
+require('markdown-toolbar-visible' not in (www / 'css/editor-v2.css').read_text(encoding='utf-8'), 'Retired Markdown toolbar CSS must stay removed')
+history=(js_dir / '12-history.js').read_text(encoding='utf-8')
+require('function undoEdit()' in history and 'function redoEdit()' in history, 'Undo/Redo engine must stay available')
+require('function saveVersionSnapshot' in history, 'Version history must stay available')

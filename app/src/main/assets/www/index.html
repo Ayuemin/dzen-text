@@ -70,28 +70,7 @@
       <button id="issueNavContext" class="issueNavContext" type="button" onclick="jumpIssueNavigator()"></button>
       <div class="repeatNavMeta">Листайте однотипные замечания стрелками. Фрагмент в редакторе выделяется автоматически.</div>
     </div>
-  <div class="markdownToolbar" id="markdownToolbar" aria-label="Панель Markdown">
-    <div class="markdownToolbarScroll">
-      <button type="button" class="mdBtn mdHistory" id="undoBtn" onclick="undoEdit()" aria-label="Отменить" title="Отменить">↶</button>
-      <button type="button" class="mdBtn mdHistory" id="redoBtn" onclick="redoEdit()" aria-label="Повторить" title="Повторить">↷</button>
-      <span class="mdDivider" aria-hidden="true"></span>
-      <button type="button" class="mdBtn mdStrong" onclick="applyMarkdown('bold')" aria-label="Жирный" title="Жирный">B</button>
-      <button type="button" class="mdBtn mdItalic" onclick="applyMarkdown('italic')" aria-label="Курсив" title="Курсив">I</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h1')" aria-label="Заголовок H1" title="Заголовок H1">H1</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h2')" aria-label="Заголовок H2" title="Заголовок H2">H2</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h3')" aria-label="Заголовок H3" title="Заголовок H3">H3</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h4')" aria-label="Заголовок H4" title="Заголовок H4">H4</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h5')" aria-label="Заголовок H5" title="Заголовок H5">H5</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('h6')" aria-label="Заголовок H6" title="Заголовок H6">H6</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('bullet')" aria-label="Маркированный список" title="Маркированный список">•</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('number')" aria-label="Нумерованный список" title="Нумерованный список">1.</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('quote')" aria-label="Цитата" title="Цитата">❝</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('link')" aria-label="Ссылка" title="Ссылка">↗</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('strike')" aria-label="Зачёркнутый" title="Зачёркнутый">S̶</button>
-      <button type="button" class="mdBtn mdCode" onclick="applyMarkdown('code')" aria-label="Код" title="Код">&lt;/&gt;</button>
-      <button type="button" class="mdBtn" onclick="applyMarkdown('hr')" aria-label="Разделитель" title="Разделитель">—</button>
-    </div>
-  </div>
+
   <footer class="bottom">
     <button class="bottomBtn iconOnly" id="speakBtn" onclick="toggleSpeak()" aria-label="Озвучить" title="Озвучить"><span id="speakIcon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4Z"/><path d="M15 9a4 4 0 0 1 0 6M17.5 6.5a8 8 0 0 1 0 11"/></svg></span><span id="speakText" class="srOnly">Озвучить</span></button>
     <div class="stats"><b id="words">0</b> слов · <b id="readTime">0 мин</b> · <b id="chars">0</b> знаков</div>
@@ -217,14 +196,6 @@
           <option value="dark">Тёмная</option>
         </select>
         <div class="smallNote">Акцент меняет только управляющие элементы. Цвет текста задаётся отдельно от него.</div>
-      </div>
-    </details>
-
-    <details class="settingsGroup">
-      <summary><span>Ввод текста</span><small>Клавиатура и форматирование</small></summary>
-      <div class="settingsGroupBody">
-        <div class="switchRow"><span>Панель Markdown над клавиатурой</span><input id="markdownToolbarSwitch" class="switch" type="checkbox" onchange="applySettings()"></div>
-        <div class="smallNote">Быстрые кнопки H1–H6, жирного, курсива, списков, цитаты, ссылки и других элементов. Можно отключить полностью.</div>
       </div>
     </details>
 

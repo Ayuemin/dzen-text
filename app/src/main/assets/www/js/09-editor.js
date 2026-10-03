@@ -127,7 +127,6 @@ function showPane(name){
   document.getElementById('editTab').classList.toggle('active',name==='edit');
   document.getElementById('previewTab').classList.toggle('active',name==='preview');
   if(name==='preview'&&previewDirty)render(false,true);
-  if(typeof updateMarkdownToolbarVisibility==='function')setTimeout(updateMarkdownToolbarVisibility,20);
   if(typeof updateCurrentArticleUi==='function')updateCurrentArticleUi();
 }
 
