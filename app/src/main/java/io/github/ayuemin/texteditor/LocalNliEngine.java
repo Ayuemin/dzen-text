@@ -33,7 +33,8 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 
 /**
- * Small local zero-shot classifier for semantic review.
+ * Small local zero-shot NLI classifier for semantic review.
+ * Each user category contains a signal hypothesis and a safe-context hypothesis.
  * A model package contains model.onnx, vocab.txt and metadata.json.
  */
 final class LocalNliEngine implements AutoCloseable {
@@ -51,8 +52,10 @@ final class LocalNliEngine implements AutoCloseable {
     private static final int MAX_CATEGORIES = 24;
     private static final int MAX_SEGMENTS = 280;
     private static final int MAX_SEGMENT_CHARS = 1200;
-    private static final int BATCH_SIZE = 24;
+    // Every PairWork expands to two encoded NLI pairs, so 12 keeps an ONNX batch near 24.
+    private static final int BATCH_SIZE = 12;
     private static final int MAX_ISSUES = 180;
+    private static final String GENERIC_SAFE = "Текст нейтрально обсуждает эту тему, предупреждает о ней или осуждает её без предложения совершить действие.";
 
     private final File rootDir;
     private final File activeDir;
@@ -78,7 +81,7 @@ final class LocalNliEngine implements AutoCloseable {
         JSONObject out = new JSONObject();
         boolean installed = packageLooksPresent(activeDir);
         put(out, "engine", "ONNX Runtime");
-        put(out, "kind", "NLI zero-shot classifier");
+        put(out, "kind", "contrastive NLI zero-shot classifier");
         put(out, "installed", installed);
         put(out, "available", installed);
         if (installed) {
@@ -172,6 +175,7 @@ final class LocalNliEngine implements AutoCloseable {
                 out.put("available", true);
                 out.put("issues", issues);
                 out.put("segments", 0);
+                out.put("categories", 0);
                 out.put("pairs", 0);
                 out.put("elapsedMs", System.currentTimeMillis() - started);
                 return out.toString();
@@ -188,20 +192,23 @@ final class LocalNliEngine implements AutoCloseable {
             for (int offset = 0; offset < pairs.size() && issues.length() < MAX_ISSUES; offset += BATCH_SIZE) {
                 int end = Math.min(pairs.size(), offset + BATCH_SIZE);
                 List<PairWork> batch = pairs.subList(offset, end);
-                float[] scores = runBatch(batch);
+                ContrastScore[] scores = runBatch(batch);
                 runs++;
                 for (int i = 0; i < batch.size() && issues.length() < MAX_ISSUES; i++) {
                     PairWork work = batch.get(i);
-                    float score = scores[i];
-                    if (score < work.category.threshold) continue;
+                    ContrastScore score = scores[i];
+                    if (score.normalized < work.category.threshold) continue;
                     String key = work.segment.id + "\u0000" + work.category.id;
                     if (!seen.add(key)) continue;
                     JSONObject issue = new JSONObject();
                     issue.put("id", "nli-" + work.category.id);
                     issue.put("category", work.category.name);
                     issue.put("title", work.category.name);
-                    issue.put("message", "Смысл фрагмента соответствует категории «" + work.category.name + "».");
-                    issue.put("score", score);
+                    issue.put("message", "Смысл фрагмента ближе к сигналу категории «" + work.category.name + "», чем к безопасному контексту.");
+                    issue.put("score", score.normalized);
+                    issue.put("signalScore", score.signal);
+                    issue.put("safeScore", score.safe);
+                    issue.put("contrast", score.contrast);
                     issue.put("start", work.segment.start);
                     issue.put("end", work.segment.end);
                     issue.put("severity", "warning");
@@ -213,7 +220,8 @@ final class LocalNliEngine implements AutoCloseable {
             out.put("issues", issues);
             out.put("segments", segments.size());
             out.put("categories", categories.size());
-            out.put("pairs", pairs.size());
+            // Each logical segment/category comparison evaluates two NLI hypotheses.
+            out.put("pairs", pairs.size() * 2);
             out.put("runs", runs);
             out.put("truncated", truncated);
             out.put("elapsedMs", System.currentTimeMillis() - started);
@@ -265,10 +273,22 @@ final class LocalNliEngine implements AutoCloseable {
         if (m.entailmentIndex < 0 || m.entailmentIndex > 8) throw new IllegalArgumentException("Некорректный entailment_index");
     }
 
-    private float[] runBatch(List<PairWork> batch) throws Exception {
-        List<EncodedPair> encoded = new ArrayList<>(batch.size());
-        for (PairWork work : batch) encoded.add(tokenizer.encodePair(work.segment.text, work.category.description));
-        return runEncodedBatch(session, meta, encoded);
+    private ContrastScore[] runBatch(List<PairWork> batch) throws Exception {
+        List<EncodedPair> encoded = new ArrayList<>(batch.size() * 2);
+        for (PairWork work : batch) {
+            encoded.add(tokenizer.encodePair(work.segment.text, work.category.signal));
+            encoded.add(tokenizer.encodePair(work.segment.text, work.category.safe));
+        }
+        float[] entailment = runEncodedBatch(session, meta, encoded);
+        ContrastScore[] result = new ContrastScore[batch.size()];
+        for (int i = 0; i < batch.size(); i++) {
+            float signal = entailment[i * 2];
+            float safe = entailment[i * 2 + 1];
+            float contrast = Math.max(-1f, Math.min(1f, signal - safe));
+            float normalized = Math.max(0f, Math.min(1f, 0.5f + contrast * 0.5f));
+            result[i] = new ContrastScore(signal, safe, contrast, normalized);
+        }
+        return result;
     }
 
     private float[] runEncodedBatch(OrtSession s, ModelMeta m, List<EncodedPair> encoded) throws Exception {
@@ -326,13 +346,15 @@ final class LocalNliEngine implements AutoCloseable {
             JSONObject o = array.optJSONObject(i);
             if (o == null || !o.optBoolean("enabled", true)) continue;
             String name = clean(o.optString("name", ""), 80);
-            String description = clean(o.optString("description", ""), 220);
-            if (name.isEmpty() || description.isEmpty()) continue;
+            String signal = clean(o.optString("signal", o.optString("description", "")), 320);
+            String safe = clean(o.optString("safe", GENERIC_SAFE), 320);
+            if (name.isEmpty() || signal.isEmpty()) continue;
+            if (safe.isEmpty()) safe = GENERIC_SAFE;
             String id = slug(o.optString("id", name));
             if (id.isEmpty() || !ids.add(id)) continue;
-            double thresholdRaw = o.optDouble("threshold", 0.55);
-            float threshold = (float) Math.max(0.05, Math.min(0.99, thresholdRaw));
-            out.add(new Category(id, name, description, threshold));
+            double thresholdRaw = o.optDouble("threshold", 0.60);
+            float threshold = (float) Math.max(0.50, Math.min(0.99, thresholdRaw));
+            out.add(new Category(id, name, signal, safe, threshold));
         }
         return out;
     }
@@ -440,10 +462,10 @@ final class LocalNliEngine implements AutoCloseable {
     }
 
     private static final class Category {
-        final String id, name, description;
+        final String id, name, signal, safe;
         final float threshold;
-        Category(String id, String name, String description, float threshold) {
-            this.id = id; this.name = name; this.description = description; this.threshold = threshold;
+        Category(String id, String name, String signal, String safe, float threshold) {
+            this.id = id; this.name = name; this.signal = signal; this.safe = safe; this.threshold = threshold;
         }
     }
 
@@ -459,12 +481,19 @@ final class LocalNliEngine implements AutoCloseable {
         PairWork(Segment segment, Category category) { this.segment = segment; this.category = category; }
     }
 
+    private static final class ContrastScore {
+        final float signal, safe, contrast, normalized;
+        ContrastScore(float signal, float safe, float contrast, float normalized) {
+            this.signal = signal; this.safe = safe; this.contrast = contrast; this.normalized = normalized;
+        }
+    }
+
     private static final class EncodedPair {
         final long[] ids, types;
         EncodedPair(long[] ids, long[] types) { this.ids = ids; this.types = types; }
     }
 
-    /** Minimal BERT tokenizer compatible with the cased RuBERT-tiny vocabulary. */
+    /** Minimal BERT WordPiece tokenizer compatible with the packaged RuBERT vocabulary. */
     private static final class WordPieceTokenizer {
         private final Map<String, Integer> vocab = new LinkedHashMap<>();
         private final int maxLength;
