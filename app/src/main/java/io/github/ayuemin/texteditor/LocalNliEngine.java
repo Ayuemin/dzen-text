@@ -33,9 +33,13 @@ import ai.onnxruntime.OrtException;
 import ai.onnxruntime.OrtSession;
 
 /**
- * Small local zero-shot NLI classifier for semantic review.
- * Each user category contains a signal hypothesis and a safe-context hypothesis.
- * A model package contains model.onnx, vocab.txt and metadata.json.
+ * Fully-local zero-shot NLI classifier for semantic review.
+ *
+ * Long texts use two stages:
+ * 1) coarse blocks are screened once against each signal hypothesis;
+ * 2) only sentences from suspicious blocks receive the full signal-vs-safe comparison.
+ * This keeps normal articles responsive without turning semantic review into a minutes-long
+ * sentence x category x two-hypothesis exhaustive pass.
  */
 final class LocalNliEngine implements AutoCloseable {
     private static final String SCHEMA = "local-nli-model-v1";
@@ -46,15 +50,24 @@ final class LocalNliEngine implements AutoCloseable {
     private static final String MODEL = "model.onnx";
     private static final String VOCAB = "vocab.txt";
     private static final String META = "metadata.json";
+
     private static final long MAX_MODEL_BYTES = 700L * 1024L * 1024L;
     private static final long MAX_VOCAB_BYTES = 8L * 1024L * 1024L;
     private static final long MAX_META_BYTES = 512L * 1024L;
+
     private static final int MAX_CATEGORIES = 24;
-    private static final int MAX_SEGMENTS = 280;
-    private static final int MAX_SEGMENT_CHARS = 1200;
-    // Every PairWork expands to two encoded NLI pairs, so 12 keeps an ONNX batch near 24.
-    private static final int BATCH_SIZE = 12;
+    private static final int MAX_SENTENCES = 1000;
+    private static final int MAX_SENTENCE_CHARS = 1200;
+    private static final int DIRECT_SENTENCE_LIMIT = 18;
+    private static final int MAX_COARSE_CHUNKS = 120;
+    private static final int MIN_COARSE_CHARS = 420;
+    private static final int MAX_COARSE_CHARS = 900;
+    // Pair batches expand to two ONNX rows during the final contrast pass.
+    private static final int BATCH_SIZE = 16;
     private static final int MAX_ISSUES = 180;
+    private static final long MAX_ANALYSIS_MS = 25_000L;
+    private static final float SCREEN_SIGNAL_FLOOR = 0.35f;
+    private static final float MIN_SIGNAL_SCORE = 0.50f;
     private static final String GENERIC_SAFE = "Текст нейтрально обсуждает эту тему, предупреждает о ней или осуждает её без предложения совершить действие.";
 
     private final File rootDir;
@@ -67,6 +80,7 @@ final class LocalNliEngine implements AutoCloseable {
     private WordPieceTokenizer tokenizer;
     private ModelMeta meta;
     private String lastError = "";
+    private volatile boolean cancelRequested = false;
 
     LocalNliEngine(Context context) {
         Context appContext = context.getApplicationContext();
@@ -75,6 +89,10 @@ final class LocalNliEngine implements AutoCloseable {
         candidateDir = new File(rootDir, CANDIDATE);
         backupDir = new File(rootDir, BACKUP);
         environment = OrtEnvironment.getEnvironment();
+    }
+
+    void requestCancel() {
+        cancelRequested = true;
     }
 
     synchronized String statusJson() {
@@ -168,64 +186,93 @@ final class LocalNliEngine implements AutoCloseable {
         JSONObject out = new JSONObject();
         JSONArray issues = new JSONArray();
         long started = System.currentTimeMillis();
+        long deadline = started + MAX_ANALYSIS_MS;
+        cancelRequested = false;
+        int runs = 0;
+        int comparisons = 0;
+        int screeningChunks = 0;
+        int candidatePairs = 0;
+        boolean timedOut = false;
+        boolean cancelled = false;
+        boolean truncated = false;
         try {
             ensureLoaded();
             List<Category> categories = parseCategories(categoriesJson);
             if (categories.isEmpty()) {
-                out.put("available", true);
-                out.put("issues", issues);
-                out.put("segments", 0);
-                out.put("categories", 0);
-                out.put("pairs", 0);
-                out.put("elapsedMs", System.currentTimeMillis() - started);
-                return out.toString();
+                return finish(out, issues, 0, 0, 0, 0, 0, false, false, false, started);
             }
-            List<Segment> allSegments = splitSegments(source == null ? "" : source);
-            boolean truncated = allSegments.size() > MAX_SEGMENTS;
-            List<Segment> segments = allSegments.size() > MAX_SEGMENTS ? allSegments.subList(0, MAX_SEGMENTS) : allSegments;
-            List<PairWork> pairs = new ArrayList<>();
-            for (Segment segment : segments) {
-                for (Category category : categories) pairs.add(new PairWork(segment, category));
+
+            List<Segment> allSentences = splitSentences(source == null ? "" : source);
+            truncated = allSentences.size() > MAX_SENTENCES;
+            List<Segment> sentences = truncated ? new ArrayList<>(allSentences.subList(0, MAX_SENTENCES)) : allSentences;
+            if (sentences.isEmpty()) {
+                return finish(out, issues, 0, categories.size(), 0, 0, 0, truncated, false, false, started);
             }
-            int runs = 0;
-            Set<String> seen = new HashSet<>();
-            for (int offset = 0; offset < pairs.size() && issues.length() < MAX_ISSUES; offset += BATCH_SIZE) {
-                int end = Math.min(pairs.size(), offset + BATCH_SIZE);
-                List<PairWork> batch = pairs.subList(offset, end);
-                ContrastScore[] scores = runBatch(batch);
+
+            if (sentences.size() <= DIRECT_SENTENCE_LIMIT) {
+                List<PairWork> direct = makePairs(sentences, categories);
+                for (int offset = 0; offset < direct.size() && issues.length() < MAX_ISSUES; offset += BATCH_SIZE) {
+                    if (cancelRequested) { cancelled = true; break; }
+                    if (System.currentTimeMillis() >= deadline) { timedOut = true; break; }
+                    int end = Math.min(direct.size(), offset + BATCH_SIZE);
+                    List<PairWork> batch = direct.subList(offset, end);
+                    ContrastScore[] scores = runContrastBatch(batch);
+                    runs++;
+                    comparisons += batch.size() * 2;
+                    appendMatches(issues, batch, scores);
+                }
+                lastError = "";
+                return finish(out, issues, sentences.size(), categories.size(), comparisons, runs, 0,
+                        truncated, timedOut, cancelled, started);
+            }
+
+            // Stage 1: screen compact blocks with only the signal hypothesis.
+            List<Segment> chunks = buildCoarseSegments(source == null ? "" : source, sentences);
+            screeningChunks = chunks.size();
+            List<PairWork> screenPairs = makePairs(chunks, categories);
+            LinkedHashMap<String, PairWork> drillPairs = new LinkedHashMap<>();
+            for (int offset = 0; offset < screenPairs.size(); offset += BATCH_SIZE * 2) {
+                if (cancelRequested) { cancelled = true; break; }
+                if (System.currentTimeMillis() >= deadline) { timedOut = true; break; }
+                int end = Math.min(screenPairs.size(), offset + BATCH_SIZE * 2);
+                List<PairWork> batch = screenPairs.subList(offset, end);
+                float[] signalScores = runSignalBatch(batch);
                 runs++;
-                for (int i = 0; i < batch.size() && issues.length() < MAX_ISSUES; i++) {
-                    PairWork work = batch.get(i);
-                    ContrastScore score = scores[i];
-                    if (score.normalized < work.category.threshold) continue;
-                    String key = work.segment.id + "\u0000" + work.category.id;
-                    if (!seen.add(key)) continue;
-                    JSONObject issue = new JSONObject();
-                    issue.put("id", "nli-" + work.category.id);
-                    issue.put("category", work.category.name);
-                    issue.put("title", work.category.name);
-                    issue.put("message", "Смысл фрагмента ближе к сигналу категории «" + work.category.name + "», чем к безопасному контексту.");
-                    issue.put("score", score.normalized);
-                    issue.put("signalScore", score.signal);
-                    issue.put("safeScore", score.safe);
-                    issue.put("contrast", score.contrast);
-                    issue.put("start", work.segment.start);
-                    issue.put("end", work.segment.end);
-                    issue.put("severity", "warning");
-                    issues.put(issue);
+                comparisons += batch.size();
+                for (int i = 0; i < batch.size(); i++) {
+                    if (signalScores[i] < SCREEN_SIGNAL_FLOOR) continue;
+                    PairWork coarse = batch.get(i);
+                    for (Segment sentence : sentences) {
+                        if (sentence.end <= coarse.segment.start) continue;
+                        if (sentence.start >= coarse.segment.end) break;
+                        if (sentence.start < coarse.segment.end && sentence.end > coarse.segment.start) {
+                            String key = sentence.id + "\u0000" + coarse.category.id;
+                            drillPairs.put(key, new PairWork(sentence, coarse.category));
+                        }
+                    }
                 }
             }
+
+            // Stage 2: only suspicious sentence/category pairs get the full contrast pass.
+            if (!cancelled && !timedOut && !drillPairs.isEmpty()) {
+                List<PairWork> drill = new ArrayList<>(drillPairs.values());
+                candidatePairs = drill.size();
+                for (int offset = 0; offset < drill.size() && issues.length() < MAX_ISSUES; offset += BATCH_SIZE) {
+                    if (cancelRequested) { cancelled = true; break; }
+                    if (System.currentTimeMillis() >= deadline) { timedOut = true; break; }
+                    int end = Math.min(drill.size(), offset + BATCH_SIZE);
+                    List<PairWork> batch = drill.subList(offset, end);
+                    ContrastScore[] scores = runContrastBatch(batch);
+                    runs++;
+                    comparisons += batch.size() * 2;
+                    appendMatches(issues, batch, scores);
+                }
+            }
+
             lastError = "";
-            out.put("available", true);
-            out.put("issues", issues);
-            out.put("segments", segments.size());
-            out.put("categories", categories.size());
-            // Each logical segment/category comparison evaluates two NLI hypotheses.
-            out.put("pairs", pairs.size() * 2);
-            out.put("runs", runs);
-            out.put("truncated", truncated);
-            out.put("elapsedMs", System.currentTimeMillis() - started);
-            out.put("modelName", meta.name);
+            String json = finish(out, issues, sentences.size(), categories.size(), comparisons, runs,
+                    screeningChunks, truncated, timedOut, cancelled, started);
+            try { out.put("candidatePairs", candidatePairs); } catch (Exception ignored) { }
             return out.toString();
         } catch (Throwable t) {
             lastError = safeMessage(t);
@@ -235,6 +282,88 @@ final class LocalNliEngine implements AutoCloseable {
             put(out, "elapsedMs", System.currentTimeMillis() - started);
             return out.toString();
         }
+    }
+
+    private String finish(JSONObject out, JSONArray issues, int sentences, int categories, int comparisons,
+                          int runs, int screeningChunks, boolean truncated, boolean timedOut,
+                          boolean cancelled, long started) {
+        put(out, "available", true);
+        put(out, "issues", issues);
+        put(out, "segments", sentences);
+        put(out, "categories", categories);
+        put(out, "pairs", comparisons);
+        put(out, "runs", runs);
+        put(out, "screeningChunks", screeningChunks);
+        put(out, "truncated", truncated);
+        put(out, "timedOut", timedOut);
+        put(out, "cancelled", cancelled);
+        put(out, "partial", truncated || timedOut || cancelled);
+        put(out, "elapsedMs", System.currentTimeMillis() - started);
+        if (meta != null) put(out, "modelName", meta.name);
+        return out.toString();
+    }
+
+    private void appendMatches(JSONArray issues, List<PairWork> batch, ContrastScore[] scores) throws Exception {
+        Set<String> existing = new HashSet<>();
+        for (int i = 0; i < issues.length(); i++) {
+            JSONObject old = issues.optJSONObject(i);
+            if (old != null) existing.add(old.optInt("start", -1) + "\u0000" + old.optInt("end", -1) + "\u0000" + old.optString("id", ""));
+        }
+        for (int i = 0; i < batch.size() && issues.length() < MAX_ISSUES; i++) {
+            PairWork work = batch.get(i);
+            ContrastScore score = scores[i];
+            if (score.signal < MIN_SIGNAL_SCORE || score.normalized < work.category.threshold) continue;
+            String issueId = "nli-" + work.category.id;
+            String key = work.segment.start + "\u0000" + work.segment.end + "\u0000" + issueId;
+            if (!existing.add(key)) continue;
+            JSONObject issue = new JSONObject();
+            issue.put("id", issueId);
+            issue.put("category", work.category.name);
+            issue.put("title", work.category.name);
+            issue.put("message", "Смысл фрагмента ближе к сигналу категории «" + work.category.name + "», чем к безопасному контексту.");
+            issue.put("score", score.normalized);
+            issue.put("signalScore", score.signal);
+            issue.put("safeScore", score.safe);
+            issue.put("contrast", score.contrast);
+            issue.put("start", work.segment.start);
+            issue.put("end", work.segment.end);
+            issue.put("severity", "warning");
+            issues.put(issue);
+        }
+    }
+
+    private List<PairWork> makePairs(List<Segment> segments, List<Category> categories) {
+        List<PairWork> pairs = new ArrayList<>(Math.max(1, segments.size() * categories.size()));
+        for (Segment segment : segments) for (Category category : categories) pairs.add(new PairWork(segment, category));
+        return pairs;
+    }
+
+    private List<Segment> buildCoarseSegments(String source, List<Segment> sentences) {
+        if (sentences.isEmpty()) return Collections.emptyList();
+        int dynamic = (int) Math.ceil(Math.max(1, source.length()) / (double) MAX_COARSE_CHUNKS);
+        int target = Math.max(MIN_COARSE_CHARS, Math.min(MAX_COARSE_CHARS, dynamic));
+        List<Segment> chunks = new ArrayList<>();
+        int id = 1;
+        int i = 0;
+        while (i < sentences.size()) {
+            int first = i;
+            int start = sentences.get(i).start;
+            int end = sentences.get(i).end;
+            i++;
+            while (i < sentences.size()) {
+                Segment next = sentences.get(i);
+                int proposed = next.end - start;
+                if (proposed > target && i > first) break;
+                end = next.end;
+                i++;
+                if (end - start >= target) break;
+            }
+            int safeEnd = Math.min(source.length(), end);
+            int safeStart = Math.max(0, Math.min(start, safeEnd));
+            String text = source.substring(safeStart, safeEnd).trim();
+            if (!text.isEmpty()) chunks.add(new Segment(id++, safeStart, safeEnd, text));
+        }
+        return chunks;
     }
 
     private void ensureLoaded() throws Exception {
@@ -273,7 +402,13 @@ final class LocalNliEngine implements AutoCloseable {
         if (m.entailmentIndex < 0 || m.entailmentIndex > 8) throw new IllegalArgumentException("Некорректный entailment_index");
     }
 
-    private ContrastScore[] runBatch(List<PairWork> batch) throws Exception {
+    private float[] runSignalBatch(List<PairWork> batch) throws Exception {
+        List<EncodedPair> encoded = new ArrayList<>(batch.size());
+        for (PairWork work : batch) encoded.add(tokenizer.encodePair(work.segment.text, work.category.signal));
+        return runEncodedBatch(session, meta, encoded);
+    }
+
+    private ContrastScore[] runContrastBatch(List<PairWork> batch) throws Exception {
         List<EncodedPair> encoded = new ArrayList<>(batch.size() * 2);
         for (PairWork work : batch) {
             encoded.add(tokenizer.encodePair(work.segment.text, work.category.signal));
@@ -359,7 +494,7 @@ final class LocalNliEngine implements AutoCloseable {
         return out;
     }
 
-    private static List<Segment> splitSegments(String source) {
+    private static List<Segment> splitSentences(String source) {
         if (source == null || source.trim().isEmpty()) return Collections.emptyList();
         BreakIterator iterator = BreakIterator.getSentenceInstance(new Locale("ru", "RU"));
         iterator.setText(source);
@@ -367,14 +502,14 @@ final class LocalNliEngine implements AutoCloseable {
         int rawStart = iterator.first();
         int rawEnd = iterator.next();
         int id = 1;
-        while (rawEnd != BreakIterator.DONE && result.size() < MAX_SEGMENTS + 1) {
+        while (rawEnd != BreakIterator.DONE && result.size() < MAX_SENTENCES + 1) {
             int start = rawStart, end = rawEnd;
             while (start < end && Character.isWhitespace(source.charAt(start))) start++;
             while (end > start && Character.isWhitespace(source.charAt(end - 1))) end--;
             if (end > start) {
                 String text = source.substring(start, end);
                 if (containsLetterOrDigit(text)) {
-                    if (text.length() > MAX_SEGMENT_CHARS) text = text.substring(0, MAX_SEGMENT_CHARS);
+                    if (text.length() > MAX_SENTENCE_CHARS) text = text.substring(0, MAX_SENTENCE_CHARS);
                     result.add(new Segment(id++, start, Math.min(end, start + text.length()), text));
                 }
             }
@@ -472,13 +607,17 @@ final class LocalNliEngine implements AutoCloseable {
     private static final class Segment {
         final int id, start, end;
         final String text;
-        Segment(int id, int start, int end, String text) { this.id = id; this.start = start; this.end = end; this.text = text; }
+        Segment(int id, int start, int end, String text) {
+            this.id = id; this.start = start; this.end = end; this.text = text;
+        }
     }
 
     private static final class PairWork {
         final Segment segment;
         final Category category;
-        PairWork(Segment segment, Category category) { this.segment = segment; this.category = category; }
+        PairWork(Segment segment, Category category) {
+            this.segment = segment; this.category = category;
+        }
     }
 
     private static final class ContrastScore {
