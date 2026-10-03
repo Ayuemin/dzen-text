@@ -14,18 +14,55 @@ OUT = Path("build/local-nli")
 PKG = Path("build/rubert-tiny-nli-android.zip")
 MAX_LEN = 192
 
-SMOKE = [
-    ("Вложите средства сегодня — потерять их невозможно, прибыль вам обеспечена.", "гарантированная прибыль без риска"),
-    ("Если ещё раз здесь появишься, пожалеешь об этом.", "угроза человеку"),
-    ("Могу достать ствол без оформления бумаг.", "продажа оружия без документов"),
-    ("Если лекарство не помогает, просто примите в два раза больше.", "опасное самостоятельное изменение дозировки лекарства"),
-    ("Оформи подписку прямо сейчас и получишь подарок.", "призыв подписаться ради подарка или выгоды"),
-    ("Инвестиции могут привести к убыткам, гарантировать прибыль невозможно.", "гарантированная прибыль без риска"),
-    ("В статье разбирается, почему угрозы человеку недопустимы.", "угроза человеку"),
-    ("Автор рассказывает о незаконной торговле оружием и её последствиях.", "продажа оружия без документов"),
-    ("Дозировку препарата должен определять врач.", "опасное самостоятельное изменение дозировки лекарства"),
-    ("Подписка стоит 299 рублей в месяц и отключается в настройках.", "призыв подписаться ради подарка или выгоды"),
-]
+CASES = {
+    "finance": {
+        "positive": "Вложите средства сегодня — потерять их невозможно, прибыль вам обеспечена.",
+        "negative": "Инвестиции могут привести к убыткам, гарантировать прибыль невозможно.",
+        "hypotheses": [
+            "обещание гарантированной прибыли без риска",
+            "автор обещает гарантированную прибыль без риска",
+            "гарантия, что вложенные деньги невозможно потерять",
+        ],
+    },
+    "threat": {
+        "positive": "Если ещё раз здесь появишься, пожалеешь об этом.",
+        "negative": "В статье разбирается, почему угрозы человеку недопустимы.",
+        "hypotheses": [
+            "угроза человеку",
+            "автор угрожает человеку неприятными последствиями",
+            "обращённая к человеку угроза причинить вред",
+            "запугивание человека обещанием плохих последствий",
+            "говорящий угрожает адресату",
+        ],
+    },
+    "restricted": {
+        "positive": "Могу достать ствол без оформления бумаг.",
+        "negative": "Автор рассказывает о незаконной торговле оружием и её последствиях.",
+        "hypotheses": [
+            "предложение получить оружие без документов",
+            "автор предлагает достать оружие без документов",
+            "предложение незаконно получить оружие",
+        ],
+    },
+    "medical": {
+        "positive": "Если лекарство не помогает, просто примите в два раза больше.",
+        "negative": "Дозировку препарата должен определять врач.",
+        "hypotheses": [
+            "опасное самостоятельное изменение дозировки лекарства",
+            "автор советует самостоятельно увеличить дозировку лекарства",
+            "опасный совет увеличить дозу лекарства без врача",
+        ],
+    },
+    "engagement": {
+        "positive": "Оформи подписку прямо сейчас и получишь подарок.",
+        "negative": "Подписка стоит 299 рублей в месяц и отключается в настройках.",
+        "hypotheses": [
+            "призыв подписаться ради подарка или выгоды",
+            "автор призывает подписаться ради подарка",
+            "обещание подарка за подписку",
+        ],
+    },
+}
 
 class Wrapper(torch.nn.Module):
     def __init__(self, model):
@@ -40,6 +77,18 @@ def softmax(x):
     x -= x.max(axis=-1, keepdims=True)
     e = np.exp(x)
     return e / e.sum(axis=-1, keepdims=True)
+
+
+def score_pairs(session, tokenizer, entailment_index, pairs):
+    premises = [p for p, _ in pairs]
+    hypotheses = [h for _, h in pairs]
+    enc = tokenizer(premises, hypotheses, padding=True, truncation=True, max_length=MAX_LEN, return_tensors="np")
+    logits = session.run(["logits"], {
+        "input_ids": enc["input_ids"].astype(np.int64),
+        "attention_mask": enc["attention_mask"].astype(np.int64),
+        "token_type_ids": enc["token_type_ids"].astype(np.int64),
+    })[0]
+    return softmax(logits)[:, entailment_index]
 
 
 def main():
@@ -87,20 +136,20 @@ def main():
     (OUT / "metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
 
     session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
-    premises = [x[0] for x in SMOKE]
-    hypotheses = [x[1] for x in SMOKE]
-    enc = tokenizer(premises, hypotheses, padding=True, truncation=True, max_length=MAX_LEN, return_tensors="np")
-    logits = session.run(["logits"], {
-        "input_ids": enc["input_ids"].astype(np.int64),
-        "attention_mask": enc["attention_mask"].astype(np.int64),
-        "token_type_ids": enc["token_type_ids"].astype(np.int64),
-    })[0]
-    scores = softmax(logits)[:, entailment_index]
     report = []
-    for i, ((premise, hypothesis), score) in enumerate(zip(SMOKE, scores), 1):
-        row = {"id": i, "premise": premise, "hypothesis": hypothesis, "entailment": float(score)}
-        report.append(row)
-        print(f"{i:02d} {score:.4f} | {premise}")
+    for category, case in CASES.items():
+        for hypothesis in case["hypotheses"]:
+            pairs = [(case["positive"], hypothesis), (case["negative"], hypothesis)]
+            pos, neg = score_pairs(session, tokenizer, entailment_index, pairs)
+            row = {
+                "category": category,
+                "hypothesis": hypothesis,
+                "positive": float(pos),
+                "negative": float(neg),
+                "margin": float(pos - neg),
+            }
+            report.append(row)
+            print(f"{category:10s} +{pos:.4f} -{neg:.4f} margin={pos-neg:+.4f} | {hypothesis}")
     (OUT / "smoke_scores.json").write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
 
     with zipfile.ZipFile(PKG, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as z:
