@@ -70,6 +70,7 @@ jobs:
           node tools/test_p0_import.js
           node tools/test_document_model.js
           node tools/test_analysis_document_model.js
+          node tools/test_proof_context.js
           node tools/test_rule_pack.js
           node tools/test_publish_export.js
           node tools/test_publish_copy.js
