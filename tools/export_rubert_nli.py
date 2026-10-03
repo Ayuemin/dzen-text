@@ -81,15 +81,13 @@ def main():
         dynamo=False,
     )
 
-    vocab_src = Path(tokenizer.vocab_files_names.get("vocab_file", "vocab.txt"))
-    # save_pretrained is the most reliable way to resolve cached tokenizer files.
     tok_dir = OUT / "tokenizer_tmp"
     tokenizer.save_pretrained(tok_dir)
     shutil.copyfile(tok_dir / "vocab.txt", OUT / "vocab.txt")
     shutil.rmtree(tok_dir)
 
     metadata = {
-        "schema": "dzen-nli-model-v1",
+        "schema": "local-nli-model-v1",
         "name": "RuBERT-tiny bilingual NLI",
         "version": "1",
         "source": MODEL_ID,
