@@ -16,103 +16,100 @@ import java.io.InputStream;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-/** MainActivity plus an optional fully-local GGUF language-model bridge. */
+/** MainActivity plus a fast fully-local ONNX NLI semantic classifier. */
 public class SemanticActivity extends MainActivity {
-    private static final int REQUEST_OPEN_LOCAL_LLM = 2915;
+    private static final int REQUEST_OPEN_LOCAL_NLI = 2916;
 
-    private LocalLlmEngine localLlm;
+    private LocalNliEngine localNli;
     private WebView semanticWebView;
-    private final AtomicBoolean llmBusy = new AtomicBoolean(false);
-    private final AtomicLong llmRequestSeq = new AtomicLong(0L);
+    private final AtomicBoolean semanticBusy = new AtomicBoolean(false);
+    private final AtomicLong requestSeq = new AtomicLong(0L);
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
-        localLlm = new LocalLlmEngine(this);
+        localNli = new LocalNliEngine(this);
         semanticWebView = findWebView(findViewById(android.R.id.content));
         if (semanticWebView != null) {
-            semanticWebView.addJavascriptInterface(new LocalLlmBridge(this, localLlm), "AndroidLocalLlm");
-            // MainActivity begins loading the page before this subclass can add its
-            // bridge. Reload once so the first stable page always sees AndroidLocalLlm.
+            semanticWebView.addJavascriptInterface(new LocalNliBridge(this, localNli), "AndroidSemanticModel");
+            // MainActivity starts loading before the subclass can attach its bridge.
+            // Reload once so the stable editor page always sees AndroidSemanticModel.
             semanticWebView.reload();
         }
     }
 
-    void pickLocalLlmModel() {
+    void pickLocalNliModel() {
         runOnUiThread(() -> {
-            if (llmBusy.get()) {
-                notifyLlmError("Дождитесь окончания текущей операции с локальной моделью");
+            if (semanticBusy.get()) {
+                notifyModelError("Дождитесь окончания текущей смысловой проверки");
                 return;
             }
             Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
             intent.addCategory(Intent.CATEGORY_OPENABLE);
-            intent.setType("*/*");
-            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
-                    "application/octet-stream", "application/x-gguf", "*/*"
-            });
+            intent.setType("application/zip");
+            intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{"application/zip", "application/octet-stream", "*/*"});
             try {
-                startActivityForResult(intent, REQUEST_OPEN_LOCAL_LLM);
+                startActivityForResult(intent, REQUEST_OPEN_LOCAL_NLI);
             } catch (Exception e) {
-                notifyLlmError("Не удалось открыть выбор GGUF-модели");
+                notifyModelError("Не удалось открыть выбор пакета смысловой модели");
             }
         });
     }
 
-    boolean clearLocalLlmModel() {
-        if (llmBusy.get() || localLlm == null) return false;
-        return localLlm.clearModel();
+    boolean clearLocalNliModel() {
+        if (semanticBusy.get() || localNli == null) return false;
+        return localNli.clearModel();
     }
 
-    long startLocalLlmAnalysis(String text, String criteria, String exclusions) {
-        if (localLlm == null) return -1L;
-        final long requestId = llmRequestSeq.incrementAndGet();
-        if (!llmBusy.compareAndSet(false, true)) {
-            notifyLlmAnalysisError(requestId, "Смысловая проверка уже выполняется");
+    long startLocalNliAnalysis(String text, String categoriesJson) {
+        if (localNli == null) return -1L;
+        final long requestId = requestSeq.incrementAndGet();
+        if (!semanticBusy.compareAndSet(false, true)) {
+            notifyAnalysisError(requestId, "Смысловая проверка уже выполняется");
             return -1L;
         }
         new Thread(() -> {
             try {
-                String result = localLlm.analyzeJson(text, criteria, exclusions);
-                notifyLlmAnalysisResult(requestId, result);
+                String result = localNli.analyzeJson(text, categoriesJson);
+                notifyAnalysisResult(requestId, result);
             } catch (Exception e) {
                 String message = e.getMessage();
                 if (message == null || message.trim().isEmpty()) message = e.getClass().getSimpleName();
-                notifyLlmAnalysisError(requestId, message);
+                notifyAnalysisError(requestId, message);
             } finally {
-                llmBusy.set(false);
+                semanticBusy.set(false);
             }
-        }, "local-gguf-analysis").start();
+        }, "local-nli-analysis").start();
         return requestId;
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode != REQUEST_OPEN_LOCAL_LLM) {
+        if (requestCode != REQUEST_OPEN_LOCAL_NLI) {
             super.onActivityResult(requestCode, resultCode, data);
             return;
         }
         if (resultCode != Activity.RESULT_OK || data == null || data.getData() == null) return;
-        if (!llmBusy.compareAndSet(false, true)) {
-            notifyLlmError("Дождитесь окончания текущей операции с локальной моделью");
+        if (!semanticBusy.compareAndSet(false, true)) {
+            notifyModelError("Дождитесь окончания текущей смысловой проверки");
             return;
         }
         final Uri uri = data.getData();
         final String displayName = readDisplayName(uri);
-        final long expectedBytes = readSize(uri);
-        notifyLlmInstalling();
+        notifyModelInstalling();
         new Thread(() -> {
             try (InputStream in = getContentResolver().openInputStream(uri)) {
                 if (in == null) throw new IllegalArgumentException("Файл модели не открыт");
-                String status = localLlm.installModel(in, displayName, expectedBytes);
-                notifyLlmChanged(status);
+                String status = localNli.installPackage(in, displayName);
+                notifyModelChanged(status);
             } catch (Exception e) {
                 String message = e.getMessage();
                 if (message == null || message.trim().isEmpty()) message = e.getClass().getSimpleName();
-                notifyLlmError(message);
+                notifyModelError(message);
             } finally {
-                llmBusy.set(false);
+                semanticBusy.set(false);
             }
-        }, "local-gguf-install").start();
+        }, "local-nli-install").start();
     }
 
     private String readDisplayName(Uri uri) {
@@ -126,40 +123,30 @@ public class SemanticActivity extends MainActivity {
             }
         } catch (Exception ignored) { }
         String last = uri.getLastPathSegment();
-        return last == null || last.trim().isEmpty() ? "model.gguf" : last;
+        return last == null || last.trim().isEmpty() ? "semantic-model.zip" : last;
     }
 
-    private long readSize(Uri uri) {
-        try (Cursor c = getContentResolver().query(uri, new String[]{OpenableColumns.SIZE}, null, null, null)) {
-            if (c != null && c.moveToFirst()) {
-                int index = c.getColumnIndex(OpenableColumns.SIZE);
-                if (index >= 0 && !c.isNull(index)) return Math.max(0L, c.getLong(index));
-            }
-        } catch (Exception ignored) { }
-        return -1L;
+    private void notifyModelInstalling() {
+        evaluateSemanticJs("window.onNativeSemanticModelInstalling&&window.onNativeSemanticModelInstalling()");
     }
 
-    private void notifyLlmInstalling() {
-        evaluateSemanticJs("window.onNativeLocalLlmInstalling&&window.onNativeLocalLlmInstalling()");
-    }
-
-    private void notifyLlmChanged(String statusJson) {
-        evaluateSemanticJs("window.onNativeLocalLlmChanged&&window.onNativeLocalLlmChanged(" +
+    private void notifyModelChanged(String statusJson) {
+        evaluateSemanticJs("window.onNativeSemanticModelChanged&&window.onNativeSemanticModelChanged(" +
                 JSONObject.quote(statusJson == null ? "{}" : statusJson) + ")");
     }
 
-    private void notifyLlmError(String message) {
-        evaluateSemanticJs("window.onNativeLocalLlmError&&window.onNativeLocalLlmError(" +
-                JSONObject.quote(message == null ? "Ошибка локальной модели" : message) + ")");
+    private void notifyModelError(String message) {
+        evaluateSemanticJs("window.onNativeSemanticModelError&&window.onNativeSemanticModelError(" +
+                JSONObject.quote(message == null ? "Ошибка смысловой модели" : message) + ")");
     }
 
-    private void notifyLlmAnalysisResult(long requestId, String resultJson) {
-        evaluateSemanticJs("window.onNativeLocalLlmResult&&window.onNativeLocalLlmResult(" + requestId + "," +
+    private void notifyAnalysisResult(long requestId, String resultJson) {
+        evaluateSemanticJs("window.onNativeSemanticResult&&window.onNativeSemanticResult(" + requestId + "," +
                 JSONObject.quote(resultJson == null ? "{}" : resultJson) + ")");
     }
 
-    private void notifyLlmAnalysisError(long requestId, String message) {
-        evaluateSemanticJs("window.onNativeLocalLlmAnalysisError&&window.onNativeLocalLlmAnalysisError(" + requestId + "," +
+    private void notifyAnalysisError(long requestId, String message) {
+        evaluateSemanticJs("window.onNativeSemanticAnalysisError&&window.onNativeSemanticAnalysisError(" + requestId + "," +
                 JSONObject.quote(message == null ? "Ошибка смысловой проверки" : message) + ")");
     }
 
@@ -182,9 +169,9 @@ public class SemanticActivity extends MainActivity {
 
     @Override
     protected void onDestroy() {
-        if (localLlm != null) {
-            localLlm.close();
-            localLlm = null;
+        if (localNli != null) {
+            localNli.close();
+            localNli = null;
         }
         semanticWebView = null;
         super.onDestroy();
