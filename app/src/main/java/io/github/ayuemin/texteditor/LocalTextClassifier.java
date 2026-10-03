@@ -1,11 +1,15 @@
 package io.github.ayuemin.texteditor;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.text.BreakIterator;
@@ -13,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import ai.onnxruntime.OnnxTensor;
 import ai.onnxruntime.OnnxValue;
@@ -22,17 +28,24 @@ import ai.onnxruntime.OrtSession;
 /**
  * Optional, fully local semantic classifier.
  *
- * The editor works normally when the model is absent. To enable this layer put
- * models/local_text_classifier.onnx and models/local_text_classifier.json into
- * app/src/main/assets. The metadata describes a compact hashed character
- * n-gram input, so no separate tokenizer library is required on Android.
+ * A model can be bundled in assets or installed by the user as a ZIP package.
+ * User packages live only in app-private storage. The package must contain an
+ * ONNX model (model.onnx or local_text_classifier.onnx) and metadata JSON
+ * (metadata.json or local_text_classifier.json).
  */
 final class LocalTextClassifier implements AutoCloseable {
     static final String MODEL_ASSET = "models/local_text_classifier.onnx";
     static final String META_ASSET = "models/local_text_classifier.json";
+    private static final String USER_DIR = "local_classifier";
+    private static final String USER_MODEL = "model.onnx";
+    private static final String USER_META = "metadata.json";
+    private static final String PREFS = "editor_text";
+    private static final String PREF_PACKAGE_NAME = "local_classifier_package_name";
     private static final String SCHEMA = "local-text-classifier-v1";
     private static final String FEATURE_KIND = "char-ngram-hash-v1";
     private static final int MAX_SEGMENTS = 512;
+    private static final long MAX_MODEL_BYTES = 512L * 1024L * 1024L;
+    private static final long MAX_META_BYTES = 2L * 1024L * 1024L;
 
     private final Context context;
     private OrtEnvironment environment;
@@ -40,6 +53,7 @@ final class LocalTextClassifier implements AutoCloseable {
     private Metadata metadata;
     private boolean loadAttempted;
     private String lastError = "";
+    private String activeSource = "";
 
     LocalTextClassifier(Context context) {
         this.context = context.getApplicationContext();
@@ -49,11 +63,19 @@ final class LocalTextClassifier implements AutoCloseable {
         ensureLoaded();
         JSONObject out = new JSONObject();
         try {
-            boolean modelPresent = assetExists(MODEL_ASSET);
-            boolean metaPresent = assetExists(META_ASSET);
+            boolean userModel = userModelFile().exists();
+            boolean userMeta = userMetaFile().exists();
+            boolean bundled = assetExists(MODEL_ASSET) && assetExists(META_ASSET);
             out.put("engine", "ONNX Runtime");
-            out.put("installed", modelPresent && metaPresent);
+            out.put("installed", (userModel && userMeta) || bundled);
+            out.put("userInstalled", userModel && userMeta);
             out.put("available", session != null && metadata != null);
+            out.put("source", activeSource);
+            if (userModel != userMeta) out.put("incompleteUserPackage", true);
+            if ("user".equals(activeSource)) {
+                out.put("packageName", context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                        .getString(PREF_PACKAGE_NAME, "Локальная модель"));
+            }
             if (metadata != null) {
                 out.put("name", metadata.name);
                 out.put("version", metadata.version);
@@ -90,16 +112,10 @@ final class LocalTextClassifier implements AutoCloseable {
                 features[i] = featuresFor(segments.get(i).text, metadata);
             }
 
-            String inputName = metadata.inputName.isEmpty()
-                    ? session.getInputNames().iterator().next() : metadata.inputName;
+            String inputName = resolvedInputName(session, metadata);
             try (OnnxTensor input = OnnxTensor.createTensor(environment, features);
                  OrtSession.Result result = session.run(Collections.singletonMap(inputName, input))) {
-                OnnxValue value;
-                if (!metadata.outputName.isEmpty() && result.get(metadata.outputName).isPresent()) {
-                    value = result.get(metadata.outputName).get();
-                } else {
-                    value = result.get(0);
-                }
+                OnnxValue value = resolvedOutput(result, metadata);
                 float[][] scores = asRows(value.getValue(), segments.size());
                 if (scores.length != segments.size()) {
                     throw new IllegalStateException("Размер выхода модели не совпадает с числом предложений");
@@ -141,27 +157,207 @@ final class LocalTextClassifier implements AutoCloseable {
         }
     }
 
+    /** Installs and validates a user model package without touching a working model on failure. */
+    synchronized String installPackage(InputStream input, String displayName) throws Exception {
+        if (input == null) throw new IllegalArgumentException("Файл модели не открыт");
+        File dir = userDirectory();
+        if (!dir.exists() && !dir.mkdirs()) throw new IllegalStateException("Не удалось создать папку модели");
+        File newModel = new File(dir, USER_MODEL + ".new");
+        File newMeta = new File(dir, USER_META + ".new");
+        deleteQuietly(newModel);
+        deleteQuietly(newMeta);
+
+        boolean gotModel = false;
+        boolean gotMeta = false;
+        try (ZipInputStream zip = new ZipInputStream(input)) {
+            ZipEntry entry;
+            while ((entry = zip.getNextEntry()) != null) {
+                if (entry.isDirectory()) {
+                    zip.closeEntry();
+                    continue;
+                }
+                String base = baseName(entry.getName()).toLowerCase(Locale.ROOT);
+                if (("model.onnx".equals(base) || "local_text_classifier.onnx".equals(base)) && !gotModel) {
+                    copyEntryLimited(zip, newModel, MAX_MODEL_BYTES);
+                    gotModel = true;
+                } else if (("metadata.json".equals(base) || "local_text_classifier.json".equals(base)) && !gotMeta) {
+                    copyEntryLimited(zip, newMeta, MAX_META_BYTES);
+                    gotMeta = true;
+                }
+                zip.closeEntry();
+            }
+        } catch (Exception e) {
+            deleteQuietly(newModel);
+            deleteQuietly(newMeta);
+            throw e;
+        }
+        if (!gotModel || !gotMeta || newModel.length() < 128 || newMeta.length() < 20) {
+            deleteQuietly(newModel);
+            deleteQuietly(newMeta);
+            throw new IllegalArgumentException("В ZIP нужны model.onnx и metadata.json");
+        }
+
+        Metadata candidateMeta = Metadata.parse(readFileText(newMeta));
+        validateModelFile(newModel, candidateMeta);
+
+        File model = userModelFile();
+        File meta = userMetaFile();
+        File oldModel = new File(dir, USER_MODEL + ".bak");
+        File oldMeta = new File(dir, USER_META + ".bak");
+        deleteQuietly(oldModel);
+        deleteQuietly(oldMeta);
+        boolean hadModel = model.exists();
+        boolean hadMeta = meta.exists();
+        if (hadModel && !model.renameTo(oldModel)) throw new IllegalStateException("Не удалось подготовить замену модели");
+        if (hadMeta && !meta.renameTo(oldMeta)) {
+            if (hadModel) oldModel.renameTo(model);
+            throw new IllegalStateException("Не удалось подготовить замену метаданных");
+        }
+
+        closeSession();
+        metadata = null;
+        loadAttempted = false;
+        activeSource = "";
+        boolean modelMoved = newModel.renameTo(model);
+        boolean metaMoved = newMeta.renameTo(meta);
+        if (!modelMoved || !metaMoved) {
+            deleteQuietly(model);
+            deleteQuietly(meta);
+            if (hadModel) oldModel.renameTo(model);
+            if (hadMeta) oldMeta.renameTo(meta);
+            deleteQuietly(newModel);
+            deleteQuietly(newMeta);
+            throw new IllegalStateException("Не удалось сохранить модель во внутреннее хранилище");
+        }
+        deleteQuietly(oldModel);
+        deleteQuietly(oldMeta);
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+                .putString(PREF_PACKAGE_NAME, displayName == null || displayName.trim().isEmpty()
+                        ? "Локальная модель" : displayName.trim())
+                .apply();
+
+        if (!ensureLoaded() || !"user".equals(activeSource)) {
+            String problem = lastError.isEmpty() ? "Модель не загрузилась после установки" : lastError;
+            throw new IllegalStateException(problem);
+        }
+        return statusJson();
+    }
+
+    synchronized boolean clearUserModel() {
+        closeSession();
+        metadata = null;
+        loadAttempted = false;
+        activeSource = "";
+        boolean okModel = !userModelFile().exists() || userModelFile().delete();
+        boolean okMeta = !userMetaFile().exists() || userMetaFile().delete();
+        File dir = userDirectory();
+        deleteQuietly(new File(dir, USER_MODEL + ".new"));
+        deleteQuietly(new File(dir, USER_META + ".new"));
+        deleteQuietly(new File(dir, USER_MODEL + ".bak"));
+        deleteQuietly(new File(dir, USER_META + ".bak"));
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(PREF_PACKAGE_NAME).apply();
+        lastError = "";
+        ensureLoaded(); // fall back to a bundled model when one exists
+        return okModel && okMeta;
+    }
+
     private synchronized boolean ensureLoaded() {
         if (session != null && metadata != null) return true;
         if (loadAttempted) return false;
         loadAttempted = true;
-        if (!assetExists(MODEL_ASSET) || !assetExists(META_ASSET)) return false;
-        try {
-            metadata = Metadata.parse(readText(META_ASSET));
-            byte[] model = readBytes(MODEL_ASSET);
-            environment = OrtEnvironment.getEnvironment();
-            session = environment.createSession(model);
-            if (session.getNumInputs() < 1 || session.getNumOutputs() < 1) {
-                throw new IllegalArgumentException("ONNX-модель не содержит вход или выход");
+        String userError = "";
+
+        if (userModelFile().exists() && userMetaFile().exists()) {
+            try {
+                metadata = Metadata.parse(readFileText(userMetaFile()));
+                environment = OrtEnvironment.getEnvironment();
+                session = environment.createSession(userModelFile().getAbsolutePath());
+                validateSession(session, metadata);
+                activeSource = "user";
+                lastError = "";
+                return true;
+            } catch (Exception e) {
+                userError = safeError(e);
+                closeSession();
+                metadata = null;
+                activeSource = "";
             }
-            lastError = "";
-            return true;
-        } catch (Exception e) {
-            lastError = safeError(e);
-            closeSession();
-            metadata = null;
-            return false;
+        } else if (userModelFile().exists() || userMetaFile().exists()) {
+            userError = "Пользовательский пакет модели неполный";
         }
+
+        if (assetExists(MODEL_ASSET) && assetExists(META_ASSET)) {
+            try {
+                metadata = Metadata.parse(readAssetText(META_ASSET));
+                byte[] model = readAssetBytes(MODEL_ASSET);
+                environment = OrtEnvironment.getEnvironment();
+                session = environment.createSession(model);
+                validateSession(session, metadata);
+                activeSource = "bundled";
+                lastError = userError;
+                return true;
+            } catch (Exception e) {
+                closeSession();
+                metadata = null;
+                activeSource = "";
+                lastError = userError.isEmpty() ? safeError(e) : userError + "; встроенная: " + safeError(e);
+                return false;
+            }
+        }
+        lastError = userError;
+        return false;
+    }
+
+    private void validateModelFile(File modelFile, Metadata meta) throws Exception {
+        OrtEnvironment env = OrtEnvironment.getEnvironment();
+        try (OrtSession candidate = env.createSession(modelFile.getAbsolutePath())) {
+            validateSession(candidate, meta);
+            float[][] sample = new float[1][meta.featureCount];
+            String inputName = resolvedInputName(candidate, meta);
+            try (OnnxTensor tensor = OnnxTensor.createTensor(env, sample);
+                 OrtSession.Result result = candidate.run(Collections.singletonMap(inputName, tensor))) {
+                OnnxValue value = resolvedOutput(result, meta);
+                float[][] rows = asRows(value.getValue(), 1);
+                if (rows.length != 1 || rows[0].length < meta.labels.size()) {
+                    throw new IllegalArgumentException("Выход модели не соответствует labels в metadata.json");
+                }
+            }
+        }
+    }
+
+    private static void validateSession(OrtSession target, Metadata meta) {
+        if (target.getNumInputs() < 1 || target.getNumOutputs() < 1) {
+            throw new IllegalArgumentException("ONNX-модель не содержит вход или выход");
+        }
+        if (!meta.inputName.isEmpty() && !target.getInputNames().contains(meta.inputName)) {
+            throw new IllegalArgumentException("В модели нет входа «" + meta.inputName + "»");
+        }
+        if (!meta.outputName.isEmpty() && !target.getOutputNames().contains(meta.outputName)) {
+            throw new IllegalArgumentException("В модели нет выхода «" + meta.outputName + "»");
+        }
+    }
+
+    private static String resolvedInputName(OrtSession target, Metadata meta) {
+        return meta.inputName.isEmpty() ? target.getInputNames().iterator().next() : meta.inputName;
+    }
+
+    private static OnnxValue resolvedOutput(OrtSession.Result result, Metadata meta) {
+        if (!meta.outputName.isEmpty() && result.get(meta.outputName).isPresent()) {
+            return result.get(meta.outputName).get();
+        }
+        return result.get(0);
+    }
+
+    private File userDirectory() {
+        return new File(context.getFilesDir(), USER_DIR);
+    }
+
+    private File userModelFile() {
+        return new File(userDirectory(), USER_MODEL);
+    }
+
+    private File userMetaFile() {
+        return new File(userDirectory(), USER_META);
     }
 
     private boolean assetExists(String name) {
@@ -172,11 +368,11 @@ final class LocalTextClassifier implements AutoCloseable {
         }
     }
 
-    private String readText(String name) throws Exception {
-        return new String(readBytes(name), StandardCharsets.UTF_8);
+    private String readAssetText(String name) throws Exception {
+        return new String(readAssetBytes(name), StandardCharsets.UTF_8);
     }
 
-    private byte[] readBytes(String name) throws Exception {
+    private byte[] readAssetBytes(String name) throws Exception {
         try (InputStream in = context.getAssets().open(name);
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] buffer = new byte[16384];
@@ -184,6 +380,40 @@ final class LocalTextClassifier implements AutoCloseable {
             while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
             return out.toByteArray();
         }
+    }
+
+    private static String readFileText(File file) throws Exception {
+        try (FileInputStream in = new FileInputStream(file);
+             ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            return new String(out.toByteArray(), StandardCharsets.UTF_8);
+        }
+    }
+
+    private static String baseName(String path) {
+        if (path == null) return "";
+        int slash = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'));
+        return slash >= 0 ? path.substring(slash + 1) : path;
+    }
+
+    private static void copyEntryLimited(InputStream in, File target, long maxBytes) throws Exception {
+        try (FileOutputStream out = new FileOutputStream(target)) {
+            byte[] buffer = new byte[16384];
+            long total = 0;
+            int read;
+            while ((read = in.read(buffer)) != -1) {
+                total += read;
+                if (total > maxBytes) throw new IllegalArgumentException("Файл модели слишком большой");
+                out.write(buffer, 0, read);
+            }
+            out.flush();
+        }
+    }
+
+    private static void deleteQuietly(File file) {
+        try { if (file != null && file.exists()) file.delete(); } catch (Exception ignored) { }
     }
 
     private static List<Segment> splitSentences(String src) {
@@ -287,6 +517,7 @@ final class LocalTextClassifier implements AutoCloseable {
     public synchronized void close() {
         closeSession();
         metadata = null;
+        activeSource = "";
     }
 
     private static final class Segment {
