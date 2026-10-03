@@ -5,6 +5,7 @@ const REVISION_KEY='p0DocumentRevisionsV1';
 let p0RevisionStore={};
 let p0State={documentId:'',revision:0,textHash:'',settingsVersion:'',rulesVersion:''};
 let p0PersistTimer=null;
+window.__experimentalSemanticViewActive=false;
 
 function nativeRevisionAvailable(){
   return !!(window.AndroidDocumentRevision
@@ -230,6 +231,64 @@ function patchAnalysisStateLabel(){
     summary.insertAdjacentHTML('beforeend',' <span class="smallNote">Проверено доступными модулями · ревизия '+Number(snap.revision||0)+'.</span>');
   }
 }
+
+function restoreRuleFilter(){
+  const root=document.querySelector('#analysisBackdrop .analysisFilters');
+  if(!root||root.querySelector('[data-mode="rules"]'))return;
+  const button=document.createElement('button');
+  button.className='analysisFilter';
+  button.dataset.mode='rules';
+  button.textContent='Правила площадки';
+  button.onclick=function(){setAnalysisMode('rules')};
+  root.appendChild(button);
+}
+function restoreRulePackUi(){
+  try{
+    if(typeof activeRulePack!=='undefined'&&!activeRulePack&&typeof loadRulePack==='function')activeRulePack=loadRulePack();
+  }catch(e){}
+
+  const wrap=document.querySelector('#settingsBackdrop .settingsGroupWrap');
+  if(wrap&&!document.querySelector('#rulePackStatus')){
+    const group=document.createElement('details');
+    group.className='settingsGroup';
+    group.id='p0RulePackSettingsGroup';
+    group.innerHTML='<summary><span>Пакет правил</span><small>Требования площадки или редакции</small></summary><div class="settingsGroupBody"><div id="rulePackStatus" class="ruleStatus"></div><div class="smallNote">Пакет работает локально. Импорт проверяется перед заменой действующего набора.</div><div class="settingActions rulePackActions"><button class="nativeBtn" type="button" data-rule-template>Скачать образец JSON</button><button class="nativeBtn primarySettingBtn" type="button" data-rule-import>Загрузить JSON</button></div></div>';
+    group.querySelector('[data-rule-template]').onclick=function(){downloadRulePackTemplate()};
+    group.querySelector('[data-rule-import]').onclick=function(){openRulePackImport()};
+    const semantic=document.querySelector('#semanticClassifierSettings');
+    if(semantic&&semantic.parentNode===wrap)wrap.insertBefore(group,semantic);else wrap.appendChild(group);
+  }
+
+  if(!document.querySelector('#rulePackFileInput')){
+    const input=document.createElement('input');
+    input.id='rulePackFileInput';input.className='fileInput';input.type='file';
+    input.accept='.json,application/json,text/plain';
+    const host=document.querySelector('.editorWrap')||document.body;host.appendChild(input);
+    input.addEventListener('change',function(e){
+      const f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;
+      const r=new FileReader();
+      r.onload=function(){window.onNativeRulePackLoaded(String(r.result||''),f.name)};
+      r.onerror=function(){toast('Не удалось прочитать JSON')};
+      r.readAsText(f,'UTF-8');
+    });
+  }
+
+  if(!document.querySelector('#rulePackBackdrop')){
+    const backdrop=document.createElement('div');
+    backdrop.className='sheetBackdrop';backdrop.id='rulePackBackdrop';
+    backdrop.innerHTML='<div class="sheet rulePackSheet"><div class="handle"></div><div class="sheetHeader"><h2>Загрузить пакет правил</h2><button class="sheetClose" type="button" data-rule-close aria-label="Закрыть">×</button></div><div class="smallNote">Поддерживается строгий формат <b>editorial-rule-pack-v1</b>. Пакет не может выполнять код или сетевые запросы.</div><div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" data-rule-file>Выбрать JSON-файл</button></div><div class="subLabel"><span>Или вставьте JSON</span></div><textarea id="rulePackPaste" class="rulePackPaste" rows="10" spellcheck="false" placeholder="{ &quot;schema&quot;: &quot;editorial-rule-pack-v1&quot;, … }"></textarea><div class="settingActions"><button class="nativeBtn" type="button" data-rule-validate>Проверить формат</button><button id="rulePackInstallBtn" class="nativeBtn primarySettingBtn" type="button" data-rule-install hidden>Установить пакет</button></div><div id="rulePackImportResult" class="rulePackImportResult"></div></div>';
+    backdrop.onclick=function(e){if(e.target===backdrop)closeRulePackImport()};
+    backdrop.querySelector('[data-rule-close]').onclick=function(){closeRulePackImport()};
+    backdrop.querySelector('[data-rule-file]').onclick=function(){chooseRulePackFile()};
+    backdrop.querySelector('[data-rule-validate]').onclick=function(){validateRulePackPaste()};
+    backdrop.querySelector('[data-rule-install]').onclick=function(){installPendingRulePack()};
+    document.body.appendChild(backdrop);
+  }
+
+  restoreRuleFilter();
+  try{if(typeof updateRulePackStatus==='function')updateRulePackStatus()}catch(e){}
+}
+
 function markSemanticExperimental(){
   const group=document.querySelector('#semanticClassifierSettings');
   if(!group)return;
@@ -245,8 +304,7 @@ function markSemanticExperimental(){
     const row=document.createElement('div');
     row.className='settingActions';
     row.innerHTML='<button class="nativeBtn" data-run-experimental-semantic type="button">Запустить экспериментальную проверку</button>';
-    const button=row.querySelector('button');
-    button.onclick=function(){
+    row.querySelector('button').onclick=function(){
       if(typeof window.runExperimentalSemanticCheck==='function')window.runExperimentalSemanticCheck();
       else toast('Экспериментальная смысловая проверка недоступна');
     };
@@ -265,11 +323,15 @@ function installFoundation(){
   p0RevisionStore=loadRevisionStore();
   syncDocumentRevision('install');
 
-  editor.addEventListener('input',function(){syncDocumentRevision('input')},true);
+  editor.addEventListener('input',function(){
+    window.__experimentalSemanticViewActive=false;
+    syncDocumentRevision('input');
+  },true);
 
   if(typeof setEditorTextForArticle==='function'){
     const priorSetArticle=setEditorTextForArticle;
     setEditorTextForArticle=function(text,focus){
+      window.__experimentalSemanticViewActive=false;
       const result=priorSetArticle(text,focus);
       syncDocumentRevision('article switch');
       return result;
@@ -302,6 +364,11 @@ function installFoundation(){
       const src=editor.value||'';
       const result=priorAnalyze();
       if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return result;
+      if(!window.__experimentalSemanticViewActive){
+        for(let i=currentAnalysis.issues.length-1;i>=0;i--){
+          if(currentAnalysis.issues[i]&&currentAnalysis.issues[i].type==='semantic')currentAnalysis.issues.splice(i,1);
+        }
+      }
       addRepeatedWordIssues(src,currentAnalysis.issues,snapshot);
       for(const issue of currentAnalysis.issues)normalizeIssueContract(issue,src,snapshot);
       recountP0Analysis();
@@ -318,8 +385,32 @@ function installFoundation(){
 
   if(typeof renderAnalysis==='function'){
     const priorRenderAnalysis=renderAnalysis;
-    renderAnalysis=function(){const out=priorRenderAnalysis();patchAnalysisStateLabel();return out};
+    renderAnalysis=function(){
+      const out=priorRenderAnalysis();
+      restoreRuleFilter();
+      patchAnalysisStateLabel();
+      return out;
+    };
     window.renderAnalysis=renderAnalysis;
+  }
+
+  if(typeof buildAnalysisReport==='function'){
+    const priorReport=buildAnalysisReport;
+    buildAnalysisReport=function(){
+      let text=priorReport();
+      const a=currentAnalysis||{};
+      const total=Number(a.warningCount)||0;
+      const rules=Number(a.rulesCount)||0;
+      const semantic=window.__experimentalSemanticViewActive?(Number(a.semanticCount)||0):0;
+      const editorCount=Math.max(0,total-rules-semantic);
+      text=String(text||'').replace(/Всего замечаний:[^\n]*/, 'Всего замечаний: '+total+'; редакторских: '+editorCount+'; правил площадки: '+rules+'; смысловых экспериментальных: '+semantic+'.');
+      if(typeof activeRulePack!=='undefined'&&activeRulePack){
+        const line='Пакет правил: '+String(activeRulePack.name||'без названия')+' · '+String(activeRulePack.version||'без версии')+'.';
+        if(!text.includes(line))text=text.replace(/\n/,'\n'+line+'\n');
+      }
+      return text;
+    };
+    window.buildAnalysisReport=buildAnalysisReport;
   }
 
   if(typeof renderReplacement==='function'){
@@ -354,8 +445,13 @@ function installFoundation(){
   }
 
   if(typeof runFullCheck==='function'){
-    window.runExperimentalSemanticCheck=runFullCheck;
+    const experimentalRun=runFullCheck;
+    window.runExperimentalSemanticCheck=function(){
+      window.__experimentalSemanticViewActive=true;
+      return experimentalRun();
+    };
     runFullCheck=function(){
+      window.__experimentalSemanticViewActive=false;
       const src=editor.value||'';
       if(!src.trim()){toast('Нет текста для проверки');return}
       editor.blur();
@@ -382,10 +478,15 @@ function installFoundation(){
 
   if(typeof openSettings==='function'){
     const priorOpenSettings=openSettings;
-    openSettings=function(){const out=priorOpenSettings();setTimeout(markSemanticExperimental,0);return out};
+    openSettings=function(){
+      const out=priorOpenSettings();
+      setTimeout(function(){restoreRulePackUi();markSemanticExperimental()},0);
+      return out;
+    };
     window.openSettings=openSettings;
   }
-  setTimeout(markSemanticExperimental,80);
+
+  setTimeout(function(){restoreRulePackUi();markSemanticExperimental()},80);
 
   try{
     if(window.AndroidDevLog&&typeof AndroidDevLog.log==='function')AndroidDevLog.log('P0','foundation installed; nativeRevision='+nativeRevisionAvailable());
