@@ -207,7 +207,7 @@ final class LocalTextClassifier implements AutoCloseable {
 
     private static float[] featuresFor(String text, Metadata meta) {
         float[] vector = new float[meta.featureCount];
-        String normalized = text.toLocaleLowerCase(new Locale("ru", "RU"))
+        String normalized = text.toLowerCase(new Locale("ru", "RU"))
                 .replaceAll("\\s+", " ").trim();
         if (normalized.isEmpty()) return vector;
         String padded = " " + normalized + " ";
