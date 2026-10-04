@@ -17,39 +17,14 @@ function spellingStateText(){
 function nativeSpellStatus(){
   try{return window.AndroidSpelling&&typeof AndroidSpelling.status==='function'?String(AndroidSpelling.status()||'{}'):'bridge-missing'}catch(e){return 'status-error:'+String(e&&e.message||e)}
 }
-
-function installCallbackTracing(){
-  if(typeof window.onNativeSpellingBatch==='function'&&!window.onNativeSpellingBatch.__diagnosticWrapped){
-    const prior=window.onNativeSpellingBatch;
-    const wrapped=function(requestId,payload){
-      diag('onNativeSpellingBatch ENTER request='+String(requestId)+' payloadChars='+String(payload||'').length+' before='+spellingStateText());
-      try{return prior.apply(this,arguments)}
-      catch(e){diag('onNativeSpellingBatch THROW request='+String(requestId)+' error='+String(e&&e.stack||e));throw e}
-      finally{diag('onNativeSpellingBatch EXIT request='+String(requestId)+' after='+spellingStateText())}
-    };
-    wrapped.__diagnosticWrapped=true;
-    window.onNativeSpellingBatch=wrapped;
-    diag('wrapped onNativeSpellingBatch');
-  }
-  if(typeof window.onNativeSpellingReady==='function'&&!window.onNativeSpellingReady.__diagnosticWrapped){
-    const priorReady=window.onNativeSpellingReady;
-    const wrappedReady=function(payload){
-      diag('onNativeSpellingReady ENTER payload='+String(payload||'').slice(0,1200));
-      try{return priorReady.apply(this,arguments)}
-      catch(e){diag('onNativeSpellingReady THROW '+String(e&&e.stack||e));throw e}
-      finally{diag('onNativeSpellingReady EXIT state='+spellingStateText())}
-    };
-    wrappedReady.__diagnosticWrapped=true;
-    window.onNativeSpellingReady=wrappedReady;
-    diag('wrapped onNativeSpellingReady');
-  }
-}
-
 function diagnosticsRoot(){
   return document.querySelector('#settingsBackdrop .settingsGroupWrap');
 }
+function diagnosticStatusElement(){
+  return document.querySelector('#diagnosticLogStatus');
+}
 function refreshDiagnosticStatus(){
-  const el=document.getElementById('diagnosticLogStatus');if(!el)return;
+  const el=diagnosticStatusElement();if(!el)return;
   if(!nativeDiagnosticsAvailable()){
     el.textContent='Диагностический мост недоступен в этой сборке.';
     return;
@@ -76,7 +51,7 @@ function clearDiagnosticLog(){
   catch(e){toast('Не удалось очистить диагностический журнал');return false}
 }
 function installDiagnosticSettings(){
-  const root=diagnosticsRoot();if(!root||document.getElementById('diagnosticSettingsGroup'))return;
+  const root=diagnosticsRoot();if(!root||document.querySelector('#diagnosticSettingsGroup'))return;
   const group=document.createElement('details');
   group.className='settingsGroup';group.id='diagnosticSettingsGroup';
   group.innerHTML='<summary><span>Диагностика</span><small>Журнал для поиска зависаний проверки</small></summary><div class="settingsGroupBody"><div id="diagnosticLogStatus" class="smallNote">Диагностический журнал готов.</div><div class="settingActions"><button class="nativeBtn primarySettingBtn" type="button" onclick="copyDiagnosticLog()">Скопировать диагностический лог</button><button class="nativeBtn" type="button" onclick="clearDiagnosticLog()">Очистить лог</button></div><div class="smallNote">Для чистого теста сначала очистите журнал, затем запустите «Проверить», дождитесь ошибки и сразу скопируйте лог.</div></div>';
@@ -87,13 +62,11 @@ window.copyDiagnosticLog=copyDiagnosticLog;
 window.clearDiagnosticLog=clearDiagnosticLog;
 window.refreshDiagnosticStatus=refreshDiagnosticStatus;
 
-installCallbackTracing();
 installDiagnosticSettings();
 diag('diagnostics module loaded; nativeStatus='+nativeSpellStatus());
 
 let lastHeartbeat=0;
 if(typeof setInterval==='function')setInterval(function(){
-  installCallbackTracing();
   const d=typeof currentAnalysis==='object'&&currentAnalysis&&currentAnalysis.spellingDiagnostics;
   if(!d||d.state!=='checking')return;
   const now=Date.now();if(now-lastHeartbeat<1900)return;lastHeartbeat=now;
