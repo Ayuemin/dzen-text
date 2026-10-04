@@ -88,7 +88,7 @@ window.addEventListener('editorKeyboardState',function(event){
 
 const editor=document.getElementById('editor'), preview=document.getElementById('preview'), htmlCode=document.getElementById('htmlCode');
 const exampleRiskWords='VPN\nВПН\nобход\nобход блокировок\nразблокировка\nпрокси\nанонимайзер';
-const defaultSettings={font:'serif',size:19,line:1.7,theme:'system',paper:'gray',accent:'#D65C43',backgroundVeil:0.6,backgroundText:'dark',customBackgroundId:'',wpm:200,tts:1.0,autosave:true,showCode:false,headingCheck:true,headingMin:8,headingMax:80,sentenceCheck:true,sentenceMax:30,paragraphCheck:true,paragraphMax:650,frequentCheck:true,frequentMin:8,nearbyCheck:true,structureCheck:true,structureMax:1800,phraseCheck:true,openingCheck:true,headingStructureCheck:true,markdownCheck:true,proofCheck:true,riskCheck:true,riskWords:exampleRiskWords};
+const defaultSettings={font:'serif',size:19,line:1.7,theme:'system',paper:'gray',accent:'#D65C43',backgroundVeil:0.6,backgroundText:'dark',customBackgroundId:'',wpm:200,tts:1.0,autosave:true,showCode:false,headingCheck:true,headingMin:8,headingMax:80,sentenceCheck:true,sentenceMax:30,paragraphCheck:true,paragraphMax:650,frequentCheck:true,frequentMin:8,nearbyCheck:true,structureCheck:true,structureMax:1800,phraseCheck:true,openingCheck:true,headingStructureCheck:true,markdownCheck:true,proofCheck:true,riskCheck:true,riskWords:exampleRiskWords,documentProfile:'article',articleTitleMode:'auto'};
 let settings={...defaultSettings}; let speaking=false; let saveTimer=null; let currentAnalysis={issues:[],warningCount:0,metrics:{}};
 let inputWasPaste=false;
 const USER_SYNONYMS_KEY='editorUserSynonymsV1';
@@ -114,3 +114,4 @@ function loadDeferredEditorModule(src,id){
 }
 loadDeferredEditorModule('js/16-proof-context.js','proofContextModuleV2');
 loadDeferredEditorModule('js/17-rule-pack-p1.js','rulePackP1Module');
+loadDeferredEditorModule('js/18-structure-p1.js','structureP1Module');
