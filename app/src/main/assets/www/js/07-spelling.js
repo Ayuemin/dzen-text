@@ -29,5 +29,25 @@ function runFullCheck(){
  },60);
 }
 function closeAnalysis(){document.getElementById('analysisBackdrop').classList.remove('open')}
-function openAnalysis(){editor.blur();setCheckRunning(true);setTimeout(()=>{try{runDeterministicAnalysis();document.getElementById('analysisBackdrop').classList.add('open');setAnalysisMode(analysisMode)}finally{setCheckRunning(false)}},40)}
+function openAnalysis(){
+ editor.blur();
+ // Reopening the sheet must preserve the last result snapshot, including its
+ // stale state after edits. Only the explicit "Проверить" action starts a new
+ // analysis. This also prevents duplicate Hunspell batches from queueing behind
+ // a still-running spelling request.
+ if(currentAnalysis&&currentAnalysis.analysisSnapshot){
+   document.getElementById('analysisBackdrop').classList.add('open');
+   setAnalysisMode(analysisMode);
+   renderAnalysis();
+   return;
+ }
+ setCheckRunning(true);
+ setTimeout(()=>{
+   try{
+     runDeterministicAnalysis();
+     document.getElementById('analysisBackdrop').classList.add('open');
+     setAnalysisMode(analysisMode);
+   }finally{setCheckRunning(false)}
+ },40);
+}
 function analysisBackdropClick(e){if(e.target.id==='analysisBackdrop')closeAnalysis()}
