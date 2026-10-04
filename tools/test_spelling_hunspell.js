@@ -191,6 +191,7 @@ const hyphenIssue=spelling.find(x=>x.word==='интернет-магазин');
 assert.ok(hyphenIssue,'hyphenated native issue should remain as a recommendation');
 assert.strictEqual(hyphenIssue.kind,'recommendation');
 assert.strictEqual(hyphenIssue.ruleId,'spelling.hyphenated-word');
+assert.ok(sandbox.issueHtml(hyphenIssue).includes('рекомендация'),'recommendation card must not be labelled as an error');
 
 sandbox.settings.spellingYoMode='strict';
 request=startSpellText('елка',11,'hash:11');
