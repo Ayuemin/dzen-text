@@ -102,7 +102,7 @@ function importPersonalDictionaryText(text,fileName){
   return {ok:true,added,rejected:parsed.rejected,truncated:parsed.truncated};
 }
 function choosePersonalDictionaryImport(){
-  const input=document.getElementById('spellingDictionaryFileInput');if(input)input.click();
+  const input=document.querySelector('#spellingDictionaryFileInput');if(input)input.click();
 }
 async function clearPersonalDictionary(){
   if(!window.AndroidSpelling||typeof AndroidSpelling.clearUserWords!=='function'){toast('Личный словарь недоступен');return false}
@@ -115,7 +115,7 @@ async function clearPersonalDictionary(){
 }
 function ensureSpellingDictionaryUi(){
   const wrap=document.querySelector('#settingsBackdrop .settingsGroupWrap');
-  if(!wrap||document.getElementById('spellingDictionarySettings'))return;
+  if(!wrap||document.querySelector('#spellingDictionarySettings'))return;
   const group=document.createElement('details');group.className='settingsGroup';group.id='spellingDictionarySettings';
   group.innerHTML='<summary><span>Орфография и личный словарь</span><small>Hunspell · слова пользователя</small></summary><div class="settingsGroupBody">'+
     '<div class="smallNote" data-spelling-dictionary-status></div>'+
@@ -126,7 +126,7 @@ function ensureSpellingDictionaryUi(){
   group.querySelector('[data-spelling-export]').onclick=exportPersonalDictionary;
   group.querySelector('[data-spelling-clear]').onclick=clearPersonalDictionary;
 
-  let input=document.getElementById('spellingDictionaryFileInput');
+  let input=document.querySelector('#spellingDictionaryFileInput');
   if(!input){
     input=document.createElement('input');input.id='spellingDictionaryFileInput';input.className='fileInput';input.type='file';input.accept='.json,.txt,application/json,text/plain';
     (document.querySelector('.editorWrap')||document.body).appendChild(input);
@@ -147,9 +147,6 @@ window.exportPersonalDictionary=exportPersonalDictionary;
 window.importPersonalDictionaryText=importPersonalDictionaryText;
 window.choosePersonalDictionaryImport=choosePersonalDictionaryImport;
 window.clearPersonalDictionary=clearPersonalDictionary;
-window.onNativeSpellingUserWordsChanged=(function(previous){
-  return function(){try{if(typeof previous==='function')previous()}catch(e){};try{renderPersonalDictionary()}catch(e){}};
-})(window.onNativeSpellingUserWordsChanged);
 
 try{
   if(typeof openSettings==='function'){
