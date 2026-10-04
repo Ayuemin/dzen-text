@@ -50,7 +50,7 @@ function spellingBridgeStatus(){
   if(!window.AndroidSpelling||typeof AndroidSpelling.status!=='function')return {state:'unavailable',error:'AndroidSpelling bridge unavailable'};
   try{return JSON.parse(AndroidSpelling.status()||'{}')}catch(e){return {state:'unavailable',error:String(e&&e.message||e)}}
 }
-function sameSnapshot(a,b){
+function spellingSnapshotMatches(a,b){
   if(!a||!b)return false;
   return String(a.documentId||'')===String(b.documentId||'')&&Number(a.revision||0)===Number(b.revision||0)&&String(a.textHash||'')===String(b.textHash||'');
 }
@@ -123,7 +123,7 @@ window.onNativeSpellingBatch=function(requestId,payload){
     setSpellingDiagnostics({state:data.state||'error',error:String(data.error||'Ошибка Hunspell')});recalcAndRender();return;
   }
   let current=null;try{current=currentDocumentSnapshot()}catch(e){}
-  if(!current||!sameSnapshot(request.snapshot,current))return;
+  if(!current||!spellingSnapshotMatches(request.snapshot,current))return;
   if(String(editor&&editor.value||'')!==request.src)return;
   const miss=new Map();
   for(const item of Array.isArray(data.misspelled)?data.misspelled:[])if(item&&item.word)miss.set(String(item.word),item);
@@ -229,7 +229,7 @@ if(typeof analyzeText==='function'){
     const oldAnalysis=currentAnalysis,oldSnapshot=oldAnalysis&&oldAnalysis.analysisSnapshot,oldSpelling=oldAnalysis&&Array.isArray(oldAnalysis.issues)?oldAnalysis.issues.filter(x=>x&&x.type==='spelling'):[];
     const result=priorAnalyzeText();
     const nextSnapshot=currentAnalysis&&currentAnalysis.analysisSnapshot;
-    if(oldSpelling.length&&oldSnapshot&&nextSnapshot&&sameSnapshot(oldSnapshot,nextSnapshot)){
+    if(oldSpelling.length&&oldSnapshot&&nextSnapshot&&spellingSnapshotMatches(oldSnapshot,nextSnapshot)){
       for(const issue of oldSpelling)currentAnalysis.issues.push(issue);
       try{if(typeof recountP0Analysis==='function')recountP0Analysis()}catch(e){}
     }
