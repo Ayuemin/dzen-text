@@ -43,7 +43,25 @@ dupe_functions = {k:v for k,v in functions.items() if len(v) > 1}
 if dupe_functions:
     errors.append("duplicate global functions: " + "; ".join(f"{k} -> {','.join(v)}" for k,v in sorted(dupe_functions.items())))
 
-dupe_callbacks = {k:v for k,v in native_callbacks.items() if len(v) > 1}
+# A callback may be deliberately wrapped by a later compatibility module, but
+# only when the wrapper first captures the existing handler and delegates to it.
+# Keep this exception narrow so accidental native callback replacement still
+# fails CI.
+def intentional_native_wrapper(name, files):
+    unique = list(dict.fromkeys(files))
+    if name != "onNativeRulePackLoaded" or unique != ["04-rules-analysis.js", "17-rule-pack-p1.js"]:
+        return False
+    text = (JS / "17-rule-pack-p1.js").read_text(encoding="utf-8")
+    return (
+        "const nativeLoaded=window.onNativeRulePackLoaded;" in text
+        and "window.onNativeRulePackLoaded=function(text,name)" in text
+        and "return nativeLoaded(text,name);" in text
+    )
+
+dupe_callbacks = {
+    k:v for k,v in native_callbacks.items()
+    if len(v) > 1 and not intentional_native_wrapper(k, v)
+}
 if dupe_callbacks:
     errors.append("duplicate native callbacks: " + "; ".join(f"{k} -> {','.join(v)}" for k,v in sorted(dupe_callbacks.items())))
 
