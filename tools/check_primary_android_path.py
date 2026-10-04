@@ -6,6 +6,7 @@ manifest = Path('app/src/main/AndroidManifest.xml').read_text(encoding='utf-8')
 editor = Path('app/src/main/java/io/github/ayuemin/texteditor/EditorActivity.java').read_text(encoding='utf-8')
 semantic = Path('app/src/main/java/io/github/ayuemin/texteditor/SemanticActivity.java').read_text(encoding='utf-8')
 spelling = Path('app/src/main/java/io/github/ayuemin/texteditor/HunspellSpellingBridge.java').read_text(encoding='utf-8')
+spelling_ui = Path('app/src/main/assets/www/js/19-spelling-hunspell.js').read_text(encoding='utf-8')
 core = Path('app/src/main/assets/www/js/01-core.js').read_text(encoding='utf-8')
 watchdog = Path('app/src/main/assets/www/js/22-spelling-watchdog.js').read_text(encoding='utf-8')
 diagnostics = Path('app/src/main/assets/www/js/23-diagnostics.js').read_text(encoding='utf-8')
@@ -37,6 +38,15 @@ assert 'SPELL-WORD' in spelling and 'SPELL-WATCH' in spelling, 'per-word/stall t
 assert 'DevLog.stackSummary(workerThread)' in spelling, 'stalled Hunspell worker stack is not captured'
 assert 'evaluateJavascript result:' in spelling, 'native-to-JS callback delivery result is not logged'
 
+# addIssue() creates issues._overflow with Object.defineProperty and therefore a
+# non-writable property reference. The spelling callback must mutate that object
+# instead of assigning a replacement, otherwise strict-mode WebView throws and
+# leaves spellingDiagnostics forever in "checking".
+assert 'currentAnalysis.issues._overflow=overflow' not in spelling_ui, 'spelling clear path reassigns non-writable issues._overflow'
+assert 'issues._overflow=overflow' not in spelling_ui, 'spelling callback reassigns non-writable issues._overflow'
+assert "Object.defineProperty(issues,'_overflow'" in spelling_ui, 'spelling callback cannot initialize a missing overflow container safely'
+assert 'delete nativeOverflow.spelling' in spelling_ui, 'spelling callback no longer mutates existing overflow container'
+
 # A native regression must never leave the analysis sheet in an endless
 # "checking" state. The watchdog cancels the logical request after 8 seconds.
 assert "22-spelling-watchdog.js" in core, 'spelling watchdog is not loaded'
@@ -54,4 +64,4 @@ assert 'AndroidPublish.copyForPublication' in diagnostics, 'diagnostic log canno
 assert 'onNativeSpellingBatch=' not in diagnostics, 'diagnostics must not become a second native batch callback owner'
 assert 'onNativeSpellingReady=' not in diagnostics, 'diagnostics must not become a second native ready callback owner'
 
-print('Primary Android path is deterministic; spelling preflight/watchdog/diagnostics + native dictionary bridges are present; semantic NLI remains isolated')
+print('Primary Android path is deterministic; spelling preflight/watchdog/diagnostics + overflow-safe callback + native dictionary bridges are present; semantic NLI remains isolated')
