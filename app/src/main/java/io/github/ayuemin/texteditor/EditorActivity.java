@@ -35,6 +35,7 @@ public final class EditorActivity extends MainActivity {
     public void onCreate(Bundle state) {
         super.onCreate(state);
         DevLog.init(this);
+        DevLog.i("APP", "EditorActivity.onCreate; production diagnostics enabled; savedState=" + (state != null));
         WebView web = findWebView(findViewById(android.R.id.content));
         if (web == null) {
             DevLog.e("APP", "WebView not found; production bridges unavailable", null);
@@ -50,9 +51,31 @@ public final class EditorActivity extends MainActivity {
         spellingBridge = new HunspellSpellingBridge(this, web);
         web.addJavascriptInterface(spellingBridge, "AndroidSpelling");
         web.addJavascriptInterface(new SpellingFileBridge(), "AndroidSpellingFile");
+        web.addJavascriptInterface(new DiagnosticsBridge(), "AndroidDiagnostics");
         spellingBridge.start();
         web.loadUrl(EDITOR_URL);
-        DevLog.i("APP", "Deterministic editor loaded with revision + spelling bridges");
+        DevLog.i("APP", "Deterministic editor loaded with revision + spelling + diagnostics bridges");
+    }
+
+    /** Development-only bridge used to retrieve the on-device diagnostic log. */
+    public final class DiagnosticsBridge {
+        @JavascriptInterface
+        public String read() {
+            String value = DevLog.read();
+            DevLog.i("DIAG", "diagnostic log read by JS; chars=" + value.length());
+            return value;
+        }
+
+        @JavascriptInterface
+        public void clear() {
+            DevLog.clear();
+        }
+
+        @JavascriptInterface
+        public void log(String area, String message) {
+            String safeArea = area == null || area.trim().isEmpty() ? "JS" : area.trim();
+            DevLog.i(safeArea, message == null ? "" : message);
+        }
     }
 
     public final class SpellingFileBridge {
@@ -141,6 +164,7 @@ public final class EditorActivity extends MainActivity {
 
     @Override
     protected void onDestroy() {
+        DevLog.i("APP", "EditorActivity.onDestroy");
         editorWeb = null;
         if (spellingBridge != null) {
             spellingBridge.close();
