@@ -87,9 +87,14 @@ sandbox.skipSpellingOccurrence(issue.start,issue.end,issue.word);
 assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling').length,0,'skip must remove only the current occurrence');
 
 batch=null;sandbox.analyzeText();
-assert.ok(batch);
 deliverMisspell();
-assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling').length,1,'new revision analysis should show misspelling again');
+assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling').length,0,'skip must survive recheck of the same revision');
+
+snapshot.revision=8;
+snapshot.textHash='hash:2';
+batch=null;sandbox.analyzeText();
+deliverMisspell();
+assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling').length,1,'skip must expire after document revision changes');
 
 assert.strictEqual(sandbox.addSpellingUserWord('ашипка'),true);
 assert.strictEqual(addedUserWord,'ашипка');
@@ -98,12 +103,12 @@ assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling')
 batch=null;sandbox.analyzeText();
 const staleBatch={...batch};
 assert.ok(staleBatch&&staleBatch.id);
-snapshot.revision=8;
-snapshot.textHash='hash:2';
+snapshot.revision=9;
+snapshot.textHash='hash:3';
 sandbox.onNativeSpellingBatch(staleBatch.id,JSON.stringify({state:'ready',checked:1,durationMs:1,misspelled:[{word:'ашипка',suggestions:['ошибка']}]}));
 assert.strictEqual(sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling').length,0,'stale native response must be discarded');
-snapshot.revision=7;
-snapshot.textHash='hash:1';
+snapshot.revision=8;
+snapshot.textHash='hash:2';
 
 batch=null;sandbox.analyzeText();
 deliverMisspell();
