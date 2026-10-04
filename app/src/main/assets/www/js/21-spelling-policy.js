@@ -22,7 +22,7 @@ function classifySpellWord(value){
   if(/[A-Za-z]/.test(word))return {check:false,reason:'product-or-mixed-script'};
   // Dotted abbreviations are tokenized into one-letter pieces; short ALL-CAPS
   // forms are conventional abbreviations. Neither is a hard spelling error.
-  if(/^[А-ЯЁ]$/.test(word)||/^[А-ЯЁ]{2,12}(?:-[А-ЯЁ]{1,12})*$/.test(word))return {check:false,reason:'abbreviation'};
+  if(/^[А-Яа-яЁё]$/.test(word)||/^[А-ЯЁ]{2,12}(?:-[А-ЯЁ]{1,12})*$/.test(word))return {check:false,reason:'abbreviation'};
   // Internal capitals are a strong local signal for a product/name token.
   if(/[а-яё][А-ЯЁ]/.test(word))return {check:false,reason:'product-name'};
   if(!/^[А-Яа-яЁё]+(?:[-’'][А-Яа-яЁё]+)*$/.test(word))return {check:false,reason:'unsupported-shape'};
