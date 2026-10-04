@@ -20,8 +20,6 @@ const sandbox={
     {id:'b',type:'word',title:'B',message:'B',values:['b']},
     {id:'manual-a',type:'manual',title:'Manual',message:'M'}
   ]},
-  activeAutoRules(){return this.activeRulePack.rules.filter(r=>r.type!=='manual');},
-  manualRuleItems(){return this.activeRulePack.rules.filter(r=>r.type==='manual');},
   analyzeRulePack(){return {checked:1,matches:100,errors:[]};},
   renderRulePackManual(){return '';},
   lastRulePackDiagnostics:{checked:0,matches:0,errors:[]},
@@ -29,6 +27,11 @@ const sandbox={
   validateRulePackObject(input){return {ok:true,errors:[],pack:input,autoCount:(input.rules||[]).filter(r=>r.type!=='manual').length,manualCount:(input.rules||[]).filter(r=>r.type==='manual').length};},
   saveRulePack(){return true;},closeRulePackImport(){},pendingRulePack:null
 };
+// The production v1 functions read browser globals lexically; they do not rely
+// on the caller's `this`. Mirror that here so the P1 wrapper is tested against
+// the same calling contract.
+sandbox.activeAutoRules=()=>sandbox.activeRulePack.rules.filter(r=>r.type!=='manual');
+sandbox.manualRuleItems=()=>sandbox.activeRulePack.rules.filter(r=>r.type==='manual');
 sandbox.window=sandbox;
 sandbox.globalThis=sandbox;
 vm.createContext(sandbox);
