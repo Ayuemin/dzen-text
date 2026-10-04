@@ -10,6 +10,7 @@ import android.webkit.WebView;
  * as an explicit experiment; this subclass adds the deterministic SPELL path.
  */
 public final class EditorActivity extends SemanticActivity {
+    private static final String EDITOR_URL = "file:///android_asset/www/index.html";
     private HunspellSpellingBridge spellingBridge;
 
     @Override
@@ -23,7 +24,12 @@ public final class EditorActivity extends SemanticActivity {
         spellingBridge = new HunspellSpellingBridge(this, web);
         web.addJavascriptInterface(spellingBridge, "AndroidSpelling");
         spellingBridge.start();
-        DevLog.i("SPELL", "AndroidSpelling bridge attached");
+        // SemanticActivity already replaced MainActivity's initial asset load to
+        // attach its optional bridges. Stop that queued load once more so the
+        // production page is guaranteed to start with AndroidSpelling present.
+        web.stopLoading();
+        web.loadUrl(EDITOR_URL);
+        DevLog.i("SPELL", "AndroidSpelling bridge attached; editor asset reload requested");
     }
 
     private static WebView findWebView(View root) {
