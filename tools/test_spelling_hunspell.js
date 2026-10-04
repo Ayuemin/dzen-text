@@ -13,6 +13,7 @@ let staleMarks=0;
 const snapshot={documentId:'article-1',revision:7,textHash:'hash:1',settingsVersion:'s',rulesVersion:'r'};
 const sandbox={
   console,P0Core:P0,
+  settings:{spellingYoMode:'normal'},
   editor:{value:'Текст ашипка.\n\n`код ашипка`\n\nhttps://example.test/ашипка\n\nМЧС работает.'},
   currentAnalysis:{issues:[],warningCount:0,editorCount:0,rulesCount:0,metrics:{},analysisSnapshot:{...snapshot}},
   localStorage:{getItem(k){return Object.prototype.hasOwnProperty.call(storage,k)?storage[k]:null},setItem(k,v){storage[k]=String(v)}},
@@ -24,6 +25,7 @@ const sandbox={
   },
   currentDocumentSnapshot(){return {...snapshot}},
   snapshotMatchesCurrent(){return true},
+  persistSettings(){return true},
   recountP0Analysis(){
     const a=sandbox.currentAnalysis;a.warningCount=a.issues.length;a.editorCount=a.issues.length;
   },
@@ -37,11 +39,13 @@ const sandbox={
   escapeHtml(v){return String(v)},
   jumpTo(){},toast(){},markAnalysisStale(){staleMarks++},
   applyDocumentEdits(edits,snap,label){appliedEdit={edits,snapshot:snap,label};return true},
-  document:{getElementById(){return null}},
+  setTimeout(){return 0},clearTimeout(){},
+  document:{readyState:'complete',getElementById(){return null},querySelector(){return null}},
 };
 sandbox.window=sandbox;sandbox.globalThis=sandbox;
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'..','app','src','main','assets','www','js','19-spelling-hunspell.js'),'utf8'),sandbox,{filename:'19-spelling-hunspell.js'});
+vm.runInContext(fs.readFileSync(path.join(__dirname,'..','app','src','main','assets','www','js','21-spelling-policy.js'),'utf8'),sandbox,{filename:'21-spelling-policy.js'});
 
 function deliverMisspell(suggestions=['ошибка','нашивка']){
   assert.ok(batch,'native spelling batch not requested');
@@ -52,6 +56,7 @@ function deliverMisspell(suggestions=['ошибка','нашивка']){
 }
 
 assert.ok(sandbox.SpellingHunspell,'SpellingHunspell API missing');
+assert.ok(sandbox.SpellingPolicy,'SpellingPolicy API missing');
 const tokens=sandbox.SpellingHunspell.collectCandidates(sandbox.editor.value).map(x=>x.text);
 assert.ok(tokens.includes('Текст'));
 assert.ok(tokens.includes('ашипка'));
@@ -120,4 +125,43 @@ batch=null;sandbox.analyzeText();
 assert.ok(batch);
 assert.strictEqual(batch.words.includes('ашипка'),false,'allowed article word returned to native batch');
 
-console.log('SPELL01/02 Hunspell integration tests passed');
+// SPELL04: deterministic token policy. Numbers/model names, mixed-script product
+// tokens and conventional abbreviations are outside Russian dictionary errors.
+assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('МЧС').check,false);
+assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('т').check,false);
+assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('ЯндексGPT').check,false);
+assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('Камера-15').check,false);
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('интернет-магазин').reason,'hyphenated');
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('обычный').check,true);
+assert.strictEqual(sandbox.SpellingPolicy.adaptSuggestionCase('Елка','ёлка'),'Ёлка');
+
+// Normal е/ё mode suppresses a miss when Hunspell's correction differs only by ё.
+sandbox.settings.spellingYoMode='normal';
+let policyIssue={type:'spelling',word:'елка',fragment:'елка',suggestions:['ёлка','елки'],fixes:[],ruleId:'spelling.unknown-word',kind:'error'};
+let result=sandbox.SpellingPolicy.rewriteIssueByPolicy(policyIssue);
+assert.strictEqual(result.keep,false,'normal е/ё mode must suppress an equivalent ё-only correction');
+
+// Strict mode exposes the same signal as a dedicated, safely fixable ё issue.
+sandbox.settings.spellingYoMode='strict';
+policyIssue={type:'spelling',word:'елка',fragment:'елка',suggestions:['ёлка','елки'],fixes:[],ruleId:'spelling.unknown-word',kind:'error'};
+result=sandbox.SpellingPolicy.rewriteIssueByPolicy(policyIssue);
+assert.strictEqual(result.keep,true);
+assert.strictEqual(policyIssue.ruleId,'spelling.yo');
+assert.strictEqual(policyIssue.suggestions[0],'ёлка');
+assert.strictEqual(policyIssue.fixes[0].replacement,'ёлка');
+
+// A rejected hyphenated form is downgraded to a recommendation: the dictionary
+// rejection alone is not enough to assert that the hyphen itself is wrong.
+policyIssue={type:'spelling',word:'интернет-магазин',fragment:'интернет-магазин',suggestions:['интернет магазин'],fixes:[],ruleId:'spelling.unknown-word',kind:'error'};
+result=sandbox.SpellingPolicy.rewriteIssueByPolicy(policyIssue);
+assert.strictEqual(result.keep,true);
+assert.strictEqual(policyIssue.ruleId,'spelling.hyphenated-word');
+assert.strictEqual(policyIssue.kind,'recommendation');
+
+// Product-like mixed-script tokens must not survive into spelling issues; GRAM04
+// remains responsible for suspicious alphabet mixing.
+policyIssue={type:'spelling',word:'ЯндексGPT',fragment:'ЯндексGPT',suggestions:['Яндекс'],fixes:[],ruleId:'spelling.unknown-word',kind:'error'};
+result=sandbox.SpellingPolicy.rewriteIssueByPolicy(policyIssue);
+assert.strictEqual(result.keep,false);
+
+console.log('SPELL01/02/04 Hunspell integration tests passed');
