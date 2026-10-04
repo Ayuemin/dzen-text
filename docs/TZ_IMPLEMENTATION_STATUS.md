@@ -2,7 +2,7 @@
 
 Рабочая ветка для полного ТЗ: `prototype/editorial-rule-packs-full-tz`.
 
-Последняя полностью подтверждённая точка перед интеграцией SPELL: `489b6d60eb92a1c7a4cc8410bc44797c22fa2400`, Android CI №650 — `success`. В этом CI прошли расширенные regression-тесты `GRAM04/A06`, `STRUCT01-04/A05` и `PACK02-05`, а также debug/release сборка и оба spelling probe APK.
+Последняя полностью подтверждённая точка: `3d0f14c3b82310047e2b806978840eb9ccf97589`, Android CI №652 — `success`. В этом CI прошли расширенные regression-тесты `GRAM04/A06`, `STRUCT01-04/A05`, `PACK02-05` и новый `SPELL01/02 Hunspell integration test`; успешно собраны debug/release основного приложения и оба spelling probe APK. Отдельная payload-проверка подтвердила основной `ru_RU`, Hunspell MPL notice и `libhunspell-editor.so` для `arm64-v8a`, `armeabi-v7a`, `x86_64`.
 
 Статусы: `DONE-CI` — автоматизировано и проходит CI, но может требовать телефонной приёмки; `IN PROGRESS` — реализуется; `TODO` — ещё не реализовано; `DEVICE` — обязательно проверить на физическом Android; `QUALITY` — требуется корпус и пороги качества.
 
@@ -21,8 +21,8 @@
 ## P1
 
 - DOC 05 — `IN PROGRESS / DONE-CI foundation`: добавлена модель Markdown-блоков и исходных UTF-16 диапазонов; код, URL, link destination и пути исключаются, подпись ссылки/заголовки/цитаты остаются анализируемыми. Основной анализ слов, предложений, абзацев и заголовков уже использует document model. Новый spelling path также получает слова через эту модель. Ещё требуется довести все дополнительные языковые модули до единого агрегатора и привести импортированный HTML к той же модели.
-- SPELL 01 — `DEVICE DECISION COMPLETE / INTEGRATION IN PROGRESS`: на физическом TECNO LJ7 / Android API 36 / arm64-v8a Morfologik принял 18/18 корректных и поймал 11/12 ошибок при 94 522 checks/s; Hunspell принял 18/18 и поймал 12/12 при 86 321 checks/s. Выбран Hunspell 1.7.2 + pinned LibreOffice ru_RU. Основной app получает собственный JNI/CMake bridge и тот же pinned словарь; интеграция должна пройти Android CI и отдельную телефонную приёмку основного APK.
-- SPELL 02 — `IN PROGRESS`: spelling UI уже получает до 5 вариантов и базовые действия «Исправить / Пропустить / Разрешить / В словарь». Остались телефонная проверка, формализация регистра/ранжирования и полный acceptance corpus.
+- SPELL 01 — `DONE-CI / DEVICE main-app acceptance`: на физическом TECNO LJ7 / Android API 36 / arm64-v8a Morfologik принял 18/18 корректных и поймал 11/12 ошибок при 94 522 checks/s; Hunspell принял 18/18 и поймал 12/12 при 86 321 checks/s. Выбран Hunspell 1.7.2 + pinned LibreOffice ru_RU. Основной app уже содержит собственный JNI/CMake bridge и тот же pinned словарь; CI №652 подтвердил сборку, ресурсы и три ABI. Осталась телефонная приёмка именно основного APK.
+- SPELL 02 — `IN PROGRESS / DONE-CI foundation`: spelling UI получает до 5 вариантов и базовые действия «Исправить / Пропустить / Разрешить / В словарь»; regression проверяет DOC05 exclusions, issue contract и article allow-list. Остались телефонная проверка, формализация регистра/ранжирования и полный acceptance corpus.
 - SPELL 03 — `IN PROGRESS foundation`: пользовательские слова хранятся отдельно от встроенного ru_RU, bridge умеет add/list/remove/clear и переинициализирует Hunspell после удаления. Ещё нужны полноценный UI просмотра/удаления и импорт/экспорт.
 - SPELL 04 — `TODO / partial guard`: до формализации режима ё/е, дефисов, чисел, аббревиатур и продуктовых названий короткие ALL-CAPS слова временно не отправляются в Hunspell, чтобы не создавать заведомый шум. Полное поведение по ТЗ ещё не реализовано.
 - SPELL acceptance — `QUALITY`: 300 минимальных + 50 реальных фрагментов, 80/20, precision >=95%, recall >=90%, top-3 >=85%.
@@ -40,14 +40,14 @@
 - PACK 05 — `IN PROGRESS / DONE-CI foundation`: диагностика различает непроверенные правила, лимит замечаний и runtime-ошибки отдельного правила; UI показывает «Проверено частично» и число проверенных правил. Глобальные состояния unavailable/прерванного языкового модуля ещё должны быть унифицированы в UI 03 / ARCH 01–03.
 - UI 01 — `TODO`: проверка изменённого блока 500–800 мс без фокуса/клавиатуры.
 - UI 02 — `TODO`: безопасная подсветка непосредственно в тексте или отдельный прототип/решение.
-- UI 03 — `IN PROGRESS foundation`: spelling path различает initializing/checking/ready/unavailable/error и показывает состояние в анализе; общая унификация всех модулей ещё не закончена.
-- UI 04 — `IN PROGRESS`: для орфографии добавлены «Исправить / Пропустить / Разрешить / В словарь»; ещё нужны общий дизайн действий, отключение правила и overlap/conflict-карточка.
+- UI 03 — `IN PROGRESS / DONE-CI foundation`: spelling path различает initializing/checking/ready/unavailable/error и показывает состояние в анализе; общая унификация всех модулей ещё не закончена.
+- UI 04 — `IN PROGRESS / DONE-CI foundation`: для орфографии добавлены «Исправить / Пропустить / Разрешить / В словарь»; ещё нужны общий дизайн действий, отключение правила и overlap/conflict-карточка.
 - UI 05 — `DEVICE`: 360dp, 150% font, TalkBack, portrait/landscape, dark, external keyboard, >=48dp.
 - DATA 03 — `TODO`: versioned backup/restore с preflight и rollback.
 - PUB 03 — `IN PROGRESS`: HTML safety тест есть; полный импорт/экспорт и диагностика ещё не завершены.
 - ARCH 01 — `IN PROGRESS`: P0 contract есть; spelling issue уже заполняет ruleId/category/kind/confidence/range/fragment/fixes/documentId/revision/moduleVersion, но нужен единый агрегатор всех языковых модулей.
-- ARCH 02 — `IN PROGRESS foundation`: Hunspell инициализируется и проверяет batch вне UI thread, новый запрос отменяет устаревший callback, JS дополнительно проверяет snapshot/revision. Инкрементальная проверка изменённого блока и общий revision-aware cache для всех модулей ещё не реализованы.
-- ARCH 03 — `IN PROGRESS`: NLI остаётся явно экспериментальным; новый Hunspell не зависит от ONNX. Удаление ненужных ONNX-зависимостей возможно только после завершения остальных обязательных локальных модулей.
+- ARCH 02 — `IN PROGRESS / DONE-CI foundation`: Hunspell инициализируется и проверяет batch вне UI thread, новый запрос отменяет устаревший callback, JS дополнительно проверяет documentId/revision/textHash. Инкрементальная проверка изменённого блока и общий revision-aware cache для всех модулей ещё не реализованы.
+- ARCH 03 — `IN PROGRESS`: NLI остаётся явно экспериментальным; основная кнопка проверки не включает экспериментальную semantic-проверку, а новый Hunspell не зависит от ONNX. Удаление ненужных ONNX-зависимостей возможно только после завершения остальных обязательных локальных модулей.
 - ARCH 04 — `IN PROGRESS`: DevLog есть; SPELL пишет только технические timings/counts без текста статьи. Нужна финальная структура версий всех модулей и debug-only UI.
 
 ## P2
@@ -63,9 +63,9 @@
 - A01–A04 — `DONE-CI`, плюс DEVICE для UI/Undo сценариев.
 - A05 — `DONE-CI / DEVICE`: regression №650 проверяет «только H1 + длинный текст» для профилей «Статья» и «Пост».
 - A06 — `DONE-CI`: отдельный GRAM04 regression-набор проверяет `3.14`, `12:30`, `т. е.`, URL, Markdown code, `?!` и смайлики без ложных механических исправлений.
-- A07–A08 — `IN PROGRESS` в составе Hunspell/SPELL; минимальный device probe выбора движка выполнен, полный корпус и режимы SPELL04 ещё нет.
+- A07–A08 — `IN PROGRESS / DONE-CI foundation`: минимальный device probe выбора движка выполнен, Hunspell интегрирован и собирается в основной APK; полный корпус и режимы SPELL04 ещё не закрыты.
 - A09 — `DONE-CI`: некорректный JSON, duplicate id, неизвестный type и лимиты размера/числа правил отклоняются до установки; действующий пакет не заменяется, есть резерв/rollback.
-- A10 — `IN PROGRESS / DONE-CI foundation`: rule-pack path различает лимит проверенных правил и лимит показанных замечаний; новый spelling path имеет unavailable/error state, но общий UI состояний ещё не унифицирован.
+- A10 — `IN PROGRESS / DONE-CI foundation`: rule-pack path различает лимит проверенных правил и лимит показанных замечаний; spelling path имеет unavailable/error state, но общий UI состояний ещё не унифицирован.
 - A11–A12 — `DONE-CI`, A11 дополнительно DEVICE для Clipboard.
 - A13 — `DONE-CI / DEVICE`.
 - A14 — `DEVICE`.
