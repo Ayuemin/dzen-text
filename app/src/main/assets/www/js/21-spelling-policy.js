@@ -93,7 +93,7 @@ function recalcAfterPolicy(){
   try{if(typeof renderAnalysis==='function')renderAnalysis()}catch(e){}
   try{if(typeof updateAnalysisDot==='function')updateAnalysisDot()}catch(e){}
 }
-function applyPolicyToCurrentIssues(){
+function applyPolicyToCurrentIssues(shouldRender=true){
   if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return {kept:0,removed:0};
   let kept=0,removed=0;
   for(let i=currentAnalysis.issues.length-1;i>=0;i--){
@@ -102,16 +102,17 @@ function applyPolicyToCurrentIssues(){
     const result=rewriteIssueByPolicy(issue);
     if(!result.keep){currentAnalysis.issues.splice(i,1);removed++;}else kept++;
   }
-  recalcAfterPolicy();
+  if(shouldRender)recalcAfterPolicy();
   return {kept,removed};
 }
 
-const previousBatch=typeof window.onNativeSpellingBatch==='function'?window.onNativeSpellingBatch:null;
-if(previousBatch){
-  window.onNativeSpellingBatch=function(requestId,payload){
-    const out=previousBatch.call(this,requestId,payload);
-    applyPolicyToCurrentIssues();
-    return out;
+// Keep exactly one Android native callback. The Hunspell module owns it; this
+// policy layer hooks the common recount/render boundary used after a batch.
+const previousRecalc=typeof window.recalcAndRender==='function'?window.recalcAndRender:null;
+if(previousRecalc){
+  window.recalcAndRender=function(){
+    applyPolicyToCurrentIssues(false);
+    return previousRecalc.apply(this,arguments);
   };
 }
 
@@ -144,7 +145,7 @@ function syncPolicyUi(){
 }
 function installUiSoon(){
   ensurePolicyUi();
-  if(typeof document!=='undefined'&&typeof document.querySelector==='function'&&!document.querySelector('#spellingPolicySettings'))setTimeout(ensurePolicyUi,120);
+  if(typeof document!=='undefined'&&typeof document.querySelector==='function'&&!document.querySelector('#spellingPolicySettings')&&typeof setTimeout==='function')setTimeout(ensurePolicyUi,120);
 }
 try{
   if(typeof openSettings==='function'){
@@ -154,7 +155,7 @@ try{
   }
 }catch(e){}
 if(typeof document!=='undefined'){
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',installUiSoon,{once:true});else installUiSoon();
+  if(document.readyState==='loading'&&typeof document.addEventListener==='function')document.addEventListener('DOMContentLoaded',installUiSoon,{once:true});else installUiSoon();
 }
 
 window.setSpellingYoMode=setYoMode;
