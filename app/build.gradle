@@ -17,6 +17,23 @@ android {
         targetSdk 35
         versionCode 1
         versionName '0.1.0-prototype'
+
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17 -fexceptions -frtti'
+                arguments '-DANDROID_STL=c++_shared'
+            }
+        }
+        ndk {
+            abiFilters 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path file('src/main/cpp/CMakeLists.txt')
+            version '3.22.1'
+        }
     }
 
     signingConfigs {
@@ -44,7 +61,7 @@ android {
 }
 
 dependencies {
-    // Fast fully-local semantic classification. The transformer package itself
-    // is installed by the user and stored in app-private storage.
+    // Experimental semantic classification. The transformer package itself is
+    // optional and is not part of the deterministic editor readiness path.
     implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.30.0'
 }
