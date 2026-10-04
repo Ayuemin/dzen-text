@@ -113,8 +113,6 @@ final class HunspellSpellingBridge implements AutoCloseable {
         if (word.isEmpty()) return false;
         Set<String> words = userWordsSet();
         if (!words.remove(word)) return false;
-        // Hunspell cannot reliably remove a runtime-added word. Persist first;
-        // then recreate the engine so the in-memory dictionary matches storage.
         if (!saveUserWords(words)) return false;
         restartEngine();
         notifyUserWordsChanged();
@@ -156,9 +154,15 @@ final class HunspellSpellingBridge implements AutoCloseable {
             JSONArray misspelled = new JSONArray();
             LinkedHashSet<String> unique = new LinkedHashSet<>();
             int count = Math.min(input.length(), MAX_BATCH_WORDS);
+            int filtered = 0;
             for (int i = 0; i < count; i++) {
                 String word = input.optString(i, "").trim();
-                if (!word.isEmpty() && word.length() <= 80) unique.add(word);
+                if (word.isEmpty() || word.length() > 80) continue;
+                if (!isSafeRussianSpellToken(word)) {
+                    filtered++;
+                    continue;
+                }
+                unique.add(word);
             }
 
             long started = System.nanoTime();
@@ -177,10 +181,11 @@ final class HunspellSpellingBridge implements AutoCloseable {
             double durationMs = (System.nanoTime() - started) / 1_000_000.0;
             out.put("state", "ready");
             out.put("checked", checked);
+            out.put("filtered", filtered);
             out.put("misspelled", misspelled);
             out.put("durationMs", durationMs);
             deliverBatch(token, requestId, out);
-            DevLog.i("SPELL", "batch checked=" + checked + "; misspelled=" + misspelled.length() + "; ms=" + durationMs);
+            DevLog.i("SPELL", "batch checked=" + checked + "; filtered=" + filtered + "; misspelled=" + misspelled.length() + "; ms=" + durationMs);
         } catch (Throwable t) {
             try {
                 out.put("requestId", requestId);
@@ -190,6 +195,22 @@ final class HunspellSpellingBridge implements AutoCloseable {
             deliverBatch(token, requestId, out);
             DevLog.e("SPELL", "Hunspell batch failed", t);
         }
+    }
+
+    /**
+     * SPELL04 preflight belongs before Hunspell, not only in JS post-processing.
+     * Mixed Cyrillic/Latin product names can make suggestion generation very
+     * expensive and are owned by the alphabet-mixing rule rather than spelling.
+     */
+    static boolean isSafeRussianSpellToken(String raw) {
+        String word = raw == null ? "" : raw.trim();
+        if (word.isEmpty() || word.length() > 80) return false;
+        if (!word.matches(".*[А-Яа-яЁё].*")) return false;
+        if (word.matches(".*[0-9].*")) return false;
+        if (word.matches(".*[A-Za-z].*")) return false;
+        if (word.matches("[А-Яа-яЁё]")) return false;
+        if (word.matches("[А-ЯЁ]{2,12}(?:-[А-ЯЁ]{1,12})*")) return false;
+        return word.matches("[А-Яа-яЁё]+(?:[-’'][А-Яа-яЁё]+)*");
     }
 
     private void deliverBatch(long token, String requestId, JSONObject out) {
