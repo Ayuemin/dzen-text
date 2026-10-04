@@ -6,30 +6,36 @@ import android.view.ViewGroup;
 import android.webkit.WebView;
 
 /**
- * Production editor activity. SemanticActivity keeps the old NLI path available
- * as an explicit experiment; this subclass adds the deterministic SPELL path.
+ * Production deterministic editor activity.
+ *
+ * The normal application path deliberately does not inherit SemanticActivity
+ * and therefore does not create LocalNliEngine or attach AndroidSemanticModel.
+ * The old NLI implementation remains in the project as an explicit experiment.
  */
-public final class EditorActivity extends SemanticActivity {
+public final class EditorActivity extends MainActivity {
     private static final String EDITOR_URL = "file:///android_asset/www/index.html";
     private HunspellSpellingBridge spellingBridge;
 
     @Override
     public void onCreate(Bundle state) {
         super.onCreate(state);
+        DevLog.init(this);
         WebView web = findWebView(findViewById(android.R.id.content));
         if (web == null) {
-            DevLog.e("SPELL", "WebView not found; AndroidSpelling bridge unavailable", null);
+            DevLog.e("APP", "WebView not found; production bridges unavailable", null);
             return;
         }
+
+        // MainActivity starts loading the asset immediately. Stop that queued
+        // load, attach all mandatory production bridges, then load the editor
+        // once with the deterministic runtime already available to JavaScript.
+        web.stopLoading();
+        web.addJavascriptInterface(new DocumentRevisionBridge(this), "AndroidDocumentRevision");
         spellingBridge = new HunspellSpellingBridge(this, web);
         web.addJavascriptInterface(spellingBridge, "AndroidSpelling");
         spellingBridge.start();
-        // SemanticActivity already replaced MainActivity's initial asset load to
-        // attach its optional bridges. Stop that queued load once more so the
-        // production page is guaranteed to start with AndroidSpelling present.
-        web.stopLoading();
         web.loadUrl(EDITOR_URL);
-        DevLog.i("SPELL", "AndroidSpelling bridge attached; editor asset reload requested");
+        DevLog.i("APP", "Deterministic editor loaded with revision + spelling bridges");
     }
 
     private static WebView findWebView(View root) {
