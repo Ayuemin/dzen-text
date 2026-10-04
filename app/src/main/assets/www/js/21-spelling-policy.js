@@ -118,6 +118,17 @@ if(previousRecount){
   window.recountP0Analysis=recountP0Analysis;
 }
 
+// The legacy spelling card predates Issue.kind and labels every spelling row as
+// an error. Preserve its actions/layout but make recommendation cards truthful.
+const previousIssueHtml=typeof issueHtml==='function'?issueHtml:null;
+if(previousIssueHtml){
+  issueHtml=function(issue){
+    const html=previousIssueHtml(issue);
+    return issue&&issue.type==='spelling'&&issue.kind==='recommendation'?String(html).replace(' · ошибка · ',' · рекомендация · '):html;
+  };
+  window.issueHtml=issueHtml;
+}
+
 function setYoMode(mode){
   const next=mode===YO_STRICT?YO_STRICT:YO_NORMAL;
   try{settings.spellingYoMode=next}catch(e){return false}
