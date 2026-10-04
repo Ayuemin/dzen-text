@@ -102,6 +102,9 @@ function importPersonalDictionaryText(text,fileName){
   return {ok:true,added,rejected:parsed.rejected,truncated:parsed.truncated};
 }
 function choosePersonalDictionaryImport(){
+  if(window.AndroidSpellingFile&&typeof AndroidSpellingFile.pickImport==='function'){
+    AndroidSpellingFile.pickImport();return;
+  }
   const input=document.querySelector('#spellingDictionaryFileInput');if(input)input.click();
 }
 async function clearPersonalDictionary(){
@@ -126,6 +129,8 @@ function ensureSpellingDictionaryUi(){
   group.querySelector('[data-spelling-export]').onclick=exportPersonalDictionary;
   group.querySelector('[data-spelling-clear]').onclick=clearPersonalDictionary;
 
+  // Browser fallback; Android production uses AndroidSpellingFile so import does
+  // not depend on WebChromeClient.onShowFileChooser support.
   let input=document.querySelector('#spellingDictionaryFileInput');
   if(!input){
     input=document.createElement('input');input.id='spellingDictionaryFileInput';input.className='fileInput';input.type='file';input.accept='.json,.txt,application/json,text/plain';
@@ -147,6 +152,12 @@ window.exportPersonalDictionary=exportPersonalDictionary;
 window.importPersonalDictionaryText=importPersonalDictionaryText;
 window.choosePersonalDictionaryImport=choosePersonalDictionaryImport;
 window.clearPersonalDictionary=clearPersonalDictionary;
+window.onNativeSpellingDictionaryLoaded=function(text,name){
+  return importPersonalDictionaryText(String(text||''),String(name||''));
+};
+window.onNativeSpellingDictionaryError=function(message){
+  toast(message||'Не удалось импортировать личный словарь');
+};
 
 try{
   if(typeof openSettings==='function'){
