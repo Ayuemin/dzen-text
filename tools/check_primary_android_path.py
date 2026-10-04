@@ -35,6 +35,7 @@ run_batch = spelling.split('private void runBatch', 1)[1].split('private void st
 assert '.suggestions(' not in run_batch, 'Hunspell suggest() leaked back into critical document batch'
 assert 'SPELL-WORD' in spelling and 'SPELL-WATCH' in spelling, 'per-word/stall tracing is missing'
 assert 'DevLog.stackSummary(workerThread)' in spelling, 'stalled Hunspell worker stack is not captured'
+assert 'evaluateJavascript result:' in spelling, 'native-to-JS callback delivery result is not logged'
 
 # A native regression must never leave the analysis sheet in an endless
 # "checking" state. The watchdog cancels the logical request after 8 seconds.
@@ -43,12 +44,14 @@ assert 'TIMEOUT_MS=8000' in watchdog, 'spelling watchdog timeout changed or miss
 assert "diagnostics.state='error'" in watchdog, 'spelling watchdog does not surface a terminal state'
 assert "AndroidSpelling.cancel" in watchdog, 'spelling watchdog does not invalidate the stuck request'
 
-# The physical-device test must be self-diagnosing without adb: settings expose
-# copy/clear controls and JS callback/heartbeat events are persisted to DevLog.
+# The physical-device test must be self-diagnosing without adb. Keep one owner
+# for each native callback: the diagnostics module only emits state heartbeats
+# and exposes copy/clear controls, while the bridge logs callback delivery.
 assert "23-diagnostics.js" in core, 'diagnostics UI module is not loaded'
 assert 'copyDiagnosticLog' in diagnostics and 'clearDiagnosticLog' in diagnostics, 'diagnostic log controls missing'
-assert 'onNativeSpellingBatch ENTER' in diagnostics, 'JS native-batch callback tracing missing'
 assert 'checking heartbeat' in diagnostics, 'JS spelling heartbeat tracing missing'
 assert 'AndroidPublish.copyForPublication' in diagnostics, 'diagnostic log cannot be copied from the app'
+assert 'onNativeSpellingBatch=' not in diagnostics, 'diagnostics must not become a second native batch callback owner'
+assert 'onNativeSpellingReady=' not in diagnostics, 'diagnostics must not become a second native ready callback owner'
 
 print('Primary Android path is deterministic; spelling preflight/watchdog/diagnostics + native dictionary bridges are present; semantic NLI remains isolated')
