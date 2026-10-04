@@ -23,6 +23,11 @@ import java.util.concurrent.atomic.AtomicLong;
  * Initialization and batch checks run on one worker thread. A newer request
  * invalidates callbacks from older requests; JavaScript additionally verifies
  * documentId/revision/textHash before accepting results.
+ *
+ * Important: the critical batch path performs spell() only. Hunspell suggest()
+ * can be much more expensive than dictionary membership checks and must never
+ * be able to block the whole document check. Suggestions are therefore
+ * intentionally deferred to a separate future path.
  */
 final class HunspellSpellingBridge implements AutoCloseable {
     private static final String PREFS = "editor_spelling_v1";
@@ -82,8 +87,7 @@ final class HunspellSpellingBridge implements AutoCloseable {
         final long token = generation.incrementAndGet();
         final String id = requestId == null ? "" : requestId;
         final String payload = wordsJson == null ? "[]" : wordsJson;
-        final int limit = Math.max(1, Math.min(5, suggestionLimit));
-        worker.execute(() -> runBatch(token, id, payload, limit));
+        worker.execute(() -> runBatch(token, id, payload));
         return token;
     }
 
@@ -136,7 +140,7 @@ final class HunspellSpellingBridge implements AutoCloseable {
         return true;
     }
 
-    private void runBatch(long token, String requestId, String wordsJson, int limit) {
+    private void runBatch(long token, String requestId, String wordsJson) {
         JSONObject out = new JSONObject();
         try {
             out.put("requestId", requestId);
@@ -173,9 +177,11 @@ final class HunspellSpellingBridge implements AutoCloseable {
                 if (!value.isMisspelled(word)) continue;
                 JSONObject miss = new JSONObject();
                 miss.put("word", word);
-                JSONArray suggestions = new JSONArray();
-                for (String suggestion : value.suggestions(word, limit)) suggestions.put(suggestion);
-                miss.put("suggestions", suggestions);
+                // Keep the document check deterministic and bounded. Suggestions
+                // are deliberately empty here; suggest() will be reintroduced on
+                // an isolated, non-blocking path so a slow typo cannot stall all
+                // spelling diagnostics.
+                miss.put("suggestions", new JSONArray());
                 misspelled.put(miss);
             }
             double durationMs = (System.nanoTime() - started) / 1_000_000.0;
@@ -184,8 +190,9 @@ final class HunspellSpellingBridge implements AutoCloseable {
             out.put("filtered", filtered);
             out.put("misspelled", misspelled);
             out.put("durationMs", durationMs);
+            out.put("suggestionsDeferred", true);
             deliverBatch(token, requestId, out);
-            DevLog.i("SPELL", "batch checked=" + checked + "; filtered=" + filtered + "; misspelled=" + misspelled.length() + "; ms=" + durationMs);
+            DevLog.i("SPELL", "batch checked=" + checked + "; filtered=" + filtered + "; misspelled=" + misspelled.length() + "; suggestions=deferred; ms=" + durationMs);
         } catch (Throwable t) {
             try {
                 out.put("requestId", requestId);
