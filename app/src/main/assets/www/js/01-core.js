@@ -115,3 +115,4 @@ function loadDeferredEditorModule(src,id){
 loadDeferredEditorModule('js/16-proof-context.js','proofContextModuleV2');
 loadDeferredEditorModule('js/17-rule-pack-p1.js','rulePackP1Module');
 loadDeferredEditorModule('js/18-structure-p1.js','structureP1Module');
+loadDeferredEditorModule('js/19-spelling-hunspell.js','spellingHunspellModule');
