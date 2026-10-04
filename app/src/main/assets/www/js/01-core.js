@@ -118,3 +118,4 @@ loadDeferredEditorModule('js/18-structure-p1.js','structureP1Module');
 loadDeferredEditorModule('js/19-spelling-hunspell.js','spellingHunspellModule');
 loadDeferredEditorModule('js/20-spelling-dictionary.js','spellingDictionaryModule');
 loadDeferredEditorModule('js/21-spelling-policy.js','spellingPolicyModule');
+loadDeferredEditorModule('js/22-spelling-watchdog.js','spellingWatchdogModule');
