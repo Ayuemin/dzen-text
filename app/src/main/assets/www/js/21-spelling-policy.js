@@ -106,14 +106,16 @@ function applyPolicyToCurrentIssues(shouldRender=true){
   return {kept,removed};
 }
 
-// Keep exactly one Android native callback. The Hunspell module owns it; this
-// policy layer hooks the common recount/render boundary used after a batch.
-const previousRecalc=typeof window.recalcAndRender==='function'?window.recalcAndRender:null;
-if(previousRecalc){
-  window.recalcAndRender=function(){
+// Keep exactly one Android native callback. The Hunspell module owns it and
+// calls recountP0Analysis after materializing a native batch. Hook that shared
+// boundary so policy is guaranteed to run before counts/UI are refreshed.
+const previousRecount=typeof recountP0Analysis==='function'?recountP0Analysis:null;
+if(previousRecount){
+  recountP0Analysis=function(){
     applyPolicyToCurrentIssues(false);
-    return previousRecalc.apply(this,arguments);
+    return previousRecount.apply(this,arguments);
   };
+  window.recountP0Analysis=recountP0Analysis;
 }
 
 function setYoMode(mode){
