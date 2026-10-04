@@ -86,7 +86,7 @@ const noopClassList={add(){},remove(){},toggle(){}};
 const analysisDot={classList:noopClassList,setAttribute(){},title:''};
 const genericElement={classList:noopClassList,setAttribute(){},querySelector(){return null},querySelectorAll(){return []},insertAdjacentElement(){},appendChild(){}};
 const integration={
-  console,P0Core:P0,
+  console,P0Core:P0,stopWords:new Set(),
   settings:{
     documentProfile:'article',articleTitleMode:'auto',
     headingCheck:true,headingMin:8,headingMax:80,
