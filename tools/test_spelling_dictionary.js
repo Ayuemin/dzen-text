@@ -4,10 +4,19 @@ const fs=require('fs');
 const path=require('path');
 const vm=require('vm');
 
+let pickerCalls=0;
+const addedWords=[];
+const messages=[];
 const sandbox={
   console,
-  document:{readyState:'loading',addEventListener(){},querySelector(){return null},getElementById(){return null}},
-  AndroidSpelling:{userWords(){return JSON.stringify(['ёжик','Арбуз','ёжик'])},status(){return JSON.stringify({state:'ready'})}},
+  document:{readyState:'loading',addEventListener(){},querySelector(){return null}},
+  AndroidSpelling:{
+    userWords(){return JSON.stringify(['ёжик','Арбуз','ёжик'])},
+    status(){return JSON.stringify({state:'ready'})},
+    addUserWord(word){addedWords.push(String(word));return true}
+  },
+  AndroidSpellingFile:{pickImport(){pickerCalls++}},
+  toast(message){messages.push(String(message))},
   setTimeout(){},
 };
 sandbox.window=sandbox;sandbox.globalThis=sandbox;
@@ -50,4 +59,17 @@ const nativeWords=Array.from(api.nativeUserWords());
 assert.ok(nativeWords.includes('ёжик'));
 assert.ok(nativeWords.includes('Арбуз'));
 
-console.log('SPELL03 personal dictionary import/export parser tests passed');
+sandbox.choosePersonalDictionaryImport();
+assert.strictEqual(pickerCalls,1,'Android production import must use native system picker');
+assert.deepStrictEqual(addedWords,[],'opening picker must not mutate dictionary');
+
+const importResult=sandbox.onNativeSpellingDictionaryLoaded(JSON.stringify({schema:'spelling-user-dictionary-v1',words:['новослово','ёжик'] }),'roundtrip.json');
+assert.strictEqual(importResult.ok,true);
+assert.strictEqual(importResult.added,2);
+assert.deepStrictEqual(addedWords,['новослово','ёжик']);
+assert.ok(messages.some(x=>x.includes('Импортировано слов: 2')),'native import result was not surfaced');
+
+sandbox.onNativeSpellingDictionaryError('Ошибка чтения');
+assert.ok(messages.includes('Ошибка чтения'),'native picker error was not surfaced');
+
+console.log('SPELL03 personal dictionary import/export + native picker tests passed');
