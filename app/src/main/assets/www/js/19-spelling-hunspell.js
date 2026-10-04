@@ -72,8 +72,11 @@ function setSpellingDiagnostics(patch){
 function clearSpellingIssues(){
   if(!currentAnalysis||!Array.isArray(currentAnalysis.issues))return;
   for(let i=currentAnalysis.issues.length-1;i>=0;i--)if(currentAnalysis.issues[i]&&currentAnalysis.issues[i].type==='spelling')currentAnalysis.issues.splice(i,1);
-  const overflow={...(currentAnalysis.issues._overflow||currentAnalysis.issueOverflow||{})};delete overflow.spelling;
-  currentAnalysis.issues._overflow=overflow;currentAnalysis.issueOverflow=overflow;
+  // addIssue() defines _overflow as a non-writable property. Mutate the
+  // referenced object; assigning a new object throws in strict mode on WebView.
+  const nativeOverflow=currentAnalysis.issues._overflow;
+  if(nativeOverflow&&typeof nativeOverflow==='object')delete nativeOverflow.spelling;
+  if(currentAnalysis.issueOverflow&&typeof currentAnalysis.issueOverflow==='object')delete currentAnalysis.issueOverflow.spelling;
 }
 function recalcAndRender(){
   try{if(typeof recountP0Analysis==='function')recountP0Analysis()}catch(e){}
@@ -136,8 +139,13 @@ window.onNativeSpellingBatch=function(requestId,payload){
     if(shown>=MAX_VISIBLE_ISSUES){hidden++;continue}
     issues.push(createSpellingIssue(token,entry,request.snapshot));shown++;
   }
-  const overflow={...(issues._overflow||currentAnalysis.issueOverflow||{})};if(hidden)overflow.spelling=hidden;else delete overflow.spelling;
-  issues._overflow=overflow;currentAnalysis.issueOverflow=overflow;
+  let overflow=issues._overflow;
+  if(!overflow||typeof overflow!=='object'){
+    Object.defineProperty(issues,'_overflow',{value:Object.create(null),enumerable:false});
+    overflow=issues._overflow;
+  }
+  if(hidden)overflow.spelling=hidden;else delete overflow.spelling;
+  currentAnalysis.issueOverflow={...overflow};
   setSpellingDiagnostics({state:'ready',checked:Number(data.checked)||0,issues:shown+hidden,visible:shown,hidden,durationMs:Number(data.durationMs)||0,error:''});
   pendingRequest=null;recalcAndRender();
 };
