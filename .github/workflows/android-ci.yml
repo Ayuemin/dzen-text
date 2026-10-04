@@ -74,6 +74,7 @@ jobs:
           node tools/test_proof_context.js
           node tools/test_structure_p1.js
           node tools/test_spelling_hunspell.js
+          node tools/test_spelling_dictionary.js
           node tools/test_primary_check_path.js
           node tools/test_rule_pack.js
           node tools/test_rule_pack_p1.js
