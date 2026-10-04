@@ -54,6 +54,13 @@ function deliverMisspell(suggestions=['ошибка','нашивка']){
     misspelled:[{word:'ашипка',suggestions}]
   }));
 }
+function startSpellText(text,revision,hash){
+  sandbox.editor.value=text;snapshot.revision=revision;snapshot.textHash=hash;batch=null;sandbox.analyzeText();
+  assert.ok(batch,'native batch missing for SPELL04 integration');return {...batch};
+}
+function deliverBatch(request,entries){
+  sandbox.onNativeSpellingBatch(request.id,JSON.stringify({state:'ready',checked:request.words.length,durationMs:1.25,misspelled:entries}));
+}
 
 assert.ok(sandbox.SpellingHunspell,'SpellingHunspell API missing');
 assert.ok(sandbox.SpellingPolicy,'SpellingPolicy API missing');
@@ -127,10 +134,10 @@ assert.strictEqual(batch.words.includes('ашипка'),false,'allowed article w
 
 // SPELL04: deterministic token policy. Numbers/model names, mixed-script product
 // tokens and conventional abbreviations are outside Russian dictionary errors.
-assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('МЧС').check,false);
-assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('т').check,false);
-assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('ЯндексGPT').check,false);
-assert.deepStrictEqual(sandbox.SpellingPolicy.classifySpellWord('Камера-15').check,false);
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('МЧС').check,false);
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('т').check,false);
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('ЯндексGPT').check,false);
+assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('Камера-15').check,false);
 assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('интернет-магазин').reason,'hyphenated');
 assert.strictEqual(sandbox.SpellingPolicy.classifySpellWord('обычный').check,true);
 assert.strictEqual(sandbox.SpellingPolicy.adaptSuggestionCase('Елка','ёлка'),'Ёлка');
@@ -163,5 +170,35 @@ assert.strictEqual(policyIssue.kind,'recommendation');
 policyIssue={type:'spelling',word:'ЯндексGPT',fragment:'ЯндексGPT',suggestions:['Яндекс'],fixes:[],ruleId:'spelling.unknown-word',kind:'error'};
 result=sandbox.SpellingPolicy.rewriteIssueByPolicy(policyIssue);
 assert.strictEqual(result.keep,false);
+
+// Integration: policy must run inside the real native-batch callback, not only
+// when rewriteIssueByPolicy is called directly.
+sandbox.settings.spellingYoMode='normal';
+let request=startSpellText('елка т. е. ЯндексGPT интернет-магазин Камера-15',10,'hash:10');
+deliverBatch(request,[
+  {word:'елка',suggestions:['ёлка']},
+  {word:'т',suggestions:['та']},
+  {word:'е',suggestions:['ее']},
+  {word:'ЯндексGPT',suggestions:['Яндекс']},
+  {word:'интернет-магазин',suggestions:['интернет магазин']}
+]);
+let spelling=sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling');
+assert.strictEqual(spelling.some(x=>x.word==='елка'),false,'normal ё mode leaked through native callback');
+assert.strictEqual(spelling.some(x=>x.word==='т'||x.word==='е'),false,'dotted abbreviation letters leaked through native callback');
+assert.strictEqual(spelling.some(x=>x.word==='ЯндексGPT'),false,'product-like mixed token leaked through native callback');
+assert.strictEqual(spelling.some(x=>x.word==='Камера-15'),false,'number/model token leaked through native callback');
+const hyphenIssue=spelling.find(x=>x.word==='интернет-магазин');
+assert.ok(hyphenIssue,'hyphenated native issue should remain as a recommendation');
+assert.strictEqual(hyphenIssue.kind,'recommendation');
+assert.strictEqual(hyphenIssue.ruleId,'spelling.hyphenated-word');
+
+sandbox.settings.spellingYoMode='strict';
+request=startSpellText('елка',11,'hash:11');
+deliverBatch(request,[{word:'елка',suggestions:['ёлка']}]);
+spelling=sandbox.currentAnalysis.issues.filter(x=>x.type==='spelling');
+assert.strictEqual(spelling.length,1,'strict ё mode must expose one native issue');
+assert.strictEqual(spelling[0].ruleId,'spelling.yo');
+assert.strictEqual(spelling[0].suggestions[0],'ёлка');
+assert.strictEqual(spelling[0].fixes[0].replacement,'ёлка');
 
 console.log('SPELL01/02/04 Hunspell integration tests passed');
