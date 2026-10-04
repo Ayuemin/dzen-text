@@ -71,6 +71,7 @@ jobs:
           node tools/test_document_model.js
           node tools/test_analysis_document_model.js
           node tools/test_proof_context.js
+          node tools/test_structure_p1.js
           node tools/test_rule_pack.js
           node tools/test_rule_pack_p1.js
           node tools/test_publish_export.js
