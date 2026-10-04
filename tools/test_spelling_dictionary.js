@@ -35,10 +35,15 @@ assert.strictEqual(parsed.rejected,1);
 parsed=api.parseImportWords('{bad json','dict.json');
 assert.strictEqual(parsed.ok,false,'malformed JSON import must be rejected');
 
-const many=Array.from({length:5002},(_,i)=>'слово'+String(i).replace(/\d/g,d=>'а'.repeat(Number(d)+1)));
+function letters(n){
+  let out='';let value=n+1;
+  while(value>0){value--;out=String.fromCharCode(1072+(value%32))+out;value=Math.floor(value/32)}
+  return out;
+}
+const many=Array.from({length:5002},(_,i)=>'слово'+letters(i));
 parsed=api.parseImportWords(JSON.stringify(many),'many.json');
 assert.strictEqual(parsed.ok,true);
-assert.ok(parsed.words.length<=api.MAX_IMPORT_WORDS);
+assert.strictEqual(parsed.words.length,api.MAX_IMPORT_WORDS);
 assert.strictEqual(parsed.truncated,true);
 
 const nativeWords=Array.from(api.nativeUserWords());
